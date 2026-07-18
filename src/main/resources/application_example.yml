@@ -54,3 +54,6 @@ logging:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
     root: info
+
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}

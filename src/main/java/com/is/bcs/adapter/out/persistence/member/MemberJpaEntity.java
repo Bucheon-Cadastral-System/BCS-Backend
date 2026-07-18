@@ -1,18 +1,12 @@
 package com.is.bcs.adapter.out.persistence.member;
 
-import com.is.bcs.domain.member.District;
-import com.is.bcs.domain.member.Member;
-import com.is.bcs.domain.member.MemberRole;
-import com.is.bcs.domain.member.MemberStatus;
-import com.is.bcs.domain.member.OAuthProvider;
-import com.is.bcs.domain.member.Position;
-import com.is.bcs.domain.member.Team;
+import com.is.bcs.domain.member.*;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -94,13 +88,13 @@ public class MemberJpaEntity {
             nullable = false,
             updatable = false
     )
-    private Instant requestedAt;
+    private LocalDateTime requestedAt;
 
     @Column(name = "approved_at")
-    private Instant approvedAt;
+    private LocalDateTime approvedAt;
 
     @Column(name = "deactivated_at")
-    private Instant deactivatedAt;
+    private LocalDateTime deactivatedAt;
 
     private MemberJpaEntity(
             Long id,
@@ -115,9 +109,9 @@ public class MemberJpaEntity {
             Position position,
             MemberRole role,
             MemberStatus status,
-            Instant requestedAt,
-            Instant approvedAt,
-            Instant deactivatedAt
+            LocalDateTime requestedAt,
+            LocalDateTime approvedAt,
+            LocalDateTime deactivatedAt
     ) {
         this.id = id;
         this.provider = provider;

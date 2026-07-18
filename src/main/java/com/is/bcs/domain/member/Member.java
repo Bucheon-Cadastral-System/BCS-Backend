@@ -2,7 +2,7 @@ package com.is.bcs.domain.member;
 
 import lombok.Getter;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Getter
@@ -24,9 +24,9 @@ public class Member {
     private MemberRole role;
     private MemberStatus status;
 
-    private final Instant requestedAt;
-    private Instant approvedAt;
-    private Instant deactivatedAt;
+    private final LocalDateTime requestedAt;
+    private LocalDateTime approvedAt;
+    private LocalDateTime deactivatedAt;
 
     private Member(
             Long id,
@@ -41,9 +41,9 @@ public class Member {
             Position position,
             MemberRole role,
             MemberStatus status,
-            Instant requestedAt,
-            Instant approvedAt,
-            Instant deactivatedAt
+            LocalDateTime requestedAt,
+            LocalDateTime approvedAt,
+            LocalDateTime deactivatedAt
     ) {
         this.id = id;
         this.provider = Objects.requireNonNull(provider);
@@ -72,21 +72,19 @@ public class Member {
      */
     public static Member registerWithKakao(
             String kakaoId,
-            String name,
-            String email,
-            Instant requestedAt
+            LocalDateTime requestedAt
     ) {
         return new Member(
                 null,
                 OAuthProvider.KAKAO,
                 kakaoId,
-                name,
-                null,
-                email,
-                null,
-                null,
-                null,
-                null,
+                null, // name
+                null, // phone
+                null, // email
+                null, // district
+                null, // department
+                null, // team
+                null, // position
                 MemberRole.USER,
                 MemberStatus.PENDING,
                 requestedAt,
@@ -111,9 +109,9 @@ public class Member {
             Position position,
             MemberRole role,
             MemberStatus status,
-            Instant requestedAt,
-            Instant approvedAt,
-            Instant deactivatedAt
+            LocalDateTime requestedAt,
+            LocalDateTime approvedAt,
+            LocalDateTime deactivatedAt
     ) {
         return new Member(
                 id,
@@ -163,7 +161,7 @@ public class Member {
         );
     }
 
-    public void approve(Instant approvedAt) {
+    public void approve(LocalDateTime approvedAt) {
         validatePendingStatus();
         validateProfileCompleted();
 
@@ -172,7 +170,7 @@ public class Member {
         this.deactivatedAt = null;
     }
 
-    public void deactivate(Instant deactivatedAt) {
+    public void deactivate(LocalDateTime deactivatedAt) {
         if (status != MemberStatus.ACTIVE) {
             throw new IllegalStateException(
                     "활성 회원만 비활성화할 수 있습니다."
@@ -225,4 +223,19 @@ public class Member {
 
         return value.trim();
     }
+
+    public boolean isProfileCompleted() {
+        return hasText(name)
+                && hasText(phone)
+                && hasText(email)
+                && district != null
+                && hasText(department)
+                && team != null
+                && position != null;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
 }
