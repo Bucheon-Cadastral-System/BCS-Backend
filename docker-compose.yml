@@ -1,0 +1,28 @@
+# Docker-compose.yml
+# 실제 서버와 맞게 postgreSQL 버전 동일
+# Spring 은 개발 시 직접 ./gradlew bootRun 으로 띄우는게 더 빠름으로 제외
+
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    container_name: bcs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres_admin
+      POSTGRES_PASSWORD: "admin"
+      PGDATA: /var/lib/postgresql/18/docker
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - postgres18_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres18_data:
