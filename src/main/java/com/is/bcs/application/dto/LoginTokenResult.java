@@ -1,4 +1,8 @@
 package com.is.bcs.application.dto;
 
-public class LoginTokenResult {
+public record LoginTokenResult(
+        String accessToken,
+        String refreshToken,
+        long accessTokenExpiresIn
+) {
 }

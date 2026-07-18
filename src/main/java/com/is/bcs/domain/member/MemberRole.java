@@ -1,4 +1,6 @@
 package com.is.bcs.domain.member;
 
-public class MemberRole {
+public enum MemberRole {
+    USER,
+    ADMIN
 }

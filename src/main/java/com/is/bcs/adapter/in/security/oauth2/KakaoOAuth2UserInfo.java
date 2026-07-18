@@ -1,4 +1,4 @@
 package com.is.bcs.adapter.in.security.oauth2;
 
-public class KakaoOauth2UserInfo {
+public class KakaoOAuth2UserInfo {
 }

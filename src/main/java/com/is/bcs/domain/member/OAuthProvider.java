@@ -1,4 +1,5 @@
 package com.is.bcs.domain.member;
 
-public class OAuthProvider {
+public enum OAuthProvider {
+    KAKAO
 }

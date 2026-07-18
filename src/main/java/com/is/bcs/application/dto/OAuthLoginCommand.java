@@ -1,4 +1,9 @@
 package com.is.bcs.application.dto;
 
-public class OAuthLoginCommand {
+import com.is.bcs.domain.member.OAuthProvider;
+
+public record OAuthLoginCommand(
+        OAuthProvider provider,
+        String providerUserId
+) {
 }

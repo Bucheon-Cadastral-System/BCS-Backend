@@ -1,4 +1,9 @@
 package com.is.bcs.application.port.in;
 
-public class IssueLoginTokenUseCase {
+import com.is.bcs.application.dto.LoginTokenResult;
+import com.is.bcs.domain.member.MemberRole;
+
+public interface IssueLoginTokenUseCase {
+
+    LoginTokenResult issue(Long memberId, MemberRole role);
 }

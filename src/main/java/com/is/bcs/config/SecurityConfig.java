@@ -42,7 +42,13 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated()
                 )
-                 .oauth2Login(Customizer.withDefaults())
+                .oauth2Login(Customizer.withDefaults())
+//                .oauth2Login(oauth2 -> oauth2
+//                        .userInfoEndpoint(userInfo -> userInfo
+//                                .userService(customOAuth2UserService)
+//                        )
+//                        .successHandler(oAuth2SuccessHandler)
+//                )
                 .build();
 
     }
