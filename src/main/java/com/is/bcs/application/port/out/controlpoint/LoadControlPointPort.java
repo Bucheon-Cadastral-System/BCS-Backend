@@ -14,4 +14,6 @@ public interface LoadControlPointPort {
     List<ControlPoint> findAll();
 
     boolean existsByPointNo(String pointNo);
+
+    long count();
 }

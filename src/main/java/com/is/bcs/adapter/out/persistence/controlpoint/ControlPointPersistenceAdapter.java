@@ -37,6 +37,11 @@ public class ControlPointPersistenceAdapter
     }
 
     @Override
+    public long count() {
+        return repository.count();
+    }
+
+    @Override
     public ControlPoint save(ControlPoint point) {
         return repository.save(ControlPointJpaEntity.fromDomain(point)).toDomain();
     }
