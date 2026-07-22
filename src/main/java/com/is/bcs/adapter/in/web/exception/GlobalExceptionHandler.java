@@ -1,7 +1,11 @@
 package com.is.bcs.adapter.in.web.exception;
 
+import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
+import com.is.bcs.domain.member.exception.InvalidMemberStateException;
+import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -12,6 +16,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.time.Clock;
@@ -34,8 +39,13 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private final Clock clock;
+    private final ErrorDetailResolver errorDetailResolver;
 
-    /** 프레임워크 예외 공통 경유 지점 — code(구체 핸들러가 안 정했을 때만 fallback)와 timestamp를 일괄 보강한다. */
+    /**
+     * 프레임워크 예외 공통 경유 지점 — code(구체 핸들러가 안 정했을 때만 fallback)와 timestamp를 일괄 보강한다.
+     * fallback 응답은 detail도 번들 문구로 통일한다(/error 정규화와 동일 문구) —
+     * 프레임워크 원문은 버전 따라 바뀌는 영문이라 응답엔 싣지 않고 로그로만 남긴다.
+     */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception ex, Object body, HttpHeaders headers,
@@ -46,6 +56,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             var props = problem.getProperties();
             if (props == null || !props.containsKey("code")) {
                 problem.setProperty("code", defaultCode(statusCode));
+                problem.setDetail(errorDetailResolver.detailFor(statusCode));
+                if (statusCode.is5xxServerError()) {
+                    log.error("프레임워크 예외(5xx fallback)", ex);
+                } else {
+                    log.debug("프레임워크 예외(4xx fallback): {}", ex.getMessage());
+                }
             }
             problem.setProperty("timestamp", OffsetDateTime.now(clock));
         }
@@ -96,6 +112,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problem.setProperty("code", CommonErrorCode.COMMON_INVALID_INPUT.code());
         problem.setProperty("errors", errors);
         return handleExceptionInternal(ex, problem, headers, status, request);
+    }
+
+    /** 파라미터·경로변수 타입 변환 실패(숫자 자리에 문자 등) — 미분류 fallback이 아니라 입력 오류로 분류한다. */
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        String field = ex instanceof MethodArgumentTypeMismatchException m ? m.getName() : ex.getPropertyName();
+        String message = "올바른 형식이 아닙니다";
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, (field != null ? field + ": " : "") + message);
+        problem.setProperty("code", CommonErrorCode.COMMON_INVALID_INPUT.code());
+        problem.setProperty("errors", List.of(new ValidationError(field, message)));
+        return handleExceptionInternal(ex, problem, headers, status, request);
+    }
+
+    // ── 도메인 예외 ──────────────────────────────────────────────
+
+    @ExceptionHandler(MemberNotFoundException.class)
+    public ProblemDetail handleMemberNotFound(MemberNotFoundException e) {
+        return problem(MemberErrorCode.MEMBER_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidMemberStateException.class)
+    public ProblemDetail handleInvalidMemberState(InvalidMemberStateException e) {
+        return problem(MemberErrorCode.MEMBER_INVALID_STATE, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidMemberProfileException.class)
+    public ProblemDetail handleInvalidMemberProfile(InvalidMemberProfileException e) {
+        return problem(MemberErrorCode.MEMBER_PROFILE_INVALID, e.getMessage());
     }
 
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */

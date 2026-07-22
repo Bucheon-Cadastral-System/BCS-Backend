@@ -17,6 +17,7 @@ spring:
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    open-in-view: false # API 서버라 뷰 렌더링 없음 — 요청 내내 커넥션을 잡아두는 OSIV 비활성화
     hibernate:
       ddl-auto: create # 개발 단계: 기동마다 스키마 드롭 후 재생성
     show-sql: false
@@ -24,6 +25,8 @@ spring:
       hibernate:
         format_sql: true
         use_sql_comments: true
+        hbm2ddl:
+          create_namespaces: true # @Table(schema="bcs")의 스키마가 없으면 생성
         jdbc:
           time_zone: Asia/Seoul
 
@@ -53,8 +56,6 @@ springdoc:
   swagger-ui:
     tags-sorter: alpha
     operations-sorter: alpha
-    url: /item/v3/api-docs
-    config-url: /item/v3/api-docs/swagger-config
 
 logging:
   level:
