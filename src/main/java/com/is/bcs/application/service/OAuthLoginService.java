@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 
 @Service
@@ -45,7 +45,7 @@ public class OAuthLoginService implements OAuthLoginUseCase {
 
     private OAuthLoginResult registerNewMember(OAuthLoginCommand command) {
         // 신규 회원 객체 생성
-        Member member = Member.registerWithKakao(command.providerUserId(), LocalDateTime.now(clock));
+        Member member = Member.registerWithKakao(command.providerUserId(), OffsetDateTime.now(clock));
 
         Member savedMember = saveMemberPort.save(member);
 

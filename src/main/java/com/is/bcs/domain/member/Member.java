@@ -2,7 +2,7 @@ package com.is.bcs.domain.member;
 
 import lombok.Getter;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Objects;
 
 @Getter
@@ -24,9 +24,9 @@ public class Member {
     private MemberRole role;
     private MemberStatus status;
 
-    private final LocalDateTime requestedAt;
-    private LocalDateTime approvedAt;
-    private LocalDateTime deactivatedAt;
+    private final OffsetDateTime requestedAt;
+    private OffsetDateTime approvedAt;
+    private OffsetDateTime deactivatedAt;
 
     private Member(
             Long id,
@@ -41,9 +41,9 @@ public class Member {
             Position position,
             MemberRole role,
             MemberStatus status,
-            LocalDateTime requestedAt,
-            LocalDateTime approvedAt,
-            LocalDateTime deactivatedAt
+            OffsetDateTime requestedAt,
+            OffsetDateTime approvedAt,
+            OffsetDateTime deactivatedAt
     ) {
         this.id = id;
         this.provider = Objects.requireNonNull(provider);
@@ -72,7 +72,7 @@ public class Member {
      */
     public static Member registerWithKakao(
             String kakaoId,
-            LocalDateTime requestedAt
+            OffsetDateTime requestedAt
     ) {
         return new Member(
                 null,
@@ -109,9 +109,9 @@ public class Member {
             Position position,
             MemberRole role,
             MemberStatus status,
-            LocalDateTime requestedAt,
-            LocalDateTime approvedAt,
-            LocalDateTime deactivatedAt
+            OffsetDateTime requestedAt,
+            OffsetDateTime approvedAt,
+            OffsetDateTime deactivatedAt
     ) {
         return new Member(
                 id,
@@ -161,7 +161,7 @@ public class Member {
         );
     }
 
-    public void approve(LocalDateTime approvedAt) {
+    public void approve(OffsetDateTime approvedAt) {
         validatePendingStatus();
         validateProfileCompleted();
 
@@ -170,7 +170,7 @@ public class Member {
         this.deactivatedAt = null;
     }
 
-    public void deactivate(LocalDateTime deactivatedAt) {
+    public void deactivate(OffsetDateTime deactivatedAt) {
         if (status != MemberStatus.ACTIVE) {
             throw new IllegalStateException(
                     "활성 회원만 비활성화할 수 있습니다."

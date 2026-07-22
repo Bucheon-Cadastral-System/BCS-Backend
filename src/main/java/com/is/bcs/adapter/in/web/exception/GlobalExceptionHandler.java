@@ -1,0 +1,122 @@
+package com.is.bcs.adapter.in.web.exception;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * 모든 실패 응답을 ProblemDetail(RFC 9457) + code + timestamp로 통일하는 전역 예외 처리기.
+ *
+ * problemdetails 활성화 시 Boot가 ResponseEntityExceptionHandler 기반 내장 핸들러를 등록하므로,
+ * 프레임워크 표준 예외까지 같은 포맷으로 내리려면 이 클래스를 상속해 훅을 오버라이드해야 한다
+ * (비상속 @ExceptionHandler는 내장 핸들러에 우선순위가 밀려 무시된다).
+ *
+ * 서블릿 필터단(보안 401/403 등)에서 난 예외는 이 advice의 범위 밖이라 별도 핸들러로 처리한다.
+ */
+@Slf4j
+@RequiredArgsConstructor
+@RestControllerAdvice
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+
+    private final Clock clock;
+
+    /** 프레임워크 예외 공통 경유 지점 — code(구체 핸들러가 안 정했을 때만 fallback)와 timestamp를 일괄 보강한다. */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(
+            Exception ex, Object body, HttpHeaders headers,
+            HttpStatusCode statusCode, WebRequest request) {
+        ResponseEntity<Object> response =
+                super.handleExceptionInternal(ex, body, headers, statusCode, request);
+        if (response != null && response.getBody() instanceof ProblemDetail problem) {
+            var props = problem.getProperties();
+            if (props == null || !props.containsKey("code")) {
+                problem.setProperty("code", defaultCode(statusCode));
+            }
+            problem.setProperty("timestamp", OffsetDateTime.now(clock));
+        }
+        return response;
+    }
+
+    /** 요청 바디(@Valid) 검증 실패 — detail 요약 + errors[] 필드별 목록 */
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        String detail = ex.getBindingResult().getAllErrors().stream()
+                .map(e -> e instanceof FieldError fe
+                        ? fe.getField() + ": " + e.getDefaultMessage()
+                        : e.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+        List<ValidationError> errors = ex.getBindingResult().getAllErrors().stream()
+                .map(e -> e instanceof FieldError fe
+                        ? new ValidationError(fe.getField(), e.getDefaultMessage())
+                        : new ValidationError(null, e.getDefaultMessage()))
+                .toList();
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setProperty("code", CommonErrorCode.COMMON_INVALID_INPUT.code());
+        problem.setProperty("errors", errors);
+        return handleExceptionInternal(ex, problem, headers, status, request);
+    }
+
+    /** 파라미터·경로변수 제약 위반 — status가 가변(파라미터 400 / 반환값 500)이라 status에 맞는 code를 고른다. */
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(
+            HandlerMethodValidationException ex, HttpHeaders headers,
+            HttpStatusCode status, WebRequest request) {
+        if (status.is5xxServerError()) { // 반환값 검증 실패 = 서버 결함 → 필드·파라미터명 비노출
+            log.error("메서드 반환값 검증 실패", ex);
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, "서버 내부 오류가 발생했습니다");
+            problem.setProperty("code", CommonErrorCode.COMMON_INTERNAL_ERROR.code());
+            return handleExceptionInternal(ex, problem, headers, status, request);
+        }
+        List<ValidationError> errors = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(err -> new ValidationError(
+                                result.getMethodParameter().getParameterName(), err.getDefaultMessage())))
+                .toList();
+        String detail = errors.stream()
+                .map(e -> (e.field() != null ? e.field() + ": " : "") + e.message())
+                .collect(Collectors.joining(", "));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
+        problem.setProperty("code", CommonErrorCode.COMMON_INVALID_INPUT.code());
+        problem.setProperty("errors", errors);
+        return handleExceptionInternal(ex, problem, headers, status, request);
+    }
+
+    /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception e) {
+        log.error("처리되지 않은 예외 발생", e);
+        return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
+    }
+
+    /** 도메인 예외 핸들러 공통 보강 — ErrorCode 한 상수로 status·code를 지정하고 timestamp를 더한다. */
+    private ProblemDetail problem(ErrorCode errorCode, String detail) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(errorCode.status(), detail);
+        problem.setProperty("code", errorCode.code());
+        problem.setProperty("timestamp", OffsetDateTime.now(clock));
+        return problem;
+    }
+
+    /** 구체 핸들러가 code를 정하지 않은 프레임워크 예외의 fallback — 실제 status 기준으로 고른다. */
+    private String defaultCode(HttpStatusCode status) {
+        return status.is5xxServerError()
+                ? CommonErrorCode.COMMON_INTERNAL_ERROR.code()
+                : CommonErrorCode.COMMON_BAD_REQUEST.code();
+    }
+}
