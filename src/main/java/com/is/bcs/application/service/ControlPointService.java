@@ -26,11 +26,6 @@ public class ControlPointService implements RegisterControlPointUseCase, GetCont
 
     @Override
     public ControlPoint register(RegisterControlPointCommand command) {
-        if (loadControlPointPort.existsByPointNo(command.pointNo())) {
-            throw new DuplicateControlPointException(
-                    "이미 등록된 관리번호입니다: " + command.pointNo());
-        }
-
         ControlPoint point = ControlPoint.register(
                 command.pointNo(), command.type(), command.name(),
                 new TmCoordinate(command.crs(), command.northing(), command.easting()),
@@ -39,6 +34,12 @@ public class ControlPointService implements RegisterControlPointUseCase, GetCont
                 command.markerMaterial(), command.installType(), command.installedDate(),
                 command.traverse()
         );
+
+        // 도메인이 정규화(trim)한 관리번호로 검사해야 공백 섞인 요청도 유니크 제약 전에 409로 걸린다
+        if (loadControlPointPort.existsByPointNo(point.getPointNo())) {
+            throw new DuplicateControlPointException(
+                    "이미 등록된 관리번호입니다: " + point.getPointNo());
+        }
 
         return saveControlPointPort.save(point);
     }

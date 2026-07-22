@@ -28,15 +28,19 @@ class SurveyRecordTest {
     }
 
     @Test
-    @DisplayName("판정 정정 — 결과와 조사 시각이 함께 갱신된다")
-    void revise_updatesResultAndTime() {
-        SurveyRecord record = SurveyRecord.create(1L, 10L, SurveyResult.INTACT, SURVEYED_AT, null);
+    @DisplayName("판정 정정 — 결과·비고·조사 시각이 새 내용으로 교체된다")
+    void revise_replacesResultNoteAndTime() {
+        SurveyRecord record = SurveyRecord.create(1L, 10L, SurveyResult.INTACT, SURVEYED_AT, "최초 비고");
         OffsetDateTime revisedAt = SURVEYED_AT.plusDays(1);
 
-        record.revise(SurveyResult.LOST, revisedAt);
+        record.revise(SurveyResult.LOST, revisedAt, "정정 비고");
 
         assertTrue(record.isLost());
         assertEquals(revisedAt, record.getSurveyedAt());
+        assertEquals("정정 비고", record.getNote());
+
+        record.revise(SurveyResult.INTACT, revisedAt, null);
+        assertEquals(null, record.getNote()); // 비고 없는 정정은 비고를 지운다(전체 교체)
     }
 
     @Test

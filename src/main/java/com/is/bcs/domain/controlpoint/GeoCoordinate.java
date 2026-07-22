@@ -9,7 +9,9 @@ import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 public record GeoCoordinate(double longitude, double latitude) {
 
     public GeoCoordinate {
-        if (longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
+        // NaN은 모든 범위 비교를 통과하므로 유한수 검증을 먼저 한다
+        if (!Double.isFinite(longitude) || !Double.isFinite(latitude)
+                || longitude < -180 || longitude > 180 || latitude < -90 || latitude > 90) {
             throw new InvalidControlPointException(
                     "경위도 범위를 벗어났습니다: " + longitude + ", " + latitude);
         }

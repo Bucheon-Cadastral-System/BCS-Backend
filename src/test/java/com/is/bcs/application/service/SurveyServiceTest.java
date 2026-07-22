@@ -94,10 +94,11 @@ class SurveyServiceTest {
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
 
         SurveyRecord revised = service.record(
-                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, null));
+                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, "정정 비고"));
 
         assertEquals(first.getId(), revised.getId()); // 레코드는 하나 — id 유지
         assertTrue(revised.isLost());
+        assertEquals("정정 비고", revised.getNote()); // 정정 시 비고도 교체된다
         assertEquals(1, service.getByProjectId(project.getId()).size());
     }
 

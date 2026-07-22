@@ -66,6 +66,23 @@ class ControlPointServiceTest {
     }
 
     @Test
+    @DisplayName("공백이 섞인 관리번호도 정규화 후 중복으로 걸린다")
+    void register_duplicateWithWhitespace_throws() {
+        service.register(csvRow1Command());
+
+        RegisterControlPointCommand padded = new RegisterControlPointCommand(
+                "  41192D000001265  ", PointType.DOGEUN, "1465공",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545236.77"), new BigDecimal("181840.96"),
+                126.794623, 37.506423,
+                null, null, null, null, null, null, null
+        );
+
+        assertThrows(DuplicateControlPointException.class, () -> service.register(padded));
+        assertEquals(1, store.findAll().size());
+    }
+
+    @Test
     @DisplayName("관리번호로 조회하고, 없으면 ControlPointNotFoundException")
     void getByPointNo() {
         service.register(csvRow1Command());

@@ -13,8 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.net.URI;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequiredArgsConstructor
@@ -28,7 +27,9 @@ public class ControlPointController {
     public ResponseEntity<ControlPointResponse> register(@Valid @RequestBody RegisterControlPointRequest request) {
         ControlPoint point = registerControlPointUseCase.register(request.toCommand());
         return ResponseEntity
-                .created(URI.create("/api/control-points/" + point.getPointNo()))
+                // 관리번호는 형식 미확정 입력이라 경로 세그먼트로 인코딩해 Location을 만든다
+                .created(UriComponentsBuilder.fromPath("/api/control-points/{pointNo}")
+                        .buildAndExpand(point.getPointNo()).encode().toUri())
                 .body(ControlPointResponse.from(point));
     }
 

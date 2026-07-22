@@ -49,10 +49,11 @@ public class SurveyRecord {
         return new SurveyRecord(id, projectId, pointId, result, surveyedAt, note);
     }
 
-    /** 판정 정정 — 결과와 함께 정정 시각을 새 조사 시각으로 기록한다. */
-    public void revise(SurveyResult result, OffsetDateTime surveyedAt) {
+    /** 판정 정정 — 결과·비고를 새 내용으로 교체하고 정정 시각을 조사 시각으로 기록한다. */
+    public void revise(SurveyResult result, OffsetDateTime surveyedAt, String note) {
         this.result = Objects.requireNonNull(result, "조사 결과는 필수입니다.");
         this.surveyedAt = Objects.requireNonNull(surveyedAt, "조사 시각은 필수입니다.");
+        this.note = note;
     }
 
     public boolean isLost() {

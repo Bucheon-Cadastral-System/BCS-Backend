@@ -86,6 +86,8 @@ class ControlPointTest {
     void geoCoordinate_rejectsOutOfRange() {
         assertThrows(InvalidControlPointException.class, () -> new GeoCoordinate(181.0, 37.5));
         assertThrows(InvalidControlPointException.class, () -> new GeoCoordinate(126.79, 95.0));
+        assertThrows(InvalidControlPointException.class, () -> new GeoCoordinate(Double.NaN, 37.5));
+        assertThrows(InvalidControlPointException.class, () -> new GeoCoordinate(126.79, Double.NaN));
         assertTrue(new GeoCoordinate(126.79, 37.5).longitude() > 0);
     }
 }

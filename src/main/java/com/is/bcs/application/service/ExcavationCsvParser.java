@@ -51,6 +51,11 @@ public final class ExcavationCsvParser {
     private ExcavationCsvParser() {
     }
 
+    private static final List<String> REQUIRED_COLUMNS = List.of(
+            "기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표",
+            "토지소재지", "상세주소", "표지재질", "도선등급", "도선명", "도호",
+            "교차구분", "설치구분", "설치일자", "기존조사내", "기존조사일", "조사대상여", "경도(X)", "위도(Y)");
+
     public static List<Row> parse(byte[] content) {
         List<String> lines = new String(content, EUC_KR).lines().filter(l -> !l.isBlank()).toList();
         if (lines.isEmpty()) {
@@ -58,6 +63,12 @@ public final class ExcavationCsvParser {
         }
 
         Map<String, Integer> header = headerIndex(splitCsv(lines.get(0)));
+        // 데이터 행이 없어도(빈 목록 → 빈 프로젝트) 조용히 성공하지 않도록 필수 헤더를 먼저 검증한다
+        List<String> missing = REQUIRED_COLUMNS.stream().filter(c -> !header.containsKey(c)).toList();
+        if (!missing.isEmpty()) {
+            throw new InvalidControlPointException("CSV 헤더에 필수 컬럼이 없습니다: " + String.join(", ", missing));
+        }
+
         List<Row> rows = new ArrayList<>();
         for (int i = 1; i < lines.size(); i++) {
             rows.add(parseRow(splitCsv(lines.get(i)), header, i + 1));

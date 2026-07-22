@@ -84,6 +84,14 @@ class ExcavationCsvParserTest {
     }
 
     @Test
+    @DisplayName("필수 컬럼이 없는 헤더는 데이터 행이 없어도 거부한다")
+    void parse_missingRequiredColumns_throws() {
+        byte[] wrongHeader = "foo,bar\n".getBytes(EUC_KR);
+
+        assertThrows(InvalidControlPointException.class, () -> ExcavationCsvParser.parse(wrongHeader));
+    }
+
+    @Test
     @DisplayName("알 수 없는 어휘(종류·좌표계 등)는 행 번호와 함께 거부한다")
     void parse_unknownVocabulary_throws() {
         String header = "순번,종류,기준점명,조사대상여,기준점번호,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,표지재질,도선등급,도선명,도호,교차구분,설치구분,설치일자,기존조사내,기존조사일,field_20,경도(X),위도(Y)";

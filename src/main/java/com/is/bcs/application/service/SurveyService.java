@@ -68,7 +68,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
         SurveyRecord record = loadSurveyRecordPort
                 .findRecordByProjectIdAndPointId(command.projectId(), command.pointId())
                 .map(existing -> {
-                    existing.revise(command.result(), now);
+                    existing.revise(command.result(), now, command.note());
                     return existing;
                 })
                 .orElseGet(() -> SurveyRecord.create(
