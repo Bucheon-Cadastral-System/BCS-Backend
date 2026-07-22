@@ -8,6 +8,9 @@ public enum SurveyErrorCode implements ErrorCode {
     /** 조사 프로젝트 없음 */
     SURVEY_PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND),
 
+    /** 조사기록 없음 */
+    SURVEY_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND),
+
     /** 조사 프로젝트·조사기록 필수값 위반 */
     SURVEY_INVALID(HttpStatus.BAD_REQUEST);
 

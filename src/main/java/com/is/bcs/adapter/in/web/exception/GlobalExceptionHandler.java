@@ -1,12 +1,14 @@
 package com.is.bcs.adapter.in.web.exception;
 
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
+import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
+import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
@@ -158,9 +160,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ControlPointErrorCode.CONTROL_POINT_INVALID, e.getMessage());
     }
 
+    @ExceptionHandler(DuplicateControlPointException.class)
+    public ProblemDetail handleDuplicateControlPoint(DuplicateControlPointException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
+    }
+
     @ExceptionHandler(SurveyProjectNotFoundException.class)
     public ProblemDetail handleSurveyProjectNotFound(SurveyProjectNotFoundException e) {
         return problem(SurveyErrorCode.SURVEY_PROJECT_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(SurveyRecordNotFoundException.class)
+    public ProblemDetail handleSurveyRecordNotFound(SurveyRecordNotFoundException e) {
+        return problem(SurveyErrorCode.SURVEY_RECORD_NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(InvalidSurveyException.class)

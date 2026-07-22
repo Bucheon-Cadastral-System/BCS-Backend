@@ -9,7 +9,10 @@ public enum ControlPointErrorCode implements ErrorCode {
     CONTROL_POINT_NOT_FOUND(HttpStatus.NOT_FOUND),
 
     /** 기준점 필수값·형식 위반 */
-    CONTROL_POINT_INVALID(HttpStatus.BAD_REQUEST);
+    CONTROL_POINT_INVALID(HttpStatus.BAD_REQUEST),
+
+    /** 관리번호 중복 */
+    CONTROL_POINT_DUPLICATE(HttpStatus.CONFLICT);
 
     private final HttpStatus status;
 

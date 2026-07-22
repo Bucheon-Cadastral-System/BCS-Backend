@@ -66,6 +66,17 @@ class SurveyPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("조사기록을 프로젝트×기준점으로 삭제한다")
+    void deleteByProjectIdAndPointId_removesRecord() {
+        SurveyProject project = savedProject();
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
+
+        adapter.deleteByProjectIdAndPointId(project.getId(), 10L);
+
+        assertTrue(adapter.findRecordByProjectIdAndPointId(project.getId(), 10L).isEmpty());
+    }
+
+    @Test
     @DisplayName("같은 프로젝트×기준점의 조사기록은 두 번 만들 수 없다")
     void duplicateProjectPoint_rejected() {
         SurveyProject project = savedProject();
