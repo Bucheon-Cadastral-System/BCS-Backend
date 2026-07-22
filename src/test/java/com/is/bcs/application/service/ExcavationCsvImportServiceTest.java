@@ -119,6 +119,11 @@ class ExcavationCsvImportServiceTest {
         }
 
         @Override
+        public long count() {
+            return points.size();
+        }
+
+        @Override
         public ControlPoint save(ControlPoint point) {
             long id = point.getId() != null ? point.getId() : ++sequence;
             ControlPoint saved = ControlPoint.restore(

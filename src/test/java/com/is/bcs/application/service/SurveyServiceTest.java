@@ -227,5 +227,10 @@ class SurveyServiceTest {
         public boolean existsByPointNo(String pointNo) {
             return findByPointNo(pointNo).isPresent();
         }
+
+        @Override
+        public long count() {
+            return points.size();
+        }
     }
 }
