@@ -3,6 +3,7 @@ package com.is.bcs.adapter.in.web;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -108,6 +109,18 @@ class ErrorResponseIntegrationTest {
     }
 
     @Test
+    @DisplayName("파라미터 제약 위반(내장 메서드 검증) — COMMON_INVALID_INPUT + errors[] 파라미터명")
+    void parameterValidation_errorsArray() throws Exception {
+        MvcResult result = mockMvc.perform(get("/test-errors/param-validate").param("page", "0"))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"code\":\"COMMON_INVALID_INPUT\""));
+        assertTrue(body.contains("\"field\":\"page\""));
+    }
+
+    @Test
     @DisplayName("파라미터 타입 변환 실패 — fallback이 아니라 COMMON_INVALID_INPUT + errors[]")
     void typeMismatch_invalidInput() throws Exception {
         MvcResult result = mockMvc.perform(get("/test-errors/type-mismatch").param("count", "abc"))
@@ -168,6 +181,12 @@ class ErrorResponseIntegrationTest {
         @GetMapping("/type-mismatch")
         String typeMismatch(@RequestParam("count") int count) {
             return "ok:" + count;
+        }
+
+        // 클래스에 @Validated 없이 파라미터 제약만 — Spring 6.1+ 내장 메서드 검증 경로(컨벤션)
+        @GetMapping("/param-validate")
+        String paramValidate(@RequestParam("page") @Min(1) int page) {
+            return "ok:" + page;
         }
 
         @GetMapping("/boom")
