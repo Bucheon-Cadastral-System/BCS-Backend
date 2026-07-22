@@ -33,9 +33,12 @@ dependencies {
     testAnnotationProcessor 'org.projectlombok:lombok'
 
     // JWT
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
-    implementation 'io.jsonwebtoken:jjwt-impl:0.12.3'
-    implementation 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // Caffeine Cache (카페인 캐시)
+    implementation 'com.github.ben-manes.caffeine:caffeine'
 
     // Spring Security
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
