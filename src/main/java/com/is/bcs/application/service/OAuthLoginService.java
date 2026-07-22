@@ -30,8 +30,8 @@ public class OAuthLoginService implements OAuthLoginUseCase {
                         command.provider(),
                         command.providerUserId()
                 )
-                .map( member -> existingMemberResult(member) )
-                .orElseGet(() -> registerNewMember(command));
+                .map( member -> existingMemberResult(member) ) // 조회 결과 있으면 반환
+                .orElseGet(() -> registerNewMember(command));  // 조회 결과 없으면 가입 처리
     }
 
     private OAuthLoginResult existingMemberResult(Member member) {
@@ -43,13 +43,9 @@ public class OAuthLoginService implements OAuthLoginUseCase {
         );
     }
 
-    private OAuthLoginResult registerNewMember(
-            OAuthLoginCommand command
-    ) {
-        Member member = Member.registerWithKakao(
-                command.providerUserId(),
-                LocalDateTime.now(clock)
-        );
+    private OAuthLoginResult registerNewMember(OAuthLoginCommand command) {
+        // 신규 회원 객체 생성
+        Member member = Member.registerWithKakao(command.providerUserId(), LocalDateTime.now(clock));
 
         Member savedMember = saveMemberPort.save(member);
 
