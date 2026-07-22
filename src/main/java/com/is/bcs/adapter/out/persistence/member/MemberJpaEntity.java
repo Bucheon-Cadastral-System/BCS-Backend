@@ -1,12 +1,13 @@
 package com.is.bcs.adapter.out.persistence.member;
 
+import com.is.bcs.adapter.out.persistence.common.BaseTime;
 import com.is.bcs.domain.member.*;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Getter
 @Entity
@@ -22,7 +23,9 @@ import java.time.LocalDateTime;
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemberJpaEntity {
+public class MemberJpaEntity extends BaseTime {
+    // requested_at(가입 신청 시각)은 업무 필드라 도메인이 소유하고,
+    // created_at/updated_at(BaseTime)은 감사용 인프라 컬럼이라 도메인에 매핑하지 않는다.
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -88,13 +91,13 @@ public class MemberJpaEntity {
             nullable = false,
             updatable = false
     )
-    private LocalDateTime requestedAt;
+    private OffsetDateTime requestedAt;
 
     @Column(name = "approved_at")
-    private LocalDateTime approvedAt;
+    private OffsetDateTime approvedAt;
 
     @Column(name = "deactivated_at")
-    private LocalDateTime deactivatedAt;
+    private OffsetDateTime deactivatedAt;
 
     private MemberJpaEntity(
             Long id,
@@ -109,9 +112,9 @@ public class MemberJpaEntity {
             Position position,
             MemberRole role,
             MemberStatus status,
-            LocalDateTime requestedAt,
-            LocalDateTime approvedAt,
-            LocalDateTime deactivatedAt
+            OffsetDateTime requestedAt,
+            OffsetDateTime approvedAt,
+            OffsetDateTime deactivatedAt
     ) {
         this.id = id;
         this.provider = provider;

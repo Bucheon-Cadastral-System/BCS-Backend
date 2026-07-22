@@ -17,12 +17,12 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-                .info(new Info().title("Item API")
-                        .description("Item Application API Documentation")
+                .info(new Info().title("BCS API")
+                        .description("부천시 지적기준점 관리 시스템 API 문서")
                         .version("v1.0"))
 
                 .addServersItem(new Server()
-                        .url("http://localhost:8080/item")
+                        .url("http://localhost:8080")
                         .description("[Default] local 8080 포트"))
 
                 .components(new Components()
