@@ -11,8 +11,7 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
-public class MemberPersistenceAdapter
-        implements LoadMemberPort, SaveMemberPort {
+public class MemberPersistenceAdapter implements LoadMemberPort, SaveMemberPort {
 
     private final MemberJpaRepository memberJpaRepository;
 
