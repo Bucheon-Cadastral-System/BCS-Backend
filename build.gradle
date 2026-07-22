@@ -39,6 +39,7 @@ dependencies {
 
     // Caffeine Cache (카페인 캐시)
     implementation 'com.github.ben-manes.caffeine:caffeine'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
 
     // Spring Security
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
