@@ -87,6 +87,32 @@ class MemberTest {
     }
 
     @Test
+    @DisplayName("프로필 검증이 중간에 실패하면 앞선 필드도 변경되지 않는다")
+    void completeProfile_failure_noPartialMutation() {
+        Member member = pendingMember();
+
+        assertThrows(InvalidMemberProfileException.class, () -> member.completeProfile(
+                "홍길동", "010-1234-5678", "hong@bucheon.go.kr",
+                District.WONMI, "토지정보과", Team.CADASTRAL_INFORMATION, null // 마지막 필드만 위반
+        ));
+
+        assertNull(member.getName());
+        assertFalse(member.isProfileCompleted());
+    }
+
+    @Test
+    @DisplayName("승인·비활성화 시각이 없으면 상태가 바뀌기 전에 실패한다")
+    void stateTransition_nullTime_noStateChange() {
+        Member pending = completedPendingMember();
+        assertThrows(NullPointerException.class, () -> pending.approve(null));
+        assertEquals(MemberStatus.PENDING, pending.getStatus());
+
+        Member active = activeMember();
+        assertThrows(NullPointerException.class, () -> active.deactivate(null));
+        assertEquals(MemberStatus.ACTIVE, active.getStatus());
+    }
+
+    @Test
     @DisplayName("PENDING이 아닌 회원은 프로필을 완성할 수 없다")
     void completeProfile_notPending_throws() {
         Member active = activeMember();

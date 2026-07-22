@@ -146,13 +146,22 @@ public class Member {
     ) {
         validatePendingStatus();
 
-        this.name = requireText(name, "이름");
-        this.phone = requireText(phone, "전화번호");
-        this.email = requireText(email, "이메일");
-        this.district = requireField(district, "지역");
-        this.department = requireText(department, "부서");
-        this.team = requireField(team, "팀");
-        this.position = requireField(position, "직급");
+        // 검증을 모두 통과한 뒤에만 필드를 변경한다 — 중간 실패 시 부분 변경 방지
+        String validName = requireText(name, "이름");
+        String validPhone = requireText(phone, "전화번호");
+        String validEmail = requireText(email, "이메일");
+        District validDistrict = requireField(district, "지역");
+        String validDepartment = requireText(department, "부서");
+        Team validTeam = requireField(team, "팀");
+        Position validPosition = requireField(position, "직급");
+
+        this.name = validName;
+        this.phone = validPhone;
+        this.email = validEmail;
+        this.district = validDistrict;
+        this.department = validDepartment;
+        this.team = validTeam;
+        this.position = validPosition;
     }
 
     public void approve(OffsetDateTime approvedAt) {
@@ -163,8 +172,9 @@ public class Member {
             );
         }
 
+        Objects.requireNonNull(approvedAt); // 상태 변경 전에 검증 — 실패 시 부분 변경 방지
         this.status = MemberStatus.ACTIVE;
-        this.approvedAt = Objects.requireNonNull(approvedAt);
+        this.approvedAt = approvedAt;
         this.deactivatedAt = null;
     }
 
@@ -175,9 +185,9 @@ public class Member {
             );
         }
 
+        Objects.requireNonNull(deactivatedAt); // 상태 변경 전에 검증 — 실패 시 부분 변경 방지
         this.status = MemberStatus.INACTIVE;
-        this.deactivatedAt =
-                Objects.requireNonNull(deactivatedAt);
+        this.deactivatedAt = deactivatedAt;
     }
 
     public void reactivate() {
