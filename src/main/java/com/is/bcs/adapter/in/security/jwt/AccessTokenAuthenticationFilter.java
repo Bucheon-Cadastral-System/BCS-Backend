@@ -43,20 +43,30 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(
                             claims,
                             null,
-                            List.of(
-                                    new SimpleGrantedAuthority(
-                                            "ROLE_" + claims.role().name()
-                                    )
-                            )
+                            List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name()))
                     );
 
             SecurityContextHolder.getContext().setAuthentication(authentication); // Role 등록
 
-            filterChain.doFilter(request, response);
+
         } catch (JwtException | IllegalArgumentException exception) {
             SecurityContextHolder.clearContext();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않은 Access Token입니다.");
         }
+        filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilter(
+            HttpServletRequest request
+    ) {
+        String path = request.getServletPath();
+
+        return path.equals("/api/auth/token/exchange")
+                || path.equals("/api/auth/token/refresh")
+                || path.equals("/api/auth/logout")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/item/v3/api-docs");
     }
 
     private String resolveAccessToken(HttpServletRequest request) {

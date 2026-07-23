@@ -29,6 +29,7 @@ import java.util.UUID;
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final String frontendBaseUrl;
+    private final boolean refreshCookieSecure;
     private final TokenProvider tokenProvider;
     private final RefreshTokenStore refreshTokenStore;
     private final TokenHasher tokenHasher;
@@ -38,6 +39,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     public OAuth2SuccessHandler(
             @Value("${app.frontend-base-url}")
             String frontendBaseUrl,
+            @Value("${app.auth.refresh-cookie.secure}")
+            boolean refreshCookieSecure,
             TokenProvider tokenProvider,
             RefreshTokenStore refreshTokenStore,
             TokenHasher tokenHasher,
@@ -45,6 +48,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             Clock clock
     ) {
         this.frontendBaseUrl = frontendBaseUrl;
+        this.refreshCookieSecure = refreshCookieSecure;
         this.tokenProvider = tokenProvider;
         this.refreshTokenStore = refreshTokenStore;
         this.tokenHasher = tokenHasher;
@@ -59,26 +63,18 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         MemberStatus status = principal.getStatus();
 
-        log.info("OAuth2SuccessHandler 동작중!!! 👑👑👑👑👑👑👑👑👑👑👑");
-
         switch (status) {
             case PENDING -> handlePending(response);
             case ACTIVE -> handleActive(request, response, principal);
             case INACTIVE -> handleInactive(request, response);
         }
-
-
-
-        log.info("OAuth2SuccessHandler 종료!!! 👑👑👑👑👑👑👑👑👑👑👑");
     }
 
     private BcsOAuth2Principal getPrincipal(Authentication authentication) {
         Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof BcsOAuth2Principal bcsPrincipal)) {
-            throw new IllegalStateException(
-                    "지원하지 않는 인증 사용자입니다."
-            );
+            throw new IllegalStateException("지원하지 않는 인증 사용자입니다.");
         }
 
         return bcsPrincipal;
@@ -146,12 +142,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                         + "/oauth/success?code="
                         + encodedCode
         );
-
-        log.info("발급된 일회용 코드는 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", exchangeCode);
-        log.info("액세스 토큰은 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", issuedTokens.accessToken());
-        log.info("리프레시 토큰은 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", issuedTokens.refreshToken());
-
-
     }
 
     private void handleInactive(HttpServletRequest request, HttpServletResponse response) throws IOException {
@@ -181,10 +171,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         ResponseCookie cookie = ResponseCookie
                 .from("refresh_token", refreshToken)
                 .httpOnly(true)
-                .secure(false) // local 테스트
-//                .secure(true)
+                .secure(refreshCookieSecure)
                 .sameSite("Lax")
-                .path("/api/auth/token/refresh")
+                .path("/api/auth")
                 .maxAge(maxAge)
                 .build();
 

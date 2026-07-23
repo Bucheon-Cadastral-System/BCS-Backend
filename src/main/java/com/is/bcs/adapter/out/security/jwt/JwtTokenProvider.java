@@ -12,6 +12,7 @@ import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class JwtTokenProvider implements TokenProvider {
 
@@ -91,6 +93,7 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public RefreshTokenClaims validateRefreshToken(String token) {
+        log.info("Validating refresh token: {}", token);
         Claims claims = parseClaims(token);
 
         validateTokenType(claims, TokenType.REFRESH);

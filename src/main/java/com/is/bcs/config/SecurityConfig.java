@@ -36,7 +36,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers(
                                 "/api/auth/token/exchange",
-                                "/api/auth/token/refresh"
+                                "/api/auth/token/refresh",
+                                "/api/auth/logout"
                         )
                 )
 
@@ -56,7 +57,8 @@ public class SecurityConfig {
                                 "/item/v3/api-docs/**",
 
                                 "/api/auth/token/exchange",
-                                "/api/auth/token/refresh"
+                                "/api/auth/token/refresh",
+                                "/api/auth/logout"
 
                         ).permitAll()
 

@@ -7,8 +7,10 @@ import com.is.bcs.application.port.out.token.TokenHasher;
 import com.is.bcs.application.port.out.token.TokenProvider;
 import com.is.bcs.domain.token.RefreshToken;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LogoutService implements LogoutUseCase {
@@ -19,6 +21,7 @@ public class LogoutService implements LogoutUseCase {
 
     @Override
     public void logout(String rawRefreshToken) {
+
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             return;
         }
@@ -43,5 +46,8 @@ public class LogoutService implements LogoutUseCase {
         if (!storedToken.tokenHash().equals(presentedHash)) {
             throw new IllegalArgumentException("Refresh Token이 일치하지 않습니다.");
         }
+
+        log.info("Logout successful.");
+
     }
 }
