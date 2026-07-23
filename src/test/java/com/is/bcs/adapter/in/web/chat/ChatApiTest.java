@@ -57,7 +57,9 @@ class ChatApiTest {
         String body = bodyOf(result);
         assertTrue(body.contains("\"code\":\"COMMON_INVALID_INPUT\""));
         assertTrue(body.contains("\"errors\""));
-        assertTrue(body.contains("\"message\""));
+        // errors[]에 위반 필드와 검증 메시지가 실렸는지 — 실제 문구로 확인(top-level message 필드는 없음)
+        assertTrue(body.contains("\"field\":\"message\""));
+        assertTrue(body.contains("질문은 필수입니다"));
     }
 
     /** 유스케이스 페이크 — 질문이 컨트롤러를 통과해 그대로 전달되는지만 본다. */

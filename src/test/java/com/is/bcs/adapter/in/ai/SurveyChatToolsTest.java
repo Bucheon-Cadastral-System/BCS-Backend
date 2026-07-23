@@ -63,6 +63,7 @@ class SurveyChatToolsTest {
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
+        assertEquals(1L, fake.progressProjectId); // 전달받은 id를 그대로 유스케이스에 넘긴다
         assertEquals(1, progress.intactPoints());
         assertEquals(0, progress.lostPoints());
         assertEquals(0, progress.etcPoints());
@@ -72,6 +73,7 @@ class SurveyChatToolsTest {
     @DisplayName("조사 현황 실패 예외는 잡지 않고 그대로 올린다 — 정형화는 ChatToolErrorProcessor 몫")
     void getSurveyProgress_missing_propagates() {
         assertThrows(SurveyProjectNotFoundException.class, () -> tools.getSurveyProgress(99L));
+        assertEquals(99L, fake.progressProjectId); // 실패 경로에서도 전달받은 id를 그대로 넘긴다
     }
 
     /** 조사 조회 유스케이스 페이크. */
@@ -79,6 +81,7 @@ class SurveyChatToolsTest {
 
         final Map<Long, SurveyProject> projects = new HashMap<>();
         SurveyProgress progress;
+        Long progressProjectId; // getProgress에 전달된 id 기록 — 도구가 올바른 id를 넘기는지 검증용
 
         @Override
         public List<SurveyProject> getAll() {
@@ -101,6 +104,7 @@ class SurveyChatToolsTest {
 
         @Override
         public SurveyProgress getProgress(Long projectId) {
+            this.progressProjectId = projectId;
             if (progress == null) {
                 throw new SurveyProjectNotFoundException("조사 프로젝트를 찾을 수 없습니다: " + projectId);
             }
