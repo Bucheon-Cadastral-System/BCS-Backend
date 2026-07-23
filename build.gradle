@@ -18,6 +18,10 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    set('springAiVersion', "2.0.0")
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -51,8 +55,19 @@ dependencies {
     //Swagger UI :  http://localhost:8080/swagger-ui/index.html#/
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 
+    // Spring AI (챗봇: ChatClient + 도구 호출, 모델은 Ollama)
+    implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 통합 테스트는 각자 데이터를 넣으므로 기동 시드(DogeunSeedRunner)를 꺼 커밋된 시드가 개수 단언을 오염시키지 않게 한다
+    systemProperty 'bcs.seed.enabled', 'false'
 }

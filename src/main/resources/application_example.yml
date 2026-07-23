@@ -33,6 +33,17 @@ spring:
   jackson:
     time-zone: Asia/Seoul # java.time 직렬화 타임존 — DB에서 UTC로 읽힌 시각도 응답은 +09:00으로
 
+  ai:
+    ollama:
+      base-url: http://localhost:11434 # Ollama 서버 주소
+      chat:
+        model: qwen3 # 도구 호출을 지원하는 모델이어야 함 — 서버에 받아둔 태그로 지정
+
+  http:
+    clients: # Boot 4.0부터 spring.http.client(단수)는 deprecated → clients(복수)
+      connect-timeout: 5s # Ollama 등 RestClient 연결 대기 상한(현재 유일 소비자) — 서버 미기동 시 빠르게 실패
+      read-timeout: 60s # LLM 생성이 길 수 있어 넉넉히, 단 무응답 요청이 스레드를 무한정 붙잡지 않게 상한을 둔다
+
   security:
     oauth2:
       client:

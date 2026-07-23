@@ -1,5 +1,6 @@
 package com.is.bcs.application.service;
 
+import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
@@ -99,6 +100,32 @@ class ControlPointServiceTest {
         assertEquals(1, service.getAll().size());
     }
 
+    @Test
+    @DisplayName("개수 요약 — 전체 개수와 종류별 개수를 종류 순서대로, 없는 종류도 0으로 채워 준다")
+    void getCountSummary_returnsZeroFilledCountsInTypeOrder() {
+        service.register(csvRow1Command());
+        service.register(minimalCommand("41192D000001266", PointType.DOGEUN));
+        service.register(minimalCommand("41190A000000001", PointType.TRIANGULATION));
+
+        ControlPointCountSummary summary = service.getCountSummary();
+
+        assertEquals(3, summary.total());
+        assertEquals(1, summary.countByType().get(PointType.TRIANGULATION));
+        assertEquals(0, summary.countByType().get(PointType.TRIANGULATION_AUX));
+        assertEquals(2, summary.countByType().get(PointType.DOGEUN));
+        assertEquals(List.of(PointType.values()), List.copyOf(summary.countByType().keySet()));
+    }
+
+    private static RegisterControlPointCommand minimalCommand(String pointNo, PointType type) {
+        return new RegisterControlPointCommand(
+                pointNo, type, "점-" + pointNo,
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545000.00"), new BigDecimal("181000.00"),
+                126.79, 37.50,
+                null, null, null, null, null, null, null
+        );
+    }
+
     /** 포트 페이크 — 인메모리 저장으로 서비스 로직만 검증한다. */
     private static class FakeControlPointStore implements LoadControlPointPort, SaveControlPointPort {
 
@@ -128,6 +155,13 @@ class ControlPointServiceTest {
         @Override
         public long count() {
             return points.size();
+        }
+
+        @Override
+        public Map<PointType, Long> countByType() {
+            Map<PointType, Long> counts = new HashMap<>();
+            points.values().forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
+            return counts;
         }
 
         @Override

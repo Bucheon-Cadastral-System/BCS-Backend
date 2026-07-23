@@ -12,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -86,5 +87,23 @@ class SurveyPersistenceAdapterTest {
             adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, null));
             recordRepository.flush(); // 유니크 제약은 flush 시점에 검증된다
         });
+    }
+
+    @Test
+    @DisplayName("결과별 개수는 해당 프로젝트의 기록만 결과별로 센다")
+    void countByResult_groupsOwnProjectRecords() {
+        SurveyProject project = savedProject();
+        SurveyProject other = adapter.save(SurveyProject.create(
+                SurveyProjectType.GENERAL, "다른 조사", null));
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(project.getId(), 11L, SurveyResult.LOST, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(project.getId(), 12L, SurveyResult.INTACT, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(other.getId(), 10L, SurveyResult.ETC, SURVEYED_AT, null));
+
+        Map<SurveyResult, Long> counts = adapter.countByResult(project.getId());
+
+        assertEquals(2, counts.get(SurveyResult.INTACT));
+        assertEquals(1, counts.get(SurveyResult.LOST));
+        assertEquals(2, counts.size()); // 기록 없는 결과(기타)는 키가 없다 — 0 채움은 서비스 몫
     }
 }

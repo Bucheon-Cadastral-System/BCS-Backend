@@ -1,5 +1,6 @@
 package com.is.bcs.application.service;
 
+import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.application.port.in.controlpoint.RegisterControlPointUseCase;
@@ -7,6 +8,7 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
+import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
@@ -14,7 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -56,5 +60,19 @@ public class ControlPointService implements RegisterControlPointUseCase, GetCont
         return loadControlPointPort.findByPointNo(pointNo)
                 .orElseThrow(() -> new ControlPointNotFoundException(
                         "기준점을 찾을 수 없습니다: " + pointNo));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ControlPointCountSummary getCountSummary() {
+        Map<PointType, Long> stored = loadControlPointPort.countByType();
+        Map<PointType, Long> countByType = new LinkedHashMap<>();
+        long total = 0;
+        for (PointType type : PointType.values()) {
+            long count = stored.getOrDefault(type, 0L);
+            countByType.put(type, count);
+            total += count;
+        }
+        return new ControlPointCountSummary(total, countByType);
     }
 }

@@ -3,11 +3,14 @@ package com.is.bcs.adapter.out.persistence.controlpoint;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
+import com.is.bcs.domain.controlpoint.PointType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -39,6 +42,14 @@ public class ControlPointPersistenceAdapter
     @Override
     public long count() {
         return repository.count();
+    }
+
+    @Override
+    public Map<PointType, Long> countByType() {
+        return repository.countByType().stream()
+                .collect(Collectors.toMap(
+                        ControlPointJpaRepository.PointTypeCount::getType,
+                        ControlPointJpaRepository.PointTypeCount::getCount));
     }
 
     @Override
