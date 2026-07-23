@@ -34,6 +34,8 @@ spring:
     time-zone: Asia/Seoul # java.time 직렬화 타임존 — DB에서 UTC로 읽힌 시각도 응답은 +09:00으로
 
   ai:
+    retry:
+      max-attempts: 1 # 동기 챗봇 경로라 재시도 없이 1회로 fast-fail — 기본 10회 재시도는 실패 응답을 분 단위로 지연시켜 클라이언트 타임아웃을 넘기고 호출 쿼터만 소진한다
     openai:
       base-url: https://generativelanguage.googleapis.com/v1beta/openai # Gemini의 OpenAI 호환 엔드포인트
       api-key: ${GEMINI_API_KEY} # Google AI Studio 발급 키 — 환경변수로 주입
@@ -46,7 +48,7 @@ spring:
 
   http:
     clients: # Boot 4.0부터 spring.http.client(단수)는 deprecated → clients(복수)
-      connect-timeout: 5s # Ollama 등 RestClient 연결 대기 상한(현재 유일 소비자) — 서버 미기동 시 빠르게 실패
+      connect-timeout: 5s # LLM API 연결(TCP·DNS) 대기 상한 — 연결 단계 문제 시 빠르게 실패
       read-timeout: 20s # LLM 생성 상한 — 무응답 요청이 스레드를 오래 붙잡지 않게(체감 대기 한계)
 
   security:
