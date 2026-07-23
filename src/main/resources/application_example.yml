@@ -43,7 +43,7 @@ spring:
         completions-path: /chat/completions # 기본값 /v1/chat/completions는 base-url의 /v1beta/openai와 겹쳐 경로가 깨짐 → 재정의
         options:
           model: gemini-3.5-flash-lite # 무료 티어 성능·사용량 균형 + function calling 지원
-          temperature: 0.0 # 도구 호출 안정화
+          # temperature/top_p/top_k은 Gemini 3.x에서 deprecated(현재 무시·향후 400)라 두지 않음 — 결정성은 시스템 프롬프트로 확보
           max-tokens: 2048
 
   http:
