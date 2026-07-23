@@ -75,6 +75,8 @@ springdoc:
   swagger-ui:
     tags-sorter: alpha
     operations-sorter: alpha
+    url: /v3/api-docs
+    config-url: /v3/api-docs/swagger-config
 
 logging:
   level:
@@ -84,3 +86,14 @@ logging:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+
+  jwt:
+    secret: ${JWT_SECRET} # JWT 서명 키 — 최소 32바이트 난수를 Base64로 인코딩하여 환경변수로 주입
+    access-token-expiration: 15m # Access Token 유효기간
+    refresh-token-expiration: 14d # Refresh Token 유효기간
+
+  auth:
+    refresh-cookie:
+      secure: ${REFRESH_COOKIE_SECURE:false} # 로컬 HTTP는 false, 운영 HTTPS는 true
+      same-site: Lax # 교차 사이트 요청의 쿠키 전송 제한
+      path: /api/auth # 재발급과 로그아웃 요청 모두에 Refresh Token 쿠키 전송
