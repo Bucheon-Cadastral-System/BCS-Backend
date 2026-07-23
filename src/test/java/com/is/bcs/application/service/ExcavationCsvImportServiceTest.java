@@ -8,6 +8,7 @@ import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.config.TimeConfig;
 import com.is.bcs.domain.controlpoint.ControlPoint;
+import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
@@ -121,6 +122,13 @@ class ExcavationCsvImportServiceTest {
         @Override
         public long count() {
             return points.size();
+        }
+
+        @Override
+        public Map<PointType, Long> countByType() {
+            Map<PointType, Long> counts = new HashMap<>();
+            points.values().forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
+            return counts;
         }
 
         @Override

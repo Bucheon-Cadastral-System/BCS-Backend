@@ -3,11 +3,14 @@ package com.is.bcs.adapter.in.bootstrap;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
+import com.is.bcs.domain.controlpoint.PointType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -63,6 +66,13 @@ class DogeunSeedRunnerTest {
         @Override
         public long count() {
             return saved.size();
+        }
+
+        @Override
+        public Map<PointType, Long> countByType() {
+            Map<PointType, Long> counts = new HashMap<>();
+            saved.forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
+            return counts;
         }
 
         @Override

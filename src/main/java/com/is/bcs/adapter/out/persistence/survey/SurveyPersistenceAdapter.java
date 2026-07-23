@@ -7,11 +7,14 @@ import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
+import com.is.bcs.domain.survey.SurveyResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -45,6 +48,14 @@ public class SurveyPersistenceAdapter
     @Override
     public Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId) {
         return recordRepository.findByProjectIdAndPointId(projectId, pointId).map(SurveyRecordJpaEntity::toDomain);
+    }
+
+    @Override
+    public Map<SurveyResult, Long> countByResult(Long projectId) {
+        return recordRepository.countByResult(projectId).stream()
+                .collect(Collectors.toMap(
+                        SurveyRecordJpaRepository.ResultCount::getResult,
+                        SurveyRecordJpaRepository.ResultCount::getCount));
     }
 
     @Override

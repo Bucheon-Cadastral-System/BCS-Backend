@@ -2,6 +2,7 @@ package com.is.bcs.application.service;
 
 import com.is.bcs.application.dto.CreateSurveyProjectCommand;
 import com.is.bcs.application.dto.RecordSurveyCommand;
+import com.is.bcs.application.dto.SurveyProgress;
 import com.is.bcs.application.port.in.survey.CancelSurveyUseCase;
 import com.is.bcs.application.port.in.survey.CreateSurveyProjectUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyProjectsUseCase;
@@ -16,6 +17,7 @@ import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
+import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -91,6 +95,25 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
     public List<SurveyRecord> getByProjectId(Long projectId) {
         requireProject(projectId);
         return loadSurveyRecordPort.findRecordsByProjectId(projectId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SurveyProgress getProgress(Long projectId) {
+        SurveyProject project = requireProject(projectId);
+
+        Map<SurveyResult, Long> stored = loadSurveyRecordPort.countByResult(projectId);
+        Map<SurveyResult, Long> countByResult = new LinkedHashMap<>();
+        long surveyed = 0;
+        for (SurveyResult result : SurveyResult.values()) {
+            long count = stored.getOrDefault(result, 0L);
+            countByResult.put(result, count);
+            surveyed += count;
+        }
+
+        long totalPoints = loadControlPointPort.count();
+        return new SurveyProgress(
+                project.getName(), totalPoints, surveyed, totalPoints - surveyed, countByResult);
     }
 
     private SurveyProject requireProject(Long id) {

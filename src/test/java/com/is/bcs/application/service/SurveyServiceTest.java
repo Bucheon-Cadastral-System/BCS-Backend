@@ -2,6 +2,7 @@ package com.is.bcs.application.service;
 
 import com.is.bcs.application.dto.CreateSurveyProjectCommand;
 import com.is.bcs.application.dto.RecordSurveyCommand;
+import com.is.bcs.application.dto.SurveyProgress;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyProjectPort;
@@ -133,6 +134,34 @@ class SurveyServiceTest {
         assertThrows(SurveyProjectNotFoundException.class, () -> service.getByProjectId(99L));
     }
 
+    @Test
+    @DisplayName("조사 현황 — 조사됨=기록 존재(망실 포함), 결과별 개수는 없는 결과도 0으로 채워 준다")
+    void getProgress_countsRecordsByResult() {
+        SurveyProject project = excavationProject();
+        for (long i = 10; i <= 14; i++) {
+            pointStore.add(i);
+        }
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null));
+        service.record(new RecordSurveyCommand(project.getId(), 12L, SurveyResult.INTACT, null));
+
+        SurveyProgress progress = service.getProgress(project.getId());
+
+        assertEquals("2026 굴착협의", progress.projectName());
+        assertEquals(5, progress.totalPoints());
+        assertEquals(3, progress.surveyedPoints());
+        assertEquals(2, progress.notSurveyedPoints());
+        assertEquals(2, progress.countByResult().get(SurveyResult.INTACT));
+        assertEquals(1, progress.countByResult().get(SurveyResult.LOST));
+        assertEquals(0, progress.countByResult().get(SurveyResult.ETC));
+    }
+
+    @Test
+    @DisplayName("없는 프로젝트의 조사 현황 조회는 SurveyProjectNotFoundException")
+    void getProgress_missingProject_throws() {
+        assertThrows(SurveyProjectNotFoundException.class, () -> service.getProgress(99L));
+    }
+
     /** 조사 포트 페이크 — 인메모리 저장으로 서비스 로직만 검증한다. */
     private static class FakeSurveyStore implements LoadSurveyProjectPort, SaveSurveyProjectPort,
             LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort {
@@ -170,6 +199,15 @@ class SurveyServiceTest {
             return records.values().stream()
                     .filter(r -> r.getProjectId().equals(projectId) && r.getPointId().equals(pointId))
                     .findFirst();
+        }
+
+        @Override
+        public Map<SurveyResult, Long> countByResult(Long projectId) {
+            Map<SurveyResult, Long> counts = new HashMap<>();
+            records.values().stream()
+                    .filter(r -> r.getProjectId().equals(projectId))
+                    .forEach(r -> counts.merge(r.getResult(), 1L, Long::sum));
+            return counts;
         }
 
         @Override
@@ -231,6 +269,13 @@ class SurveyServiceTest {
         @Override
         public long count() {
             return points.size();
+        }
+
+        @Override
+        public Map<PointType, Long> countByType() {
+            Map<PointType, Long> counts = new HashMap<>();
+            points.values().forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
+            return counts;
         }
     }
 }

@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -107,5 +108,24 @@ class ControlPointPersistenceAdapterTest {
             adapter.save(csvRow1());
             repository.flush(); // 유니크 제약은 flush 시점에 검증된다
         });
+    }
+
+    @Test
+    @DisplayName("종류별 개수는 저장된 종류만 키로 담아 센다")
+    void countByType_groupsSavedTypes() {
+        adapter.save(csvRow1());
+        adapter.save(ControlPoint.register(
+                "41190A000000001", PointType.TRIANGULATION, "삼각1",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545000.00"), new BigDecimal("181000.00")),
+                new GeoCoordinate(126.79, 37.50),
+                null, null, null, null, null, null, null
+        ));
+
+        Map<PointType, Long> counts = adapter.countByType();
+
+        assertEquals(1, counts.get(PointType.DOGEUN));
+        assertEquals(1, counts.get(PointType.TRIANGULATION));
+        assertEquals(2, counts.size()); // 없는 종류(삼각보조)는 키가 없다 — 0 채움은 서비스 몫
     }
 }

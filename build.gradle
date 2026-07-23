@@ -18,6 +18,10 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    set('springAiVersion', "2.0.0")
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -51,6 +55,15 @@ dependencies {
     //Swagger UI :  http://localhost:8080/swagger-ui/index.html#/
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 
+    // Spring AI (챗봇: ChatClient + 도구 호출, 모델은 Ollama)
+    implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
 }
 
 tasks.named('test') {
