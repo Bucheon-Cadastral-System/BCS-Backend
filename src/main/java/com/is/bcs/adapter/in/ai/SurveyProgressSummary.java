@@ -11,11 +11,13 @@ public record SurveyProgressSummary(
 ) {
 
     public static SurveyProgressSummary from(SurveyProgress progress) {
+        // 결과별 개수는 서비스가 0으로 채워 넘기지만, 매핑 경계에서도 getOrDefault로 방어한다
+        // (long 언박싱이라 키가 없으면 NPE — 부분 맵이 들어와도 0으로 편다)
         return new SurveyProgressSummary(
                 progress.projectName(), progress.totalPoints(),
                 progress.surveyedPoints(), progress.notSurveyedPoints(),
-                progress.countByResult().get(SurveyResult.INTACT),
-                progress.countByResult().get(SurveyResult.LOST),
-                progress.countByResult().get(SurveyResult.ETC));
+                progress.countByResult().getOrDefault(SurveyResult.INTACT, 0L),
+                progress.countByResult().getOrDefault(SurveyResult.LOST, 0L),
+                progress.countByResult().getOrDefault(SurveyResult.ETC, 0L));
     }
 }

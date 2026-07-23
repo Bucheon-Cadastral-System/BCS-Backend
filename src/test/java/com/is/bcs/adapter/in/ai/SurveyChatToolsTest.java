@@ -57,6 +57,18 @@ class SurveyChatToolsTest {
     }
 
     @Test
+    @DisplayName("결과 유형이 빠진 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
+    void getSurveyProgress_missingResultKeys_defaultZero() {
+        fake.progress = new SurveyProgress("2026 굴착협의", 3, 1, 2, Map.of(SurveyResult.INTACT, 1L));
+
+        SurveyProgressSummary progress = tools.getSurveyProgress(1L);
+
+        assertEquals(1, progress.intactPoints());
+        assertEquals(0, progress.lostPoints());
+        assertEquals(0, progress.etcPoints());
+    }
+
+    @Test
     @DisplayName("조사 현황 실패 예외는 잡지 않고 그대로 올린다 — 정형화는 ChatToolErrorProcessor 몫")
     void getSurveyProgress_missing_propagates() {
         assertThrows(SurveyProjectNotFoundException.class, () -> tools.getSurveyProgress(99L));

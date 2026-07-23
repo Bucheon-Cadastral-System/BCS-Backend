@@ -157,6 +157,23 @@ class SurveyServiceTest {
     }
 
     @Test
+    @DisplayName("조사 현황 — 기록이 하나도 없는 프로젝트는 조사됨 0, 결과별 개수도 모두 0으로 채운다")
+    void getProgress_noRecords_fillsZeros() {
+        SurveyProject project = excavationProject();
+        pointStore.add(10L);
+        pointStore.add(11L);
+
+        SurveyProgress progress = service.getProgress(project.getId());
+
+        assertEquals(2, progress.totalPoints());
+        assertEquals(0, progress.surveyedPoints());
+        assertEquals(2, progress.notSurveyedPoints());
+        assertEquals(0, progress.countByResult().get(SurveyResult.INTACT));
+        assertEquals(0, progress.countByResult().get(SurveyResult.LOST));
+        assertEquals(0, progress.countByResult().get(SurveyResult.ETC));
+    }
+
+    @Test
     @DisplayName("없는 프로젝트의 조사 현황 조회는 SurveyProjectNotFoundException")
     void getProgress_missingProject_throws() {
         assertThrows(SurveyProjectNotFoundException.class, () -> service.getProgress(99L));
