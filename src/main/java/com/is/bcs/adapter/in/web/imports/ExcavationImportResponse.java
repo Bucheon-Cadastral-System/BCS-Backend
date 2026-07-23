@@ -7,12 +7,13 @@ public record ExcavationImportResponse(
         int totalRows,
         int newPoints,
         int existingPoints,
+        int updatedPoints,
         int createdRecords
 ) {
 
     public static ExcavationImportResponse from(ExcavationImportResult result) {
         return new ExcavationImportResponse(
                 result.projectId(), result.totalRows(),
-                result.newPoints(), result.existingPoints(), result.createdRecords());
+                result.newPoints(), result.existingPoints(), result.updatedPoints(), result.createdRecords());
     }
 }

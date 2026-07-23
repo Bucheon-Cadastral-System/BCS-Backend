@@ -13,6 +13,9 @@ public interface LoadControlPointPort {
 
     Optional<ControlPoint> findByPointNo(String pointNo);
 
+    /** 이름·종류로 조회 — 임포트 시 관리번호가 달라도 같은 물리적 점을 찾아 중복 등록을 막는다(부천 도근점은 이름 유일). */
+    Optional<ControlPoint> findByNameAndType(String name, PointType type);
+
     List<ControlPoint> findAll();
 
     boolean existsByPointNo(String pointNo);

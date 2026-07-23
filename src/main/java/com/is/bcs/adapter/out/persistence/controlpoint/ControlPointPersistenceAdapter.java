@@ -30,6 +30,11 @@ public class ControlPointPersistenceAdapter
     }
 
     @Override
+    public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
+        return repository.findFirstByNameAndType(name, type).map(ControlPointJpaEntity::toDomain);
+    }
+
+    @Override
     public List<ControlPoint> findAll() {
         return repository.findAll().stream().map(ControlPointJpaEntity::toDomain).toList();
     }

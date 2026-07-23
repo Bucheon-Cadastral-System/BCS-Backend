@@ -13,6 +13,8 @@ public interface ControlPointJpaRepository extends JpaRepository<ControlPointJpa
 
     Optional<ControlPointJpaEntity> findByPointNo(String pointNo);
 
+    Optional<ControlPointJpaEntity> findFirstByNameAndType(String name, PointType type);
+
     boolean existsByPointNo(String pointNo);
 
     @Query("select p.type as type, count(p) as count from ControlPointJpaEntity p group by p.type")

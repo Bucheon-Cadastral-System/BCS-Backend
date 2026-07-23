@@ -5,6 +5,7 @@ public record ExcavationImportResult(
         int totalRows,
         int newPoints,
         int existingPoints,
+        int updatedPoints,
         int createdRecords
 ) {
 }

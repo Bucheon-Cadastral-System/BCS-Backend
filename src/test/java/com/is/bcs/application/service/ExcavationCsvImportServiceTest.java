@@ -8,7 +8,13 @@ import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.config.TimeConfig;
 import com.is.bcs.domain.controlpoint.ControlPoint;
+import com.is.bcs.domain.controlpoint.CoordinateSystem;
+import com.is.bcs.domain.controlpoint.GeoCoordinate;
+import com.is.bcs.domain.controlpoint.InstallType;
+import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.controlpoint.TmCoordinate;
+import com.is.bcs.domain.controlpoint.TraverseInfo;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
@@ -16,8 +22,10 @@ import com.is.bcs.domain.survey.SurveyResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,6 +60,7 @@ class ExcavationCsvImportServiceTest {
         assertEquals(49, result.totalRows());
         assertEquals(49, result.newPoints());
         assertEquals(0, result.existingPoints());
+        assertEquals(0, result.updatedPoints());
         assertEquals(44, result.createdRecords());
 
         SurveyProject project = surveyStore.projects.get(result.projectId());
@@ -89,8 +98,42 @@ class ExcavationCsvImportServiceTest {
 
         assertEquals(0, second.newPoints());
         assertEquals(49, second.existingPoints());
+        assertEquals(0, second.updatedPoints()); // 관리번호가 이미 CSV라 갱신 없이 재사용
         assertEquals(49, pointStore.points.size()); // 마스터 중복 생성 없음
         assertTrue(surveyStore.projects.size() == 2);
+    }
+
+    @Test
+    @DisplayName("이름·종류가 같은 기존 점이 있으면 중복 생성하지 않고 성과·관리번호를 CSV로 갱신한다")
+    void importCsv_dedupsByNameAndType_andUpdatesToCsv() throws Exception {
+        // 시드 placeholder — 같은 도근점 '4012공'인데 관리번호(짝수)·성과가 CSV(홀수)와 미세하게 다르다
+        pointStore.save(ControlPoint.register(
+                "41192D000006846", PointType.DOGEUN, "4012공",
+                new TmCoordinate(CoordinateSystem.BESSEL_CENTRAL, new BigDecimal("545860.00"), new BigDecimal("177390.00")),
+                new GeoCoordinate(126.744200, 37.511900),
+                "10900", "상동", "부천시 상동 529-2",
+                MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
+                new TraverseInfo("2", "ㅁ", "78", false)));
+
+        ExcavationImportResult result = service.importCsv(new ImportExcavationCsvCommand("2026 굴착협의", null, sampleCsv()));
+        assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
+        assertEquals(48, result.newPoints());    // 나머지 48건은 신규
+
+        // '4012공'은 하나만 — 시드 쌍둥이가 갱신될 뿐 새로 추가되지 않는다
+        List<ControlPoint> named = pointStore.points.values().stream()
+                .filter(p -> "4012공".equals(p.getName())).toList();
+        assertEquals(1, named.size());
+
+        ControlPoint merged = named.get(0);
+        assertEquals("41192D000006847", merged.getPointNo()); // 관리번호가 CSV(홀수)로 갱신
+        assertEquals(CoordinateSystem.GRS80_CENTRAL, merged.getTm().crs()); // 좌표계도 세계측지계로
+        assertEquals(0, new BigDecimal("545860.82").compareTo(merged.getTm().northing()));
+        assertEquals(0, new BigDecimal("177390.84").compareTo(merged.getTm().easting()));
+        assertEquals(126.744273, merged.getGeo().longitude(), 1e-6);
+        assertEquals(37.511947, merged.getGeo().latitude(), 1e-6);
+
+        assertTrue(pointStore.findByPointNo("41192D000006846").isEmpty()); // 옛 관리번호는 사라짐
+        assertEquals(49, pointStore.points.size()); // 시드 1 + 신규 48 = 49 (중복 아님)
     }
 
     /** 기준점 포트 페이크. */
@@ -107,6 +150,13 @@ class ExcavationCsvImportServiceTest {
         @Override
         public Optional<ControlPoint> findByPointNo(String pointNo) {
             return points.values().stream().filter(p -> p.getPointNo().equals(pointNo)).findFirst();
+        }
+
+        @Override
+        public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
+            return points.values().stream()
+                    .filter(p -> p.getName().equals(name) && p.getType() == type)
+                    .findFirst();
         }
 
         @Override

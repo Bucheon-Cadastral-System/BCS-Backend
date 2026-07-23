@@ -4,6 +4,7 @@ import com.is.bcs.application.dto.OAuthLoginCommand;
 import com.is.bcs.application.dto.OAuthLoginResult;
 import com.is.bcs.application.port.out.member.LoadMemberPort;
 import com.is.bcs.application.port.out.member.SaveMemberPort;
+import com.is.bcs.application.service.oauth.OAuthLoginService;
 import com.is.bcs.config.TimeConfig;
 import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.MemberRole;
