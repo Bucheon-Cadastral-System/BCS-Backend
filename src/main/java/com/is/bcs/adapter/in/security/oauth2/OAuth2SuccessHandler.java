@@ -148,6 +148,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         );
 
         log.info("발급된 일회용 코드는 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", exchangeCode);
+        log.info("액세스 토큰은 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", issuedTokens.accessToken());
+        log.info("리프레시 토큰은 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", issuedTokens.refreshToken());
 
 
     }
@@ -179,9 +181,10 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         ResponseCookie cookie = ResponseCookie
                 .from("refresh_token", refreshToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(false) // local 테스트
+//                .secure(true)
                 .sameSite("Lax")
-                .path("/api/auth/refresh")
+                .path("/api/auth/token/refresh")
                 .maxAge(maxAge)
                 .build();
 

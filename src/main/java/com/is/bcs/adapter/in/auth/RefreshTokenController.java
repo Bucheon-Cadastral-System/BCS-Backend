@@ -47,7 +47,8 @@ public class RefreshTokenController {
         ResponseCookie cookie = ResponseCookie
                 .from("refresh_token", refreshToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(false) // local 테스트
+//                .secure(true)
                 .sameSite("Lax")
                 .path("/api/auth/token/refresh")
                 .maxAge(maxAge)
