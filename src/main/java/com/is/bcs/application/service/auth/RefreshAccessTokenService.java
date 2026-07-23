@@ -1,4 +1,4 @@
-package com.is.bcs.application.service;
+package com.is.bcs.application.service.auth;
 
 import com.is.bcs.application.port.in.auth.RefreshAccessTokenUseCase;
 import com.is.bcs.application.port.out.member.LoadMemberPort;

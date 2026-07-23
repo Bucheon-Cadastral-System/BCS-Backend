@@ -2,7 +2,7 @@ package com.is.bcs.adapter.in.security.oauth2;
 
 import com.is.bcs.application.dto.OAuthLoginCommand;
 import com.is.bcs.application.dto.OAuthLoginResult;
-import com.is.bcs.application.port.in.OAuthLoginUseCase;
+import com.is.bcs.application.port.in.oauth.OAuthLoginUseCase;
 import com.is.bcs.domain.member.OAuthProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

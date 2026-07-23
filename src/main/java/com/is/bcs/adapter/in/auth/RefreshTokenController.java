@@ -17,8 +17,7 @@ import java.time.Instant;
 @RequestMapping("/api/auth")
 public class RefreshTokenController {
 
-    private final RefreshAccessTokenUseCase
-            refreshAccessTokenUseCase;
+    private final RefreshAccessTokenUseCase refreshAccessTokenUseCase;
 
     @PostMapping("/token/refresh")
     public ResponseEntity<RefreshTokenResponse> refresh(
