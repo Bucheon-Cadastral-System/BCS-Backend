@@ -83,9 +83,7 @@ public class JwtTokenProvider implements TokenProvider {
 
         return new AccessTokenClaims(
                 parseMemberId(claims),
-                MemberRole.valueOf(
-                        claims.get(ROLE_CLAIM, String.class)
-                ),
+                MemberRole.valueOf(claims.get(ROLE_CLAIM, String.class)),
                 claims.getIssuedAt().toInstant(),
                 claims.getExpiration().toInstant()
         );
@@ -147,19 +145,14 @@ public class JwtTokenProvider implements TokenProvider {
                 .getPayload();
     }
 
-    private void validateTokenType(
-            Claims claims,
-            TokenType expectedType
-    ) {
+    private void validateTokenType(Claims claims, TokenType expectedType) {
         String actualType = claims.get(
                 TOKEN_TYPE_CLAIM,
                 String.class
         );
 
         if (!expectedType.name().equals(actualType)) {
-            throw new IllegalArgumentException(
-                    "올바르지 않은 토큰 타입입니다."
-            );
+            throw new IllegalArgumentException("올바르지 않은 토큰 타입입니다.");
         }
     }
 
@@ -167,9 +160,7 @@ public class JwtTokenProvider implements TokenProvider {
         String subject = claims.getSubject();
 
         if (subject == null || subject.isBlank()) {
-            throw new IllegalArgumentException(
-                    "토큰에 사용자 식별자가 없습니다."
-            );
+            throw new IllegalArgumentException("토큰에 사용자 식별자가 없습니다.");
         }
 
         return Long.valueOf(subject);

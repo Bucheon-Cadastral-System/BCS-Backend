@@ -17,8 +17,8 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-                .info(new Info().title("Item API")
-                        .description("Item Application API Documentation")
+                .info(new Info().title("BCS API")
+                        .description("BCS Application API Documentation")
                         .version("v1.0"))
 
                 .addServersItem(new Server()

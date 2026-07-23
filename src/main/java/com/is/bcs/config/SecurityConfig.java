@@ -1,5 +1,6 @@
 package com.is.bcs.config;
 
+import com.is.bcs.adapter.in.security.jwt.AccessTokenAuthenticationFilter;
 import com.is.bcs.adapter.in.security.oauth2.CustomOAuth2UserService;
 import com.is.bcs.adapter.in.security.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -22,11 +24,21 @@ public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final AccessTokenAuthenticationFilter accessTokenAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         return http
+
+                .cors(Customizer.withDefaults())
+
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(
+                                "/api/auth/token/exchange"
+                        )
+                )
+
                 .authorizeHttpRequests(auth -> auth
                         /** 모두 사용 가능 ! */
                         .requestMatchers(
@@ -48,12 +60,19 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated()
                 )
+
+                /** Kakao Oauth2.0 Filter */
                 .oauth2Login(oauth2 -> oauth2
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService)
-                        )
+                        .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
                 )
+
+                /** AccessToken 검증 Filter */
+                .addFilterBefore(
+                        accessTokenAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                )
+
                 .build();
 
     }
