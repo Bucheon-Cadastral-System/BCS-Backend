@@ -55,8 +55,8 @@ dependencies {
     //Swagger UI :  http://localhost:8080/swagger-ui/index.html#/
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 
-    // Spring AI (챗봇: ChatClient + 도구 호출, 모델은 Ollama)
-    implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+    // Spring AI (챗봇: ChatClient + 도구 호출) — 모델은 Gemini(OpenAI 호환 엔드포인트)라 OpenAI 스타터 사용
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
 }
 

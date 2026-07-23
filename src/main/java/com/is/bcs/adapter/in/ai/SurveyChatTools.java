@@ -21,14 +21,14 @@ public class SurveyChatTools {
     private final GetSurveyProjectsUseCase getSurveyProjectsUseCase;
     private final GetSurveyRecordsUseCase getSurveyRecordsUseCase;
 
-    @Tool(description = "조사 프로젝트 목록(id·이름·유형·비고)을 조회한다. 조사 현황을 물으면 먼저 이걸로 프로젝트 id를 찾는다.")
+    @Tool(description = "조사 프로젝트 전체 목록을 조회한다(각 항목: id·이름name·유형type·비고note). 유형은 한글 표시명으로 반환한다(예: 일반·굴착협의). 사용자가 특정 프로젝트나 조사 현황을 물으면, 먼저 이 도구로 목록을 받아 이름·유형으로 해당 프로젝트를 찾고 그 id를 getSurveyProgress에 넘긴다")
     public List<ProjectSummary> getSurveyProjects() {
         return getSurveyProjectsUseCase.getAll().stream().map(ProjectSummary::from).toList();
     }
 
-    @Tool(description = "조사 프로젝트의 진행 현황(전체 기준점 수, 조사됨·미조사 수, 완전·망실·기타 수)을 조회한다.")
+    @Tool(description = "지정한 조사 프로젝트 하나의 진행 현황을 조회한다. 반환: 프로젝트명(projectName)·전체 기준점 수(totalPoints)·조사됨(surveyedPoints)·미조사(notSurveyedPoints)·결과별 완전(intactPoints)·망실(lostPoints)·기타(etcPoints). projectId는 getSurveyProjects로 먼저 찾아 넣는다")
     public SurveyProgressSummary getSurveyProgress(
-            @ToolParam(description = "조사 프로젝트 id") Long projectId) {
+            @ToolParam(description = "조사 프로젝트 id(정수) — getSurveyProjects 결과의 id 사용") Long projectId) {
         return SurveyProgressSummary.from(getSurveyRecordsUseCase.getProgress(projectId));
     }
 }
