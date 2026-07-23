@@ -7,6 +7,7 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
+import com.is.bcs.application.port.out.survey.SaveSurveyTargetPort;
 import com.is.bcs.application.service.ExcavationCsvParser.Row;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
@@ -14,6 +15,7 @@ import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
+import com.is.bcs.domain.survey.SurveyTarget;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +25,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * 굴착협의 CSV 임포트 — 한 파일로 굴착협의 프로젝트 생성, 기준점 마스터 등록, 기존조사 이력 기록을 수행한다.
+ * 굴착협의 CSV 임포트 — 한 파일로 굴착협의 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
  * 이름·종류로 같은 물리적 점을 찾아 중복 등록을 막고(관리번호가 달라도), 기존 점의 성과가 다르면 CSV의 확정 성과로 갱신한다.
  */
 @Service
@@ -35,6 +37,7 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
     private final SaveControlPointPort saveControlPointPort;
     private final SaveSurveyProjectPort saveSurveyProjectPort;
     private final SaveSurveyRecordPort saveSurveyRecordPort;
+    private final SaveSurveyTargetPort saveSurveyTargetPort;
     private final Clock clock;
 
     @Override
@@ -63,6 +66,9 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
                 point = saveControlPointPort.save(revise(existing.getId(), row));
                 updatedPoints++;
             }
+
+            // 모든 행은 이 프로젝트의 조사 대상이다 — 진행률의 분모(전체 대상)가 된다
+            saveSurveyTargetPort.save(SurveyTarget.create(project.getId(), point.getId()));
 
             if (row.priorResult() != null) {
                 saveSurveyRecordPort.save(SurveyRecord.create(

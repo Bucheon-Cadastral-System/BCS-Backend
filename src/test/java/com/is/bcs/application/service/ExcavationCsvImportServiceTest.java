@@ -6,6 +6,7 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
+import com.is.bcs.application.port.out.survey.SaveSurveyTargetPort;
 import com.is.bcs.config.TimeConfig;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
@@ -19,6 +20,7 @@ import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
+import com.is.bcs.domain.survey.SurveyTarget;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,8 +43,9 @@ class ExcavationCsvImportServiceTest {
 
     private final FakeControlPointStore pointStore = new FakeControlPointStore();
     private final FakeSurveyStore surveyStore = new FakeSurveyStore();
+    private final FakeTargetStore targetStore = new FakeTargetStore();
     private final ExcavationCsvImportService service = new ExcavationCsvImportService(
-            pointStore, pointStore, surveyStore, surveyStore,
+            pointStore, pointStore, surveyStore, surveyStore, targetStore,
             Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST));
 
     private byte[] sampleCsv() throws Exception {
@@ -134,6 +137,16 @@ class ExcavationCsvImportServiceTest {
 
         assertTrue(pointStore.findByPointNo("41192D000006846").isEmpty()); // 옛 관리번호는 사라짐
         assertEquals(49, pointStore.points.size()); // 시드 1 + 신규 48 = 49 (중복 아님)
+    }
+
+    @Test
+    @DisplayName("임포트하면 모든 행이 프로젝트의 조사 대상으로 등록된다")
+    void importCsv_registersAllRowsAsTargets() throws Exception {
+        ExcavationImportResult result = service.importCsv(
+                new ImportExcavationCsvCommand("2026 굴착협의", null, sampleCsv()));
+
+        assertEquals(49, targetStore.targets.size());
+        assertTrue(targetStore.targets.stream().allMatch(t -> t.getProjectId().equals(result.projectId())));
     }
 
     /** 기준점 포트 페이크. */
@@ -228,6 +241,25 @@ class ExcavationCsvImportServiceTest {
 
         @Override
         public List<SurveyRecord> saveAll(List<SurveyRecord> list) {
+            return list.stream().map(this::save).toList();
+        }
+    }
+
+    /** 조사 대상 포트 페이크. */
+    private static class FakeTargetStore implements SaveSurveyTargetPort {
+
+        final List<SurveyTarget> targets = new ArrayList<>();
+        private long sequence = 0;
+
+        @Override
+        public SurveyTarget save(SurveyTarget target) {
+            SurveyTarget saved = SurveyTarget.restore(++sequence, target.getProjectId(), target.getPointId());
+            targets.add(saved);
+            return saved;
+        }
+
+        @Override
+        public List<SurveyTarget> saveAll(List<SurveyTarget> list) {
             return list.stream().map(this::save).toList();
         }
     }
