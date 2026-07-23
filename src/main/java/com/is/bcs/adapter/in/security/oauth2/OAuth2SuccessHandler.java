@@ -7,6 +7,7 @@ import com.is.bcs.domain.token.RefreshToken;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -23,6 +24,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
@@ -51,21 +53,23 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     }
 
     @Override
-    public void onAuthenticationSuccess(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            Authentication authentication
-    ) throws IOException {
+    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
 
         BcsOAuth2Principal principal = getPrincipal(authentication);
 
         MemberStatus status = principal.getStatus();
+
+        log.info("OAuth2SuccessHandler 동작중!!! 👑👑👑👑👑👑👑👑👑👑👑");
 
         switch (status) {
             case PENDING -> handlePending(response);
             case ACTIVE -> handleActive(request, response, principal);
             case INACTIVE -> handleInactive(request, response);
         }
+
+
+
+        log.info("OAuth2SuccessHandler 종료!!! 👑👑👑👑👑👑👑👑👑👑👑");
     }
 
     private BcsOAuth2Principal getPrincipal(Authentication authentication) {
@@ -142,6 +146,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                         + "/oauth/success?code="
                         + encodedCode
         );
+
+        log.info("발급된 일회용 코드는 : {} ⭐️⭐️⭐️⭐️⭐️⭐️", exchangeCode);
+
 
     }
 

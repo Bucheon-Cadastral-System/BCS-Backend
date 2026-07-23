@@ -10,6 +10,7 @@ public interface RefreshTokenStore {
 
     Optional<RefreshToken> findByTokenId(String tokenId);
 
-    void deleteByTokenId(String tokenId);
+    Optional<RefreshToken> getAndDelete(String tokenId);
 
+    void deleteByTokenId(String tokenId);
 }

@@ -35,7 +35,8 @@ public class SecurityConfig {
 
                 .csrf(csrf -> csrf
                         .ignoringRequestMatchers(
-                                "/api/auth/token/exchange"
+                                "/api/auth/token/exchange",
+                                "/api/auth/token/refresh"
                         )
                 )
 
@@ -45,9 +46,18 @@ public class SecurityConfig {
                                 "/",
                                 "/login/**",
                                 "/oauth2/**",
+
+                                "/swagger-ui.html",
                                 "/swagger-ui/**",
+
+                                "/v3/api-docs",
                                 "/v3/api-docs/**",
-                                "/api/auth/token/exchange"
+                                "/item/v3/api-docs",
+                                "/item/v3/api-docs/**",
+
+                                "/api/auth/token/exchange",
+                                "/api/auth/token/refresh"
+
                         ).permitAll()
 
 

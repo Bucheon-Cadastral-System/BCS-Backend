@@ -22,7 +22,7 @@ public class SwaggerConfig {
                         .version("v1.0"))
 
                 .addServersItem(new Server()
-                        .url("http://localhost:8080/item")
+                        .url("http://localhost:8080/")
                         .description("[Default] local 8080 포트"))
 
                 .components(new Components()

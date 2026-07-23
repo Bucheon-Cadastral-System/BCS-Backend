@@ -27,14 +27,23 @@ public class CaffeineRefreshTokenStore implements RefreshTokenStore {
 
     @Override
     public Optional<RefreshToken> findByTokenId(String tokenId) {
-        return Optional.ofNullable(
-                refreshTokenCache.getIfPresent(tokenId)
-        );
+        return Optional.ofNullable(refreshTokenCache.getIfPresent(tokenId));
     }
 
     @Override
     public void deleteByTokenId(String tokenId) {
         refreshTokenCache.invalidate(tokenId);
+    }
+
+    @Override
+    public Optional<RefreshToken> getAndDelete(String tokenId) {
+        if (tokenId == null || tokenId.isBlank()) {
+            return Optional.empty();
+        }
+
+        return Optional.ofNullable(
+                refreshTokenCache.asMap().remove(tokenId)
+        );
     }
 
 }
