@@ -52,7 +52,7 @@ class ControlPointChatToolsTest {
         byType.put(PointType.DOGEUN, 2L);
         fake.countSummary = new ControlPointCountSummary(3, byType);
 
-        ControlPointChatTools.PointCountSummary summary = tools.countControlPoints();
+        PointCountSummary summary = tools.countControlPoints();
 
         assertEquals(3, summary.total());
         assertEquals(1, summary.countByType().get("지적삼각점"));
@@ -67,7 +67,7 @@ class ControlPointChatToolsTest {
     void getControlPointByNo_mapsDetail() {
         fake.points.add(csvRow1Point());
 
-        ControlPointChatTools.ControlPointDetail p = tools.getControlPointByNo("41192D000001265");
+        ControlPointDetail p = tools.getControlPointByNo("41192D000001265");
 
         assertEquals("41192D000001265", p.pointNo());
         assertEquals("1465공", p.name());
@@ -94,7 +94,7 @@ class ControlPointChatToolsTest {
                 new GeoCoordinate(126.79, 37.50),
                 null, null, null, null, null, null, null));
 
-        ControlPointChatTools.ControlPointDetail p = tools.getControlPointByNo("41192D000001266");
+        ControlPointDetail p = tools.getControlPointByNo("41192D000001266");
 
         assertNull(p.markerMaterial());
         assertNull(p.installedDate());

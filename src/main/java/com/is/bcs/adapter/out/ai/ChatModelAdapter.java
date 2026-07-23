@@ -10,6 +10,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ChatModelAdapter implements ChatModelPort {
 
+    /** 라운드 상한 중단 등으로 본문 없이 끝난 응답의 대체 안내. */
+    private static final String EMPTY_ANSWER_FALLBACK =
+            "질문 범위가 넓어 조회를 끝내지 못했습니다. 범위를 좁혀 다시 질문해 주세요.";
+
     private final ChatClient chatClient;
 
     @Override
@@ -18,6 +22,6 @@ public class ChatModelAdapter implements ChatModelPort {
                 .user(question)
                 .call()
                 .content();
-        return content == null ? "" : content;
+        return content == null || content.isBlank() ? EMPTY_ANSWER_FALLBACK : content;
     }
 }

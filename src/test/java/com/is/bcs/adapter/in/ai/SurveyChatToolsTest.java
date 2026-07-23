@@ -30,7 +30,7 @@ class SurveyChatToolsTest {
         fake.projects.put(1L, SurveyProject.restore(
                 1L, SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", "협의번호 2333"));
 
-        List<SurveyChatTools.ProjectSummary> projects = tools.getSurveyProjects();
+        List<ProjectSummary> projects = tools.getSurveyProjects();
 
         assertEquals(1, projects.size());
         assertEquals(1L, projects.getFirst().id());
@@ -45,7 +45,7 @@ class SurveyChatToolsTest {
         fake.progress = new SurveyProgress("2026 굴착협의", 5, 3, 2,
                 Map.of(SurveyResult.INTACT, 2L, SurveyResult.LOST, 1L, SurveyResult.ETC, 0L));
 
-        SurveyChatTools.SurveyProgressSummary progress = tools.getSurveyProgress(1L);
+        SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
         assertEquals("2026 굴착협의", progress.projectName());
         assertEquals(5, progress.totalPoints());
