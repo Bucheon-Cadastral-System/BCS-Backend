@@ -68,4 +68,6 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 통합 테스트는 각자 데이터를 넣으므로 기동 시드(DogeunSeedRunner)를 꺼 커밋된 시드가 개수 단언을 오염시키지 않게 한다
+    systemProperty 'bcs.seed.enabled', 'false'
 }
