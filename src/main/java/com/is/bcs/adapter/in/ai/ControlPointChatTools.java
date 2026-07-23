@@ -17,14 +17,14 @@ public class ControlPointChatTools {
 
     private final GetControlPointsUseCase getControlPointsUseCase;
 
-    @Tool(description = "지적기준점 전체 개수와 종류별(지적삼각점·지적삼각보조점·지적도근점) 개수를 조회한다.")
+    @Tool(description = "부천시 지적기준점의 전체 개수(total)와 종류별 개수(countByType: 지적삼각점·지적삼각보조점·지적도근점, 키는 한글 종류명)를 집계해 반환한다. '기준점 총 몇 개', '도근점 개수' 같은 개수·통계 질문에 사용한다")
     public PointCountSummary countControlPoints() {
         return PointCountSummary.from(getControlPointsUseCase.getCountSummary());
     }
 
-    @Tool(description = "관리번호로 지적기준점 1점의 상세(이름·종류·성과좌표·경위도·소재지·설치 정보)를 조회한다.")
+    @Tool(description = "관리번호(pointNo)로 지적기준점 1점의 상세를 조회한다. 반환: 관리번호·이름·종류·성과좌표계(crs)·TM 성과좌표(northing=북, easting=동)·경위도(longitude·latitude)·소재지(regionName·address)·표석재질·설치구분·설치일자. 특정 기준점 1점의 좌표·소재지 등을 물을 때 사용한다")
     public ControlPointDetail getControlPointByNo(
-            @ToolParam(description = "기준점 관리번호(예: 41192D000001265)") String pointNo) {
+            @ToolParam(description = "기준점 관리번호 15자리(예: 41192D000001265)") String pointNo) {
         return ControlPointDetail.from(getControlPointsUseCase.getByPointNo(pointNo));
     }
 }
