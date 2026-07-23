@@ -1,11 +1,13 @@
 package com.is.bcs.domain.token;
 
+import com.is.bcs.domain.member.MemberRole;
+
 import java.time.Instant;
 
-public record RefreshToken(
-        String tokenId,
+public record AccessToken(
         Long memberId,
-        String tokenHash,
+        MemberRole role,
+        Instant issuedAt,
         Instant expiresAt
 ) {
 

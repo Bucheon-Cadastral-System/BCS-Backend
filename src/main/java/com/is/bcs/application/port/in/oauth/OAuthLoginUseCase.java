@@ -1,4 +1,4 @@
-package com.is.bcs.application.port.in;
+package com.is.bcs.application.port.in.oauth;
 
 import com.is.bcs.application.dto.OAuthLoginCommand;
 import com.is.bcs.application.dto.OAuthLoginResult;

@@ -1,8 +1,8 @@
-package com.is.bcs.application.service;
+package com.is.bcs.application.service.oauth;
 
 import com.is.bcs.application.dto.OAuthLoginCommand;
 import com.is.bcs.application.dto.OAuthLoginResult;
-import com.is.bcs.application.port.in.OAuthLoginUseCase;
+import com.is.bcs.application.port.in.oauth.OAuthLoginUseCase;
 import com.is.bcs.application.port.out.member.LoadMemberPort;
 import com.is.bcs.application.port.out.member.SaveMemberPort;
 import com.is.bcs.domain.member.Member;

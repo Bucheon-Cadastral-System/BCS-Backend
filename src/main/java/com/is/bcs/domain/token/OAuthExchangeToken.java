@@ -2,10 +2,9 @@ package com.is.bcs.domain.token;
 
 import java.time.Instant;
 
-public record RefreshToken(
-        String tokenId,
-        Long memberId,
-        String tokenHash,
+public record OAuthExchangeToken(
+        String accessToken,
+        Instant accessTokenExpiresAt,
         Instant expiresAt
 ) {
 
