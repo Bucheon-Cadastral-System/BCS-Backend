@@ -45,6 +45,10 @@ public class RefreshAccessTokenService implements RefreshAccessTokenUseCase {
             throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
         }
 
+        if (!tokenHasher.matches(rawRefreshToken, storedToken.tokenHash())) {
+            throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
+        }
+
         // 최신 회원 상태 및 권한 조회
         Member member = loadMemberPort.findById(claims.memberId())
                 .orElseThrow(() -> new InvalidTokenException("유효하지 않은 Refresh Token입니다."));

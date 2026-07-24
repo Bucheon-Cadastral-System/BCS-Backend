@@ -42,11 +42,11 @@ public class LogoutService implements LogoutUseCase {
             throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
         }
 
-        String presentedHash = tokenHasher.hash(rawRefreshToken);
 
-        if (!storedToken.tokenHash().equals(presentedHash)) {
+        if (!tokenHasher.matches(rawRefreshToken, storedToken.tokenHash())) {
             throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
         }
+
         log.info("Logout successful.");
     }
 }
