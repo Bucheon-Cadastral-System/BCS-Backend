@@ -9,7 +9,9 @@ import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import com.is.bcs.domain.token.exception.ExpiredOAuthExchangeCodeException;
 import com.is.bcs.domain.token.exception.ExpiredTokenException;
+import com.is.bcs.domain.token.exception.InvalidOAuthExchangeCodeException;
 import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -190,6 +192,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidTokenException.class)
     public ProblemDetail handleInvalidToken(InvalidTokenException e) {
         return problem(SecurityErrorCode.TOKEN_INVALID, e.getMessage());
+    }
+
+    @ExceptionHandler(ExpiredOAuthExchangeCodeException.class)
+    public ProblemDetail handleExpiredOAuthExchangeCode(ExpiredOAuthExchangeCodeException e) {
+        return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_EXPIRED, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidOAuthExchangeCodeException.class)
+    public ProblemDetail handleInvalidOAuthExchangeCode(InvalidOAuthExchangeCodeException e) {
+        return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_INVALID, e.getMessage());
     }
 
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */

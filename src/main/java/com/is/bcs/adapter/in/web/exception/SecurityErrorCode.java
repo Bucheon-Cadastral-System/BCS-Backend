@@ -14,7 +14,11 @@ public enum SecurityErrorCode implements ErrorCode {
 
     TOKEN_INVALID(HttpStatus.UNAUTHORIZED),
 
-    TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED);
+    TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED),
+
+    OAUTH_EXCHANGE_CODE_INVALID(HttpStatus.UNAUTHORIZED),
+
+    OAUTH_EXCHANGE_CODE_EXPIRED(HttpStatus.UNAUTHORIZED);
 
     private final HttpStatus status;
 

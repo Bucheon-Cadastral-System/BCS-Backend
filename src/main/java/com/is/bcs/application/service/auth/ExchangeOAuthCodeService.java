@@ -3,6 +3,8 @@ package com.is.bcs.application.service.auth;
 import com.is.bcs.application.port.in.auth.ExchangeOAuthCodeUseCase;
 import com.is.bcs.application.port.out.token.OAuthCodeStore;
 import com.is.bcs.domain.token.OAuthExchangeToken;
+import com.is.bcs.domain.token.exception.ExpiredOAuthExchangeCodeException;
+import com.is.bcs.domain.token.exception.InvalidOAuthExchangeCodeException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -19,15 +21,15 @@ public class ExchangeOAuthCodeService implements ExchangeOAuthCodeUseCase {
     public ExchangeOAuthCodeResult exchange(String code) {
 
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("일회용 코드가 비어 있습니다.");
+            throw new InvalidOAuthExchangeCodeException("일회용 코드가 비어 있습니다.");
         }
 
         OAuthExchangeToken exchangeToken =
                 oauthCodeStore.getAndDelete(code)
-                        .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 일회용 코드입니다."));
+                        .orElseThrow(() -> new InvalidOAuthExchangeCodeException("유효하지 않은 일회용 코드입니다."));
 
         if (exchangeToken.isExpired(clock.instant())) {
-            throw new IllegalArgumentException("만료된 일회용 코드입니다.");
+            throw new ExpiredOAuthExchangeCodeException("만료된 일회용 코드입니다.");
         }
 
         return new ExchangeOAuthCodeResult(
