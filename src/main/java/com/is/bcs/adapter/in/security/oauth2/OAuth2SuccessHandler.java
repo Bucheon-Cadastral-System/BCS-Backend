@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.security.oauth2;
 
+import com.is.bcs.adapter.in.security.oauth2.exception.InvalidOAuth2PrincipalException;
 import com.is.bcs.application.port.out.token.*;
 import com.is.bcs.domain.member.MemberStatus;
 import com.is.bcs.domain.token.OAuthExchangeToken;
@@ -35,6 +36,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final TokenHasher tokenHasher;
     private final OAuthCodeStore oauthCodeStore;
     private final Clock clock;
+    private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
 
     public OAuth2SuccessHandler(
             @Value("${app.frontend-base-url}")
@@ -45,7 +47,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             RefreshTokenStore refreshTokenStore,
             TokenHasher tokenHasher,
             OAuthCodeStore oauthCodeStore,
-            Clock clock
+            Clock clock,
+            OAuth2LoginFailureHandler oauth2LoginFailureHandler
     ) {
         this.frontendBaseUrl = frontendBaseUrl;
         this.refreshCookieSecure = refreshCookieSecure;
@@ -54,12 +57,24 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         this.tokenHasher = tokenHasher;
         this.oauthCodeStore = oauthCodeStore;
         this.clock = clock;
+        this.oauth2LoginFailureHandler = oauth2LoginFailureHandler;
     }
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
 
-        BcsOAuth2Principal principal = getPrincipal(authentication);
+        final BcsOAuth2Principal principal;
+
+        try {
+            principal = getPrincipal(authentication);
+        } catch (InvalidOAuth2PrincipalException e) {
+            oauth2LoginFailureHandler.onAuthenticationFailure(
+                    request,
+                    response,
+                    e
+            );
+            return;
+        }
 
         MemberStatus status = principal.getStatus();
 
@@ -74,7 +89,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         Object principal = authentication.getPrincipal();
 
         if (!(principal instanceof BcsOAuth2Principal bcsPrincipal)) {
-            throw new IllegalStateException("지원하지 않는 인증 사용자입니다.");
+            throw new InvalidOAuth2PrincipalException("지원하지 않는 OAuth2 인증 사용자입니다.");
         }
 
         return bcsPrincipal;
@@ -194,5 +209,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             session.invalidate();
         }
     }
+
+
 
 }

@@ -1,5 +1,7 @@
 package com.is.bcs.adapter.in.security.oauth2;
 
+import com.is.bcs.adapter.in.security.oauth2.exception.InvalidOAuth2UserInfoException;
+
 import java.util.Map;
 
 public class KakaoOAuth2UserInfo {
@@ -16,7 +18,7 @@ public class KakaoOAuth2UserInfo {
         Object id = attributes.get("id");
 
         if (id == null) {
-            throw new IllegalArgumentException("카카오 사용자 ID가 없습니다.");
+            throw new InvalidOAuth2UserInfoException("카카오 사용자 ID를 확인할 수 없습니다.");
         }
 
         return String.valueOf(id);

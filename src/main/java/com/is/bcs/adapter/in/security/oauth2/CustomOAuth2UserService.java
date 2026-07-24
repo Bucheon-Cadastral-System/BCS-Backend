@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.security.oauth2;
 
+import com.is.bcs.adapter.in.security.oauth2.exception.InvalidOAuth2UserInfoException;
 import com.is.bcs.application.dto.OAuthLoginCommand;
 import com.is.bcs.application.dto.OAuthLoginResult;
 import com.is.bcs.application.port.in.oauth.OAuthLoginUseCase;
@@ -32,7 +33,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
                 .getRegistrationId();
 
         if (!"kakao".equals(registrationId)) {
-            throw new OAuth2AuthenticationException("지원하지 않는 OAuth Provider: " + registrationId);
+            throw new InvalidOAuth2UserInfoException("카카오 사용자 ID를 확인할 수 없습니다.");
         }
 
         KakaoOAuth2UserInfo kakao = new KakaoOAuth2UserInfo(oauth2User.getAttributes());
