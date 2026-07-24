@@ -7,9 +7,9 @@ import com.is.bcs.application.port.out.token.TokenProvider;
 import com.is.bcs.config.properties.JwtProperties;
 import com.is.bcs.domain.member.MemberRole;
 import com.is.bcs.domain.token.TokenType;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtParser;
-import io.jsonwebtoken.Jwts;
+import com.is.bcs.domain.token.exception.ExpiredTokenException;
+import com.is.bcs.domain.token.exception.InvalidTokenException;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
@@ -85,7 +85,7 @@ public class JwtTokenProvider implements TokenProvider {
 
         return new AccessTokenClaims(
                 parseMemberId(claims),
-                MemberRole.valueOf(claims.get(ROLE_CLAIM, String.class)),
+                parseMemberRole(claims),
                 claims.getIssuedAt().toInstant(),
                 claims.getExpiration().toInstant()
         );
@@ -93,7 +93,6 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public RefreshTokenClaims validateRefreshToken(String token) {
-        log.info("Validating refresh token: {}", token);
         Claims claims = parseClaims(token);
 
         validateTokenType(claims, TokenType.REFRESH);
@@ -140,12 +139,20 @@ public class JwtTokenProvider implements TokenProvider {
 
     private Claims parseClaims(String token) {
         if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException("토큰이 비어 있습니다.");
+            throw new InvalidTokenException("토큰이 비어 있습니다.");
         }
 
-        return jwtParser
-                .parseSignedClaims(token)
-                .getPayload();
+        try {
+            return jwtParser
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+        } catch (ExpiredJwtException e) {
+            throw new ExpiredTokenException("토큰이 만료되었습니다.", e);
+
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new InvalidTokenException("유효하지 않은 토큰입니다.", e);
+        }
     }
 
     private void validateTokenType(Claims claims, TokenType expectedType) {
@@ -155,7 +162,7 @@ public class JwtTokenProvider implements TokenProvider {
         );
 
         if (!expectedType.name().equals(actualType)) {
-            throw new IllegalArgumentException("올바르지 않은 토큰 타입입니다.");
+            throw new InvalidTokenException("올바르지 않은 토큰 타입입니다.");
         }
     }
 
@@ -163,9 +170,30 @@ public class JwtTokenProvider implements TokenProvider {
         String subject = claims.getSubject();
 
         if (subject == null || subject.isBlank()) {
-            throw new IllegalArgumentException("토큰에 사용자 식별자가 없습니다.");
+            throw new InvalidTokenException("토큰에 사용자 식별자가 없습니다.");
         }
 
-        return Long.valueOf(subject);
+        try {
+            return Long.valueOf(subject);
+        } catch (NumberFormatException e) {
+            throw new InvalidTokenException("토큰의 사용자 식별자가 올바르지 않습니다.", e);
+        }
+    }
+
+    private MemberRole parseMemberRole(Claims claims) {
+        String role = claims.get(
+                ROLE_CLAIM,
+                String.class
+        );
+
+        if (role == null || role.isBlank()) {
+            throw new InvalidTokenException("토큰에 사용자 권한이 없습니다.");
+        }
+
+        try {
+            return MemberRole.valueOf(role);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidTokenException("토큰의 사용자 권한이 올바르지 않습니다.", e);
+        }
     }
 }

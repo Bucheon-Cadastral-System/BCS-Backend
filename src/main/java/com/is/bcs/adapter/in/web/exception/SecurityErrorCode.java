@@ -10,7 +10,11 @@ public enum SecurityErrorCode implements ErrorCode {
 
     OAUTH2_PROVIDER_UNSUPPORTED(HttpStatus.BAD_REQUEST),
 
-    OAUTH2_PRINCIPAL_INVALID(HttpStatus.INTERNAL_SERVER_ERROR);
+    OAUTH2_PRINCIPAL_INVALID(HttpStatus.INTERNAL_SERVER_ERROR),
+
+    TOKEN_INVALID(HttpStatus.UNAUTHORIZED),
+
+    TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED);
 
     private final HttpStatus status;
 
