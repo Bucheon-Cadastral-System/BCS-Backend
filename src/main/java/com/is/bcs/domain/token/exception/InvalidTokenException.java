@@ -6,10 +6,7 @@ public class InvalidTokenException extends RuntimeException {
         super(message);
     }
 
-    public InvalidTokenException(
-            String message,
-            Throwable cause
-    ) {
+    public InvalidTokenException(String message, Throwable cause) {
         super(message, cause);
     }
 }
