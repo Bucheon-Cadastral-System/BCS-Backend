@@ -52,6 +52,11 @@ public class SurveyController {
         return SurveyProjectResponse.from(getSurveyProjectsUseCase.getById(projectId));
     }
 
+    @GetMapping("/{projectId}/progress")
+    public SurveyProgressResponse progress(@PathVariable("projectId") Long projectId) {
+        return SurveyProgressResponse.from(getSurveyRecordsUseCase.getProgress(projectId));
+    }
+
     @GetMapping("/{projectId}/records")
     public ContentResponse<SurveyRecordResponse> listRecords(@PathVariable("projectId") Long projectId) {
         return new ContentResponse<>(getSurveyRecordsUseCase.getByProjectId(projectId).stream()
