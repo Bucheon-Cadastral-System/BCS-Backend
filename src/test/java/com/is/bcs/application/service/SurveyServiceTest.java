@@ -7,6 +7,7 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
+import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.config.TimeConfig;
@@ -20,6 +21,7 @@ import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
+import com.is.bcs.domain.survey.SurveyTarget;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -34,8 +36,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,7 +53,7 @@ class SurveyServiceTest {
     private final FakeSurveyStore store = new FakeSurveyStore();
     private final FakePointStore pointStore = new FakePointStore();
     private final SurveyService service = new SurveyService(
-            store, store, store, store, store, pointStore, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
+            store, store, store, store, store, store, pointStore, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
 
     private SurveyProject excavationProject() {
         return service.create(new CreateSurveyProjectCommand(
@@ -140,6 +145,7 @@ class SurveyServiceTest {
         SurveyProject project = excavationProject();
         for (long i = 10; i <= 14; i++) {
             pointStore.add(i);
+            store.targets.add(SurveyTarget.create(project.getId(), i));
         }
         service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
         service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null));
@@ -154,6 +160,7 @@ class SurveyServiceTest {
         assertEquals(2, progress.countByResult().get(SurveyResult.INTACT));
         assertEquals(1, progress.countByResult().get(SurveyResult.LOST));
         assertEquals(0, progress.countByResult().get(SurveyResult.ETC));
+        assertFalse(progress.complete()); // 3/5 조사 — 미완
     }
 
     @Test
@@ -162,6 +169,8 @@ class SurveyServiceTest {
         SurveyProject project = excavationProject();
         pointStore.add(10L);
         pointStore.add(11L);
+        store.targets.add(SurveyTarget.create(project.getId(), 10L));
+        store.targets.add(SurveyTarget.create(project.getId(), 11L));
 
         SurveyProgress progress = service.getProgress(project.getId());
 
@@ -171,6 +180,7 @@ class SurveyServiceTest {
         assertEquals(0, progress.countByResult().get(SurveyResult.INTACT));
         assertEquals(0, progress.countByResult().get(SurveyResult.LOST));
         assertEquals(0, progress.countByResult().get(SurveyResult.ETC));
+        assertFalse(progress.complete()); // 대상 2, 조사 0 — 미완
     }
 
     @Test
@@ -179,12 +189,71 @@ class SurveyServiceTest {
         assertThrows(SurveyProjectNotFoundException.class, () -> service.getProgress(99L));
     }
 
+    @Test
+    @DisplayName("진행률의 전체(total)는 전역 기준점 수가 아니라 프로젝트의 대상 점 수다")
+    void getProgress_totalIsProjectTargetCount() {
+        SurveyProject project = excavationProject();
+        Long pid = project.getId();
+        // 전역 기준점은 10개지만, 이 프로젝트의 조사 대상은 4개
+        for (long i = 1; i <= 10; i++) {
+            pointStore.add(i);
+        }
+        for (long i = 1; i <= 4; i++) {
+            store.targets.add(SurveyTarget.create(pid, i));
+        }
+        service.record(new RecordSurveyCommand(pid, 1L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.LOST, null));
+
+        SurveyProgress progress = service.getProgress(pid);
+
+        assertEquals(4, progress.totalPoints());       // 전역 10이 아니라 대상 4
+        assertEquals(2, progress.surveyedPoints());
+        assertEquals(2, progress.notSurveyedPoints()); // 4 - 2
+        assertFalse(progress.complete()); // 2/4 조사 — 미완
+    }
+
+    @Test
+    @DisplayName("대상이 전부 조사되면 complete=true")
+    void getProgress_allTargetsSurveyed_complete() {
+        SurveyProject project = excavationProject();
+        Long pid = project.getId();
+        for (long i = 1; i <= 2; i++) {
+            pointStore.add(i);
+            store.targets.add(SurveyTarget.create(pid, i));
+        }
+        service.record(new RecordSurveyCommand(pid, 1L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.LOST, null));
+
+        SurveyProgress progress = service.getProgress(pid);
+
+        assertTrue(progress.complete());
+        assertEquals(0, progress.notSurveyedPoints());
+    }
+
+    @Test
+    @DisplayName("대상이 아닌 점의 기록은 진행률에 안 들어간다 (오탐 완료 방지)")
+    void getProgress_ignoresNonTargetRecords() {
+        SurveyProject project = excavationProject();
+        Long pid = project.getId();
+        pointStore.add(1L);
+        pointStore.add(2L);
+        store.targets.add(SurveyTarget.create(pid, 1L)); // 대상은 1번만
+        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.INTACT, null)); // 비대상 2번에 기록
+
+        SurveyProgress progress = service.getProgress(pid);
+
+        assertEquals(1, progress.totalPoints());    // 대상 1
+        assertEquals(0, progress.surveyedPoints());  // 비대상 기록은 미집계
+        assertFalse(progress.complete());            // 대상이 미조사라 미완
+    }
+
     /** 조사 포트 페이크 — 인메모리 저장으로 서비스 로직만 검증한다. */
     private static class FakeSurveyStore implements LoadSurveyProjectPort, SaveSurveyProjectPort,
-            LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort {
+            LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort, LoadSurveyTargetPort {
 
         private final Map<Long, SurveyProject> projects = new HashMap<>();
         private final Map<Long, SurveyRecord> records = new HashMap<>();
+        final List<SurveyTarget> targets = new ArrayList<>();
         private long projectSeq = 0;
         private long recordSeq = 0;
 
@@ -220,9 +289,12 @@ class SurveyServiceTest {
 
         @Override
         public Map<SurveyResult, Long> countByResult(Long projectId) {
+            Set<Long> targetPoints = targets.stream()
+                    .filter(t -> t.getProjectId().equals(projectId))
+                    .map(SurveyTarget::getPointId).collect(Collectors.toSet());
             Map<SurveyResult, Long> counts = new HashMap<>();
             records.values().stream()
-                    .filter(r -> r.getProjectId().equals(projectId))
+                    .filter(r -> r.getProjectId().equals(projectId) && targetPoints.contains(r.getPointId()))
                     .forEach(r -> counts.merge(r.getResult(), 1L, Long::sum));
             return counts;
         }
@@ -246,6 +318,11 @@ class SurveyServiceTest {
         public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
             records.values().removeIf(
                     r -> r.getProjectId().equals(projectId) && r.getPointId().equals(pointId));
+        }
+
+        @Override
+        public long countByProjectId(Long projectId) {
+            return targets.stream().filter(t -> t.getProjectId().equals(projectId)).count();
         }
     }
 
@@ -271,6 +348,11 @@ class SurveyServiceTest {
         @Override
         public Optional<ControlPoint> findByPointNo(String pointNo) {
             return points.values().stream().filter(p -> p.getPointNo().equals(pointNo)).findFirst();
+        }
+
+        @Override
+        public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
+            return points.values().stream().filter(p -> p.getName().equals(name) && p.getType() == type).findFirst();
         }
 
         @Override

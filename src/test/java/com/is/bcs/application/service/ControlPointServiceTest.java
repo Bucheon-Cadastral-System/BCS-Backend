@@ -143,6 +143,11 @@ class ControlPointServiceTest {
         }
 
         @Override
+        public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
+            return points.values().stream().filter(p -> p.getName().equals(name) && p.getType() == type).findFirst();
+        }
+
+        @Override
         public List<ControlPoint> findAll() {
             return new ArrayList<>(points.values());
         }

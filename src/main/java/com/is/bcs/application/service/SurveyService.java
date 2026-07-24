@@ -12,6 +12,7 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
+import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
@@ -41,6 +42,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
     private final LoadSurveyRecordPort loadSurveyRecordPort;
     private final SaveSurveyRecordPort saveSurveyRecordPort;
     private final DeleteSurveyRecordPort deleteSurveyRecordPort;
+    private final LoadSurveyTargetPort loadSurveyTargetPort;
     private final LoadControlPointPort loadControlPointPort;
     private final Clock clock;
 
@@ -111,9 +113,11 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
             surveyed += count;
         }
 
-        long totalPoints = loadControlPointPort.count();
+        long totalPoints = loadSurveyTargetPort.countByProjectId(projectId);
+        long notSurveyedPoints = totalPoints - surveyed;
+        boolean complete = totalPoints > 0 && notSurveyedPoints == 0;
         return new SurveyProgress(
-                project.getName(), totalPoints, surveyed, totalPoints - surveyed, countByResult);
+                project.getName(), totalPoints, surveyed, notSurveyedPoints, complete, countByResult);
     }
 
     private SurveyProject requireProject(Long id) {

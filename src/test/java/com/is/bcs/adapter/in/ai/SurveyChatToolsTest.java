@@ -42,7 +42,7 @@ class SurveyChatToolsTest {
     @Test
     @DisplayName("조사 현황 — 유스케이스 진행 현황을 결과별 개수 필드로 펼쳐 준다")
     void getSurveyProgress_flattensCounts() {
-        fake.progress = new SurveyProgress("2026 굴착협의", 5, 3, 2,
+        fake.progress = new SurveyProgress("2026 굴착협의", 5, 3, 2, false,
                 Map.of(SurveyResult.INTACT, 2L, SurveyResult.LOST, 1L, SurveyResult.ETC, 0L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
@@ -59,7 +59,7 @@ class SurveyChatToolsTest {
     @Test
     @DisplayName("결과 유형이 빠진 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
     void getSurveyProgress_missingResultKeys_defaultZero() {
-        fake.progress = new SurveyProgress("2026 굴착협의", 3, 1, 2, Map.of(SurveyResult.INTACT, 1L));
+        fake.progress = new SurveyProgress("2026 굴착협의", 3, 1, 2, false, Map.of(SurveyResult.INTACT, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
