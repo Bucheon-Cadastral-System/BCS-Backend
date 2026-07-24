@@ -34,6 +34,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -110,7 +112,7 @@ class ExcavationCsvImportServiceTest {
     @DisplayName("이름·종류가 같은 기존 점이 있으면 중복 생성하지 않고 성과·관리번호를 CSV로 갱신한다")
     void importCsv_dedupsByNameAndType_andUpdatesToCsv() throws Exception {
         // 시드 placeholder — 같은 도근점 '4012공'인데 관리번호(짝수)·성과가 CSV(홀수)와 미세하게 다르다
-        pointStore.save(ControlPoint.register(
+        ControlPoint seed = pointStore.save(ControlPoint.register(
                 "41192D000006846", PointType.DOGEUN, "4012공",
                 new TmCoordinate(CoordinateSystem.BESSEL_CENTRAL, new BigDecimal("545860.00"), new BigDecimal("177390.00")),
                 new GeoCoordinate(126.744200, 37.511900),
@@ -128,6 +130,7 @@ class ExcavationCsvImportServiceTest {
         assertEquals(1, named.size());
 
         ControlPoint merged = named.get(0);
+        assertEquals(seed.getId(), merged.getId()); // 기존 점 id 보존(삭제·재생성이 아님)
         assertEquals("41192D000006847", merged.getPointNo()); // 관리번호가 CSV(홀수)로 갱신
         assertEquals(CoordinateSystem.GRS80_CENTRAL, merged.getTm().crs()); // 좌표계도 세계측지계로
         assertEquals(0, new BigDecimal("545860.82").compareTo(merged.getTm().northing()));
@@ -140,6 +143,27 @@ class ExcavationCsvImportServiceTest {
     }
 
     @Test
+    @DisplayName("관리번호가 같아도 CSV 성과가 다르면 갱신한다")
+    void importCsv_samePointNoButChangedCoordinates_updates() throws Exception {
+        // 같은 도근점 '4012공'·같은 관리번호(홀수)인데 좌표가 옛 값
+        pointStore.save(ControlPoint.register(
+                "41192D000006847", PointType.DOGEUN, "4012공",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("177000.00")),
+                new GeoCoordinate(126.744000, 37.511000),
+                "10900", "상동", "부천시 상동 529-2",
+                MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
+                new TraverseInfo("2", "ㅁ", "78", false)));
+
+        ExcavationImportResult result = service.importCsv(
+                new ImportExcavationCsvCommand("2026 굴착협의", null, sampleCsv()));
+
+        assertEquals(1, result.updatedPoints()); // 관리번호가 같아도 성과가 달라 갱신
+        ControlPoint merged = pointStore.points.values().stream()
+                .filter(p -> "4012공".equals(p.getName())).findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("545860.82").compareTo(merged.getTm().northing())); // CSV 좌표로 갱신됨
+    }
+
+    @Test
     @DisplayName("임포트하면 모든 행이 프로젝트의 조사 대상으로 등록된다")
     void importCsv_registersAllRowsAsTargets() throws Exception {
         ExcavationImportResult result = service.importCsv(
@@ -147,6 +171,10 @@ class ExcavationCsvImportServiceTest {
 
         assertEquals(49, targetStore.targets.size());
         assertTrue(targetStore.targets.stream().allMatch(t -> t.getProjectId().equals(result.projectId())));
+
+        Set<Long> targetPointIds = targetStore.targets.stream().map(SurveyTarget::getPointId).collect(Collectors.toSet());
+        assertEquals(49, targetPointIds.size()); // 대상 pointId에 중복 없음
+        assertTrue(targetPointIds.stream().allMatch(id -> pointStore.findById(id).isPresent())); // 실제 임포트된 기준점에 대응
     }
 
     /** 기준점 포트 페이크. */

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 굴착협의 CSV 임포트 — 한 파일로 굴착협의 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
@@ -58,11 +59,11 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
             if (existing == null) {
                 point = saveControlPointPort.save(register(row));
                 newPoints++;
-            } else if (existing.getPointNo().equals(row.pointNo())) {
-                point = existing; // 이미 CSV 성과 — 재사용(갱신 없음)
+            } else if (unchanged(existing, row)) {
+                point = existing; // 성과·속성이 CSV와 동일 — 재사용
                 existingPoints++;
             } else {
-                // 관리번호·성과가 다른 기존 점(시드 등 placeholder) → CSV의 확정 성과로 갱신하고 id는 보존
+                // 기존 점의 성과·속성이 CSV와 다르면(관리번호가 같아도) CSV의 확정값으로 갱신하고 id는 보존
                 point = saveControlPointPort.save(revise(existing.getId(), row));
                 updatedPoints++;
             }
@@ -89,6 +90,26 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
                 row.regionCode(), row.regionName(), row.address(),
                 row.markerMaterial(), row.installType(), row.installedDate(),
                 row.traverse());
+    }
+
+    /**
+     * 기존 점의 성과·속성이 CSV 행과 완전히 같은지 — 같으면 갱신이 필요 없다(재사용).
+     * 관리번호가 같아도 좌표·주소·설치정보가 바뀌었으면 false. BigDecimal은 자릿수 차이를 무시하려 compareTo로 본다.
+     */
+    private boolean unchanged(ControlPoint p, Row row) {
+        return p.getPointNo().equals(row.pointNo())
+                && p.getTm().crs() == row.crs()
+                && p.getTm().northing().compareTo(row.northing()) == 0
+                && p.getTm().easting().compareTo(row.easting()) == 0
+                && p.getGeo().longitude() == row.longitude()
+                && p.getGeo().latitude() == row.latitude()
+                && Objects.equals(p.getRegionCode(), row.regionCode())
+                && Objects.equals(p.getRegionName(), row.regionName())
+                && Objects.equals(p.getAddress(), row.address())
+                && p.getMarkerMaterial() == row.markerMaterial()
+                && p.getInstallType() == row.installType()
+                && Objects.equals(p.getInstalledDate(), row.installedDate())
+                && Objects.equals(p.getTraverse(), row.traverse());
     }
 
     /** 기존 점을 CSV 성과로 갱신 — id는 보존하고 관리번호·좌표·속성을 최신 값으로 덮는다. */

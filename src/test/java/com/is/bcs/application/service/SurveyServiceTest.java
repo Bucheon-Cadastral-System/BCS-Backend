@@ -36,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -228,6 +230,23 @@ class SurveyServiceTest {
         assertEquals(0, progress.notSurveyedPoints());
     }
 
+    @Test
+    @DisplayName("대상이 아닌 점의 기록은 진행률에 안 들어간다 (오탐 완료 방지)")
+    void getProgress_ignoresNonTargetRecords() {
+        SurveyProject project = excavationProject();
+        Long pid = project.getId();
+        pointStore.add(1L);
+        pointStore.add(2L);
+        store.targets.add(SurveyTarget.create(pid, 1L)); // 대상은 1번만
+        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.INTACT, null)); // 비대상 2번에 기록
+
+        SurveyProgress progress = service.getProgress(pid);
+
+        assertEquals(1, progress.totalPoints());    // 대상 1
+        assertEquals(0, progress.surveyedPoints());  // 비대상 기록은 미집계
+        assertFalse(progress.complete());            // 대상이 미조사라 미완
+    }
+
     /** 조사 포트 페이크 — 인메모리 저장으로 서비스 로직만 검증한다. */
     private static class FakeSurveyStore implements LoadSurveyProjectPort, SaveSurveyProjectPort,
             LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort, LoadSurveyTargetPort {
@@ -270,9 +289,12 @@ class SurveyServiceTest {
 
         @Override
         public Map<SurveyResult, Long> countByResult(Long projectId) {
+            Set<Long> targetPoints = targets.stream()
+                    .filter(t -> t.getProjectId().equals(projectId))
+                    .map(SurveyTarget::getPointId).collect(Collectors.toSet());
             Map<SurveyResult, Long> counts = new HashMap<>();
             records.values().stream()
-                    .filter(r -> r.getProjectId().equals(projectId))
+                    .filter(r -> r.getProjectId().equals(projectId) && targetPoints.contains(r.getPointId()))
                     .forEach(r -> counts.merge(r.getResult(), 1L, Long::sum));
             return counts;
         }
