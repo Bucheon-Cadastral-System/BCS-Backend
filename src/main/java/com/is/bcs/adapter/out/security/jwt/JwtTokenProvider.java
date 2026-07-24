@@ -156,10 +156,13 @@ public class JwtTokenProvider implements TokenProvider {
     }
 
     private void validateTokenType(Claims claims, TokenType expectedType) {
-        String actualType = claims.get(
-                TOKEN_TYPE_CLAIM,
-                String.class
-        );
+        final String actualType;
+
+        try {
+            actualType = claims.get(TOKEN_TYPE_CLAIM, String.class);
+        } catch (RequiredTypeException e) {
+            throw new InvalidTokenException("토큰 타입 정보가 올바르지 않습니다.", e);
+        }
 
         if (!expectedType.name().equals(actualType)) {
             throw new InvalidTokenException("올바르지 않은 토큰 타입입니다.");
