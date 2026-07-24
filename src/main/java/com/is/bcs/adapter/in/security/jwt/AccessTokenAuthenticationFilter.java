@@ -2,12 +2,13 @@ package com.is.bcs.adapter.in.security.jwt;
 
 import com.is.bcs.application.port.out.token.AccessTokenClaims;
 import com.is.bcs.application.port.out.token.TokenProvider;
-import io.jsonwebtoken.JwtException;
+import com.is.bcs.domain.token.exception.InvalidTokenException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -18,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
@@ -49,7 +51,8 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication); // Role 등록
 
 
-        } catch (JwtException | IllegalArgumentException exception) {
+        }catch (InvalidTokenException e) {
+            log.debug("Access Token 검증 실패: {}", e.getMessage());
             SecurityContextHolder.clearContext();
         }
         filterChain.doFilter(request, response);
