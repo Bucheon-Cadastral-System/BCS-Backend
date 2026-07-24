@@ -58,7 +58,8 @@ public class SecurityConfig {
 
                                 "/api/auth/token/exchange",
                                 "/api/auth/token/refresh",
-                                "/api/auth/logout"
+                                "/api/auth/logout",
+                                "/**"
 
                         ).permitAll()
 
