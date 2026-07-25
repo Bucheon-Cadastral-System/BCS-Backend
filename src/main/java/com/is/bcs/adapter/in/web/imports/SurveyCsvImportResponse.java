@@ -1,8 +1,8 @@
 package com.is.bcs.adapter.in.web.imports;
 
-import com.is.bcs.application.dto.ExcavationImportResult;
+import com.is.bcs.application.dto.SurveyCsvImportResult;
 
-public record ExcavationImportResponse(
+public record SurveyCsvImportResponse(
         Long projectId,
         int totalRows,
         int newPoints,
@@ -11,8 +11,8 @@ public record ExcavationImportResponse(
         int createdRecords
 ) {
 
-    public static ExcavationImportResponse from(ExcavationImportResult result) {
-        return new ExcavationImportResponse(
+    public static SurveyCsvImportResponse from(SurveyCsvImportResult result) {
+        return new SurveyCsvImportResponse(
                 result.projectId(), result.totalRows(),
                 result.newPoints(), result.existingPoints(), result.updatedPoints(), result.createdRecords());
     }
