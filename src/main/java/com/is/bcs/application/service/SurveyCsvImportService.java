@@ -1,8 +1,8 @@
 package com.is.bcs.application.service;
 
-import com.is.bcs.application.dto.ExcavationImportResult;
-import com.is.bcs.application.dto.ImportExcavationCsvCommand;
-import com.is.bcs.application.port.in.imports.ImportExcavationCsvUseCase;
+import com.is.bcs.application.dto.SurveyCsvImportResult;
+import com.is.bcs.application.dto.ImportSurveyCsvCommand;
+import com.is.bcs.application.port.in.imports.ImportSurveyCsvUseCase;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
@@ -32,7 +32,7 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
+public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
 
     private final LoadControlPointPort loadControlPointPort;
     private final SaveControlPointPort saveControlPointPort;
@@ -42,7 +42,7 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
     private final Clock clock;
 
     @Override
-    public ExcavationImportResult importCsv(ImportExcavationCsvCommand command) {
+    public SurveyCsvImportResult importCsv(ImportSurveyCsvCommand command) {
         List<Row> rows = ExcavationCsvParser.parse(command.content());
 
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
@@ -78,7 +78,7 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
             }
         }
 
-        return new ExcavationImportResult(
+        return new SurveyCsvImportResult(
                 project.getId(), rows.size(), newPoints, existingPoints, updatedPoints, createdRecords);
     }
 

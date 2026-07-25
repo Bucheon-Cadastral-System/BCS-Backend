@@ -1,6 +1,6 @@
 package com.is.bcs.application.dto;
 
-public record ExcavationImportResult(
+public record SurveyCsvImportResult(
         Long projectId,
         int totalRows,
         int newPoints,

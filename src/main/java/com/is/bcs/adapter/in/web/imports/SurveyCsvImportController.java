@@ -1,8 +1,8 @@
 package com.is.bcs.adapter.in.web.imports;
 
-import com.is.bcs.application.dto.ExcavationImportResult;
-import com.is.bcs.application.dto.ImportExcavationCsvCommand;
-import com.is.bcs.application.port.in.imports.ImportExcavationCsvUseCase;
+import com.is.bcs.application.dto.ImportSurveyCsvCommand;
+import com.is.bcs.application.dto.SurveyCsvImportResult;
+import com.is.bcs.application.port.in.imports.ImportSurveyCsvUseCase;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,23 +19,23 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/imports")
-public class ExcavationImportController {
+public class SurveyCsvImportController {
 
-    private final ImportExcavationCsvUseCase importExcavationCsvUseCase;
+    private final ImportSurveyCsvUseCase importSurveyCsvUseCase;
 
-    @PostMapping("/excavation-consultation")
-    public ResponseEntity<ExcavationImportResponse> importExcavationCsv(
+    @PostMapping("/survey-csv")
+    public ResponseEntity<SurveyCsvImportResponse> importSurveyCsv(
             @RequestPart("file") MultipartFile file,
             @RequestParam("name") String name,
             @RequestParam(value = "note", required = false) String note,
-            // 조사 계기는 파일 서식과 별개 축 — 생략하면 이 서식을 쓰던 기존 호출과 같게 굴착협의로 본다
-            @RequestParam(value = "type", required = false) SurveyProjectType type
+            // 조사 계기는 파일 서식과 별개 축이라 요청이 정한다
+            @RequestParam("type") SurveyProjectType type
     ) throws IOException {
-        ExcavationImportResult result = importExcavationCsvUseCase.importCsv(new ImportExcavationCsvCommand(
-                type != null ? type : SurveyProjectType.EXCAVATION_CONSULTATION, name, note, file.getBytes()));
+        SurveyCsvImportResult result = importSurveyCsvUseCase.importCsv(
+                new ImportSurveyCsvCommand(type, name, note, file.getBytes()));
 
         return ResponseEntity
                 .created(URI.create("/api/survey-projects/" + result.projectId()))
-                .body(ExcavationImportResponse.from(result));
+                .body(SurveyCsvImportResponse.from(result));
     }
 }
