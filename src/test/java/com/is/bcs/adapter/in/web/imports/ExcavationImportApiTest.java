@@ -104,6 +104,35 @@ class ExcavationImportApiTest {
     }
 
     @Test
+    @DisplayName("유형을 지정하면 그 유형으로, 생략하면 굴착협의로 프로젝트가 생긴다")
+    void import_projectTypeFollowsRequest() throws Exception {
+        MvcResult typed = mockMvc.perform(multipart("/api/imports/excavation-consultation")
+                        .file(sampleFile())
+                        .param("name", "2026 정기조사")
+                        .param("type", "GENERAL"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(typed));
+        assertTrue(m.find());
+        MvcResult project = mockMvc.perform(get("/api/survey-projects/" + m.group(1)))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(project).contains("\"type\":\"GENERAL\""));
+
+        MvcResult omitted = mockMvc.perform(multipart("/api/imports/excavation-consultation")
+                        .file(sampleFile())
+                        .param("name", "2026 굴착협의"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Matcher m2 = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(omitted));
+        assertTrue(m2.find());
+        MvcResult fallback = mockMvc.perform(get("/api/survey-projects/" + m2.group(1)))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(fallback).contains("\"type\":\"EXCAVATION_CONSULTATION\""));
+    }
+
+    @Test
     @DisplayName("조사명 없이 업로드하면 400")
     void import_withoutName_400() throws Exception {
         mockMvc.perform(multipart("/api/imports/excavation-consultation").file(sampleFile()))

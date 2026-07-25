@@ -13,7 +13,6 @@ import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyTarget;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +25,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 굴착협의 CSV 임포트 — 한 파일로 굴착협의 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
+ * 대상지 CSV 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
+ * 프로젝트 유형은 요청이 정한다 — 파일 서식(굴착협의 대상지)과 조사 계기(일반·굴착협의)는 별개 축이다.
  * 이름·종류로 같은 물리적 점을 찾아 중복 등록을 막고(관리번호가 달라도), 기존 점의 성과가 다르면 CSV의 확정 성과로 갱신한다.
  */
 @Service
@@ -46,7 +46,7 @@ public class ExcavationCsvImportService implements ImportExcavationCsvUseCase {
         List<Row> rows = ExcavationCsvParser.parse(command.content());
 
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
-                SurveyProjectType.EXCAVATION_CONSULTATION, command.name(), command.note()));
+                command.type(), command.name(), command.note()));
 
         int newPoints = 0;
         int existingPoints = 0;
