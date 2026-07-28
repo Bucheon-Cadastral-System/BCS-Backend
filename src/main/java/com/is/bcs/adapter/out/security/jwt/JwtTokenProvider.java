@@ -184,19 +184,24 @@ public class JwtTokenProvider implements TokenProvider {
     }
 
     private MemberRole parseMemberRole(Claims claims) {
-        String role = claims.get(
-                ROLE_CLAIM,
-                String.class
-        );
-
-        if (role == null || role.isBlank()) {
-            throw new InvalidTokenException("토큰에 사용자 권한이 없습니다.");
-        }
-
         try {
+            String role = claims.get(
+                    ROLE_CLAIM,
+                    String.class
+            );
+
+            if (role == null || role.isBlank()) {
+                throw new InvalidTokenException("토큰에 사용자 권한이 없습니다.");
+            }
+
             return MemberRole.valueOf(role);
+
+        } catch (RequiredTypeException e) {
+            throw new InvalidTokenException(
+                    "토큰의 사용자 권한 타입이 올바르지 않습니다.", e);
         } catch (IllegalArgumentException e) {
-            throw new InvalidTokenException("토큰의 사용자 권한이 올바르지 않습니다.", e);
+            throw new InvalidTokenException(
+                    "토큰의 사용자 권한 값이 올바르지 않습니다.", e);
         }
     }
 }
