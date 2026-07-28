@@ -2,6 +2,7 @@ package com.is.bcs.config;
 
 import com.is.bcs.adapter.in.security.jwt.AccessTokenAuthenticationFilter;
 import com.is.bcs.adapter.in.security.oauth2.CustomOAuth2UserService;
+import com.is.bcs.adapter.in.security.oauth2.OAuth2LoginFailureHandler;
 import com.is.bcs.adapter.in.security.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -25,6 +26,7 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final AccessTokenAuthenticationFilter accessTokenAuthenticationFilter;
+    private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -45,6 +47,7 @@ public class SecurityConfig {
                         /** 모두 사용 가능 ! */
                         .requestMatchers(
                                 "/",
+                                "/error",
                                 "/login/**",
                                 "/oauth2/**",
 
@@ -78,6 +81,7 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                         .successHandler(oAuth2SuccessHandler)
+                        .failureHandler(oauth2LoginFailureHandler)
                 )
 
                 /** AccessToken 검증 Filter */

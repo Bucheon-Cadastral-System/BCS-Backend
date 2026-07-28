@@ -6,6 +6,7 @@ import com.is.bcs.application.port.out.token.RefreshTokenStore;
 import com.is.bcs.application.port.out.token.TokenHasher;
 import com.is.bcs.application.port.out.token.TokenProvider;
 import com.is.bcs.domain.token.RefreshToken;
+import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,16 +39,14 @@ public class LogoutService implements LogoutUseCase {
         }
 
         if (!storedToken.memberId().equals(claims.memberId())) {
-            throw new IllegalArgumentException("Refresh Token의 사용자 정보가 일치하지 않습니다.");
+            throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
         }
 
-        String presentedHash = tokenHasher.hash(rawRefreshToken);
 
-        if (!storedToken.tokenHash().equals(presentedHash)) {
-            throw new IllegalArgumentException("Refresh Token이 일치하지 않습니다.");
+        if (!tokenHasher.matches(rawRefreshToken, storedToken.tokenHash())) {
+            throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
         }
 
         log.info("Logout successful.");
-
     }
 }

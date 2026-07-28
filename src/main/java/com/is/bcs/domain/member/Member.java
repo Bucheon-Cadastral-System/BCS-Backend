@@ -1,11 +1,11 @@
 package com.is.bcs.domain.member;
 
+import com.is.bcs.domain.member.exception.InvalidMemberInvariantException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import lombok.Getter;
 
 import java.time.OffsetDateTime;
-import java.util.Objects;
 
 @Getter
 public class Member {
@@ -48,12 +48,8 @@ public class Member {
             OffsetDateTime deactivatedAt
     ) {
         this.id = id;
-        this.provider = Objects.requireNonNull(provider);
-        // 생성 경로 불변식(어댑터가 선검증) — 사용자 입력 위반이 아니라 내부 오류로 취급
-        if (providerUserId == null || providerUserId.isBlank()) {
-            throw new IllegalArgumentException("OAuth 사용자 ID는 필수입니다.");
-        }
-        this.providerUserId = providerUserId.trim();
+        this.provider = requireInvariant(provider, "OAuth 제공자");
+        this.providerUserId = requireInvariantText(providerUserId, "OAuth 사용자 ID");
         this.name = name;
         this.phone = phone;
         this.email = email;
@@ -61,9 +57,9 @@ public class Member {
         this.department = department;
         this.team = team;
         this.position = position;
-        this.role = Objects.requireNonNull(role);
-        this.status = Objects.requireNonNull(status);
-        this.requestedAt = Objects.requireNonNull(requestedAt);
+        this.role = requireInvariant(role, "회원 권한");
+        this.status = requireInvariant(status, "회원 상태");
+        this.requestedAt = requireInvariant(requestedAt, "가입 요청 시각");
         this.approvedAt = approvedAt;
         this.deactivatedAt = deactivatedAt;
     }
@@ -167,34 +163,27 @@ public class Member {
     public void approve(OffsetDateTime approvedAt) {
         validatePendingStatus();
         if (!isProfileCompleted()) {
-            throw new InvalidMemberStateException(
-                    "프로필이 완성되지 않아 승인할 수 없습니다."
-            );
+            throw new InvalidMemberStateException("프로필이 완성되지 않아 승인할 수 없습니다.");
         }
-
-        Objects.requireNonNull(approvedAt); // 상태 변경 전에 검증 — 실패 시 부분 변경 방지
+        OffsetDateTime validApprovedAt = requireInvariant(approvedAt, "승인 시각");
         this.status = MemberStatus.ACTIVE;
-        this.approvedAt = approvedAt;
+        this.approvedAt = validApprovedAt;
         this.deactivatedAt = null;
     }
 
     public void deactivate(OffsetDateTime deactivatedAt) {
         if (status != MemberStatus.ACTIVE) {
-            throw new InvalidMemberStateException(
-                    "활성 회원만 비활성화할 수 있습니다."
-            );
+            throw new InvalidMemberStateException("활성 회원만 비활성화할 수 있습니다.");
         }
 
-        Objects.requireNonNull(deactivatedAt); // 상태 변경 전에 검증 — 실패 시 부분 변경 방지
+        OffsetDateTime validApprovedAt = requireInvariant(deactivatedAt, "비활성화 시각");
         this.status = MemberStatus.INACTIVE;
-        this.deactivatedAt = deactivatedAt;
+        this.deactivatedAt = validApprovedAt;
     }
 
     public void reactivate() {
         if (status != MemberStatus.INACTIVE) {
-            throw new InvalidMemberStateException(
-                    "비활성 회원만 다시 활성화할 수 있습니다."
-            );
+            throw new InvalidMemberStateException("비활성 회원만 다시 활성화할 수 있습니다.");
         }
 
         this.status = MemberStatus.ACTIVE;
@@ -203,20 +192,13 @@ public class Member {
 
     private void validatePendingStatus() {
         if (status != MemberStatus.PENDING) {
-            throw new InvalidMemberStateException(
-                    "승인 대기 상태에서만 처리할 수 있습니다."
-            );
+            throw new InvalidMemberStateException("승인 대기 상태에서만 처리할 수 있습니다.");
         }
     }
 
-    private static String requireText(
-            String value,
-            String fieldName
-    ) {
+    private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
-            throw new InvalidMemberProfileException(
-                    fieldName + "은(는) 필수입니다."
-            );
+            throw new InvalidMemberProfileException(fieldName + "은(는) 필수입니다.");
         }
 
         return value.trim();
@@ -224,9 +206,7 @@ public class Member {
 
     private static <T> T requireField(T value, String fieldName) {
         if (value == null) {
-            throw new InvalidMemberProfileException(
-                    fieldName + "은(는) 필수입니다."
-            );
+            throw new InvalidMemberProfileException(fieldName + "은(는) 필수입니다.");
         }
 
         return value;
@@ -244,6 +224,24 @@ public class Member {
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+
+    private static String requireInvariantText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new InvalidMemberInvariantException(fieldName + "은(는) 필수입니다.");}
+
+        return value.trim();
+    }
+
+
+    private static <T> T requireInvariant(T value, String fieldName) {
+
+        if (value == null) {
+            throw new InvalidMemberInvariantException(fieldName + "은(는) 필수입니다.");
+        }
+
+        return value;
     }
 
 }

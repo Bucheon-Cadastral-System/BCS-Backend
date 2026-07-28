@@ -1,6 +1,7 @@
 package com.is.bcs.adapter.out.security.jwt;
 
 import com.is.bcs.application.port.out.token.TokenHasher;
+import com.is.bcs.domain.token.exception.TokenHashingException;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -14,9 +15,7 @@ public class Sha256TokenHasher implements TokenHasher {
     @Override
     public String hash(String token) {
         if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException(
-                    "해싱할 토큰이 비어 있습니다."
-            );
+            throw new TokenHashingException("해싱할 토큰이 비어 있습니다.");
         }
 
         return HexFormat.of().formatHex(digest(token));
@@ -38,7 +37,7 @@ public class Sha256TokenHasher implements TokenHasher {
                     actualHash,
                     expectedHash
             );
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException e) {
             return false;
         }
     }
@@ -47,11 +46,8 @@ public class Sha256TokenHasher implements TokenHasher {
         try {
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
             return messageDigest.digest(value.getBytes(StandardCharsets.UTF_8));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(
-                    "SHA-256 알고리즘을 사용할 수 없습니다.",
-                    exception
-            );
+        } catch (NoSuchAlgorithmException e) {
+            throw new TokenHashingException("토큰 해시 생성에 실패했습니다.", e);
         }
     }
 }

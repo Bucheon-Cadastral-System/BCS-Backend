@@ -9,6 +9,10 @@ import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import com.is.bcs.domain.token.exception.ExpiredOAuthExchangeCodeException;
+import com.is.bcs.domain.token.exception.ExpiredTokenException;
+import com.is.bcs.domain.token.exception.InvalidOAuthExchangeCodeException;
+import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
@@ -180,6 +184,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(SurveyErrorCode.SURVEY_INVALID, e.getMessage());
     }
 
+    @ExceptionHandler(ExpiredTokenException.class)
+    public ProblemDetail handleExpiredToken(ExpiredTokenException e) {
+        return problem(SecurityErrorCode.TOKEN_EXPIRED, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ProblemDetail handleInvalidToken(InvalidTokenException e) {
+        return problem(SecurityErrorCode.TOKEN_INVALID, e.getMessage());
+    }
+
+    @ExceptionHandler(ExpiredOAuthExchangeCodeException.class)
+    public ProblemDetail handleExpiredOAuthExchangeCode(ExpiredOAuthExchangeCodeException e) {
+        return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_EXPIRED, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidOAuthExchangeCodeException.class)
+    public ProblemDetail handleInvalidOAuthExchangeCode(InvalidOAuthExchangeCodeException e) {
+        return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_INVALID, e.getMessage());
+    }
+
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception e) {
@@ -201,4 +225,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ? CommonErrorCode.COMMON_INTERNAL_ERROR.code()
                 : CommonErrorCode.COMMON_BAD_REQUEST.code();
     }
+
+
 }

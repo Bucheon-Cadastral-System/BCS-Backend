@@ -1,5 +1,6 @@
 package com.is.bcs.domain.member;
 
+import com.is.bcs.domain.member.exception.InvalidMemberInvariantException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import org.junit.jupiter.api.DisplayName;
@@ -49,11 +50,13 @@ class MemberTest {
         assertFalse(member.isProfileCompleted());
     }
 
+
+
     @Test
-    @DisplayName("providerUserId가 비어 있으면 생성할 수 없다")
+    @DisplayName("providerUserId가 비어 있으면 회원 불변식 예외가 발생한다")
     void register_blankProviderUserId_throws() {
-        assertThrows(IllegalArgumentException.class, () -> Member.registerWithKakao(" ", NOW));
-        assertThrows(IllegalArgumentException.class, () -> Member.registerWithKakao(null, NOW));
+        assertThrows(InvalidMemberInvariantException.class, () -> Member.registerWithKakao(" ", NOW));
+        assertThrows(InvalidMemberInvariantException.class, () -> Member.registerWithKakao(null, NOW));
     }
 
     @Test
@@ -101,15 +104,17 @@ class MemberTest {
     }
 
     @Test
-    @DisplayName("승인·비활성화 시각이 없으면 상태가 바뀌기 전에 실패한다")
+    @DisplayName("승인·비활성화 시각이 없으면 회원 불변식 예외가 발생하고 상태가 유지된다")
     void stateTransition_nullTime_noStateChange() {
         Member pending = completedPendingMember();
-        assertThrows(NullPointerException.class, () -> pending.approve(null));
+        assertThrows(InvalidMemberInvariantException.class, () -> pending.approve(null));
         assertEquals(MemberStatus.PENDING, pending.getStatus());
+        assertNull(pending.getApprovedAt());
 
         Member active = activeMember();
-        assertThrows(NullPointerException.class, () -> active.deactivate(null));
+        assertThrows(InvalidMemberInvariantException.class, () -> active.deactivate(null));
         assertEquals(MemberStatus.ACTIVE, active.getStatus());
+        assertNull(active.getDeactivatedAt());
     }
 
     @Test
