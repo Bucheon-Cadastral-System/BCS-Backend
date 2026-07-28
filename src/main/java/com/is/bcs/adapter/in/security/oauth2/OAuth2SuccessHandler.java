@@ -143,6 +143,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 exchangeToken
         );
 
+
         // 5. 기존 OAuth 세션 제거
         clearAuthenticationSession(request);
 

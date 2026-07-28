@@ -41,7 +41,7 @@ public class AuthController {
         this.refreshAccessTokenUseCase = refreshAccessTokenUseCase;
     }
 
-    @Operation(summary = "일회용 임시 코드로 액세스 토큰 & 리프레시 토큰 교환")
+    @Operation(summary = "일회용 임시 코드로 액세스 토큰(바디) & 리프레시 토큰 교환(쿠키)")
     @PostMapping("/token/exchange")
     public ResponseEntity<OAuthCodeExchangeResponse> exchange(@Valid @RequestBody OAuthCodeExchangeRequest request) {
         ExchangeOAuthCodeUseCase.ExchangeOAuthCodeResult result = exchangeOAuthCodeUseCase.exchange(request.code());
