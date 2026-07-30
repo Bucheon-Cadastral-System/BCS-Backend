@@ -2,6 +2,8 @@ package com.is.bcs.adapter.in.member;
 
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
+import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
+import com.is.bcs.application.port.out.token.AccessTokenClaims;
 import com.is.bcs.config.SwaggerConfig;
 import com.is.bcs.domain.member.District;
 import com.is.bcs.domain.member.MemberStatus;
@@ -32,6 +34,18 @@ public class MemberController {
     public static final String CSRF_SECURITY_SCHEME = "CSRF Token";
     private final CompleteMemberProfileUseCase completeMemberProfileUseCase;
     private final GetMemberStateUseCase getMemberStateUseCase;
+    private final GetMyProfileUseCase getMyProfileUseCase;
+
+    @Operation(summary = "내 정보 조회", security = @SecurityRequirement(name = "Bearer Authentication"))
+    @GetMapping("/me")
+    public ResponseEntity<MemberProfileResponse> getMyProfile(Authentication authentication) {
+        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
+        Long memberId = principal.memberId();
+
+        GetMyProfileUseCase.Result result = getMyProfileUseCase.getProfile(memberId);
+
+        return ResponseEntity.ok(MemberProfileResponse.from(result));
+    }
 
     @Operation(summary = "가입 정보 입력", security = @SecurityRequirement(name = CSRF_SECURITY_SCHEME))
     @PutMapping("/me/registration")

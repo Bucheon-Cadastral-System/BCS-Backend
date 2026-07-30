@@ -40,9 +40,16 @@ public class SecurityConfig {
                         .csrfTokenRepository(
                                 CookieCsrfTokenRepository.withHttpOnlyFalse()
                         )
+                        .ignoringRequestMatchers(
+                                "/api/auth/token/exchange",
+                                "/api/auth/token/refresh",
+                                "/api/auth/logout"
+                        )
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/members/me").authenticated()
+
                         /** 모두 사용 가능 ! */
                         .requestMatchers(
                                 "/",

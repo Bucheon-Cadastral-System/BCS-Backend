@@ -19,11 +19,13 @@ public class CaffeineOAuthCodeStore implements OAuthCodeStore {
 
     @Override
     public void save(String code, OAuthExchangeToken exchangeToken) {
+
         oauthCodeCache.put(code, exchangeToken);
     }
 
     @Override
     public Optional<OAuthExchangeToken> getAndDelete(String code) {
+
         return Optional.ofNullable(
                 oauthCodeCache.asMap().remove(code)
         );

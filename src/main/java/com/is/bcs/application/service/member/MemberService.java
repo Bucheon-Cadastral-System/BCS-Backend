@@ -2,6 +2,7 @@ package com.is.bcs.application.service.member;
 
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
+import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
 import com.is.bcs.application.port.out.member.LoadMemberPort;
 import com.is.bcs.application.port.out.member.SaveMemberPort;
 import com.is.bcs.domain.member.Member;
@@ -13,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class MemberService
-        implements CompleteMemberProfileUseCase, GetMemberStateUseCase {
+        implements CompleteMemberProfileUseCase, GetMemberStateUseCase, GetMyProfileUseCase {
 
     private static final String DEPARTMENT = "민원지적과";
 
@@ -40,12 +41,31 @@ public class MemberService
 
     @Override
     @Transactional(readOnly = true)
-    public Result getState(Long memberId) {
+    public GetMemberStateUseCase.Result getState(Long memberId) {
         Member member = getMember(memberId);
 
-        return new Result(
+        return new GetMemberStateUseCase.Result(
                 member.getStatus(),
                 member.isProfileCompleted()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GetMyProfileUseCase.Result getProfile(Long memberId) {
+        Member member = getMember(memberId);
+
+        return new GetMyProfileUseCase.Result(
+                member.getId(),
+                member.getName(),
+                member.getPhone(),
+                member.getEmail(),
+                member.getDistrict(),
+                member.getDepartment(),
+                member.getTeam(),
+                member.getPosition(),
+                member.getRole(),
+                member.getStatus()
         );
     }
 

@@ -93,6 +93,7 @@ public class JwtTokenProvider implements TokenProvider {
 
     @Override
     public RefreshTokenClaims validateRefreshToken(String token) {
+
         Claims claims = parseClaims(token);
 
         validateTokenType(claims, TokenType.REFRESH);

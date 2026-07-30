@@ -158,6 +158,12 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                         + "/oauth/success?code="
                         + encodedCode
         );
+
+        /** 개발용 일회용코드, AccessToken, RefreshToken 출력 */
+        log.info("일회용 코드 : {}", exchangeCode);
+        log.info("액세스 토큰 : {}", issuedTokens.accessToken());
+        log.info("리프레시 토큰 : {}", issuedTokens.refreshToken());
+
     }
 
     private void handleInactive(HttpServletRequest request, HttpServletResponse response) throws IOException {
