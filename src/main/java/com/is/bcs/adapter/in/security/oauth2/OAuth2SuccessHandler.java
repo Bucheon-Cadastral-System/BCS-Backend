@@ -37,6 +37,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final OAuthCodeStore oauthCodeStore;
     private final Clock clock;
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
+    private static final String CODE_CHALLENGE_SESSION_ATTRIBUTE = "OAUTH_CODE_CHALLENGE";
 
     public OAuth2SuccessHandler(
             @Value("${app.frontend-base-url}")
@@ -135,7 +136,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 new OAuthExchangeToken(
                         issuedTokens.accessToken(),
                         issuedTokens.accessTokenExpiresAt(),
-                        clock.instant().plusSeconds(60)
+                        clock.instant().plusSeconds(60),
+                        getCodeChallenge(request)
                 );
 
         oauthCodeStore.save(
@@ -215,6 +217,24 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         if (session != null) {
             session.invalidate();
         }
+    }
+
+    private String getCodeChallenge(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+
+        if (session == null) {
+            throw new InvalidOAuth2PrincipalException("OAuth 로그인 세션이 없습니다.");
+        }
+
+        Object value = session.getAttribute(CODE_CHALLENGE_SESSION_ATTRIBUTE);
+
+        if (!(value instanceof String codeChallenge) || codeChallenge.isBlank()) {
+            throw new InvalidOAuth2PrincipalException("코드 챌린지가 없습니다.");
+        }
+
+        log.info("세션에서 코드챌린지 꺼내기 = {}", codeChallenge);
+
+        return codeChallenge;
     }
 
 

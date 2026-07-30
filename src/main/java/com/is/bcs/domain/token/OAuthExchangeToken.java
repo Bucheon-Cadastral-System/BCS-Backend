@@ -5,7 +5,8 @@ import java.time.Instant;
 public record OAuthExchangeToken(
         String accessToken,
         Instant accessTokenExpiresAt,
-        Instant expiresAt
+        Instant expiresAt,
+        String codeChallenge
 ) {
 
     public boolean isExpired(Instant now) {
