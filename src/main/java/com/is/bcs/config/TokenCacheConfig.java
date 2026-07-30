@@ -16,7 +16,6 @@ public class TokenCacheConfig {
     @Bean("refreshTokenCache")
     public Cache<String, RefreshToken> refreshTokenCache(JwtProperties jwtProperties) {
         return Caffeine.newBuilder()
-                .maximumSize(100_000)
                 .expireAfterWrite(
                     jwtProperties.refreshTokenExpiration()
                 )
@@ -26,7 +25,6 @@ public class TokenCacheConfig {
     @Bean("oauthCodeCache")
     public Cache<String, OAuthExchangeToken> oauthCodeCache() {
         return Caffeine.newBuilder()
-                .maximumSize(10_000)
                 .expireAfterWrite(Duration.ofMinutes(1))
                 .build();
     }
