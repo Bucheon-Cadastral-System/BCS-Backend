@@ -62,6 +62,19 @@ class SurveyServiceTest {
     }
 
     @Test
+    @DisplayName("조사 대상 점 id — 그 프로젝트의 대상만 돌려주고 없는 프로젝트는 거부한다")
+    void getTargetPointIds() {
+        SurveyProject project = sampleProject();
+        SurveyProject other = service.create(new CreateSurveyProjectCommand("다른 조사", STARTED, null, null));
+        store.targets.add(SurveyTarget.create(project.getId(), 10L));
+        store.targets.add(SurveyTarget.create(project.getId(), 11L));
+        store.targets.add(SurveyTarget.create(other.getId(), 12L));
+
+        assertEquals(List.of(10L, 11L), service.getTargetPointIds(project.getId()));
+        assertThrows(SurveyProjectNotFoundException.class, () -> service.getTargetPointIds(999L));
+    }
+
+    @Test
     @DisplayName("프로젝트를 생성하면 id가 발급되고 조회된다")
     void createAndGetProject() {
         SurveyProject created = sampleProject();
@@ -324,6 +337,14 @@ class SurveyServiceTest {
         @Override
         public long countByProjectId(Long projectId) {
             return targets.stream().filter(t -> t.getProjectId().equals(projectId)).count();
+        }
+
+        @Override
+        public List<Long> findPointIdsByProjectId(Long projectId) {
+            return targets.stream()
+                    .filter(t -> t.getProjectId().equals(projectId))
+                    .map(SurveyTarget::getPointId)
+                    .toList();
         }
     }
 

@@ -24,6 +24,11 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
     }
 
     @Override
+    public List<Long> findPointIdsByProjectId(Long projectId) {
+        return targetRepository.findPointIdsByProjectId(projectId);
+    }
+
+    @Override
     public SurveyTarget save(SurveyTarget target) {
         return targetRepository.save(SurveyTargetJpaEntity.fromDomain(target)).toDomain();
     }

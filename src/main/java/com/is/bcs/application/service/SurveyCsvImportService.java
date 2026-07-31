@@ -51,7 +51,7 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
 
     @Override
     public SurveyCsvImportResult importCsv(ImportSurveyCsvCommand command) {
-        SurveyTargetMapper.MappingResult mapped = SurveyTargetMapper.map(tableExtractor.extract(command.content()));
+        SurveyTargetMapper.MappingResult mapped = SurveyTargetMapper.map(tableExtractor.extract(command.content()), command.columnOverrides());
         rejectIfAnyRowFailed(mapped.errors());
         List<Row> rows = mapped.rows();
 

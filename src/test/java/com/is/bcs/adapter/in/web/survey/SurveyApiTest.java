@@ -90,6 +90,21 @@ class SurveyApiTest {
     }
 
     @Test
+    @DisplayName("조사 대상 목록 — 임포트한 프로젝트의 대상 49건을 돌려준다")
+    void listTargets() throws Exception {
+        long projectId = importSample();
+
+        MvcResult result = mockMvc.perform(get("/api/survey-projects/" + projectId + "/targets"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertTrue(bodyOf(result).contains("\"content\":["));
+        assertEquals(49, bodyOf(result).split(",").length); // 대상 49건
+
+        mockMvc.perform(get("/api/survey-projects/999999/targets")).andExpect(status().isNotFound());
+    }
+
+    @Test
     @DisplayName("프로젝트 생성·목록·단건 조회")
     void createAndGetProjects() throws Exception {
         long id = createProject();

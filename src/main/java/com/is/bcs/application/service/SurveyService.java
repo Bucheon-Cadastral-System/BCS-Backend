@@ -99,6 +99,14 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
         return loadSurveyRecordPort.findRecordsByProjectId(projectId);
     }
 
+    /** 프로젝트의 조사 대상 점 id — 없는 프로젝트면 거부한다. */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getTargetPointIds(Long projectId) {
+        requireProject(projectId);
+        return loadSurveyTargetPort.findPointIdsByProjectId(projectId);
+    }
+
     @Override
     @Transactional(readOnly = true)
     public SurveyProgress getProgress(Long projectId) {

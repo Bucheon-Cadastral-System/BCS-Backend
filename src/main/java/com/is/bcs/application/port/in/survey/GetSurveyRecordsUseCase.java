@@ -10,4 +10,7 @@ public interface GetSurveyRecordsUseCase {
     List<SurveyRecord> getByProjectId(Long projectId);
 
     SurveyProgress getProgress(Long projectId);
+
+    /** 프로젝트의 조사 대상 점 id. */
+    List<Long> getTargetPointIds(Long projectId);
 }

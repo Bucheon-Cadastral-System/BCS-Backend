@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -141,6 +142,38 @@ class SurveyTargetMapperTest {
         assertEquals(3, result.errors().getFirst().row());
         assertTrue(result.errors().getFirst().message().contains("수준점"), result.errors().getFirst().message());
         assertEquals(5, result.errors().getLast().row());
+    }
+
+    @Test
+    @DisplayName("담당자가 지정한 매핑대로 읽는다 — 사전이 몰라 무시하던 열도 항목에 이어 붙는다")
+    void map_appliesColumnOverrides() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "설치년월일"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "2018-02-21")));
+
+        MappingResult plain = SurveyTargetMapper.map(table);
+        assertNull(plain.rows().getFirst().installedDate()); // 지정 전에는 조용히 빠진다
+        assertTrue(plain.columns().ignored().contains("설치년월일"));
+
+        MappingResult mapped = SurveyTargetMapper.map(table, Map.of("설치년월일", "설치일자"));
+
+        assertEquals(LocalDate.of(2018, 2, 21), mapped.rows().getFirst().installedDate());
+        assertEquals("설치일자", mapped.columns().recognized().get("설치년월일"));
+        assertTrue(mapped.columns().ignored().isEmpty());
+    }
+
+    @Test
+    @DisplayName("지정한 매핑이 별칭 사전보다 우선한다 — 사람이 정한 것이 규칙보다 앞선다")
+    void map_overrideBeatsAlias() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "경도"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "37.506423")));
+
+        // '경도'는 사전상 경도(X)지만, 담당자가 위도라고 지정하면 그대로 따른다
+        MappingResult mapped = SurveyTargetMapper.map(table, Map.of("경도", "위도(Y)"));
+
+        assertNull(mapped.rows().getFirst().longitude());
+        assertEquals(37.506423, mapped.rows().getFirst().latitude());
     }
 
     @Test

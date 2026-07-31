@@ -104,6 +104,11 @@ class SurveyChatToolsTest {
         }
 
         @Override
+        public List<Long> getTargetPointIds(Long projectId) {
+            return List.of();
+        }
+
+        @Override
         public SurveyProgress getProgress(Long projectId) {
             this.progressProjectId = projectId;
             if (progress == null) {

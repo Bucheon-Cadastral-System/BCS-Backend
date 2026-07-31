@@ -118,8 +118,22 @@ public final class SurveyTargetMapper {
     private SurveyTargetMapper() {
     }
 
+    /** 이 매퍼가 읽을 줄 아는 항목 — 화면이 "이 열을 무엇으로 읽을지" 고르는 목록으로 쓴다. */
+    public static List<String> assignableColumns() {
+        return KNOWN_COLUMNS;
+    }
+
     public static MappingResult map(Table table) {
-        Map<String, Integer> columns = columnIndex(table.headers());
+        return map(table, Map.of());
+    }
+
+    /**
+     * @param overrides 파일의 열 이름 → 읽어 들일 항목. 사전이 알아보지 못한 열을 담당자가 직접 이어 붙일 때 쓴다.
+     *                  별칭 사전보다 우선한다 — 사람이 정한 것이 규칙보다 앞선다.
+     */
+    public static MappingResult map(Table table, Map<String, String> overrides) {
+        Map<String, String> resolved = resolveOverrides(overrides);
+        Map<String, Integer> columns = columnIndex(table.headers(), resolved);
 
         List<String> missing = REQUIRED_COLUMNS.stream().filter(c -> !columns.containsKey(normalize(c))).toList();
         if (!missing.isEmpty()) {
@@ -138,11 +152,27 @@ public final class SurveyTargetMapper {
                 errors.add(new RowError(rowNumber, e.getMessage()));
             }
         }
-        return new MappingResult(List.copyOf(rows), columnMapping(table.headers()), List.copyOf(errors));
+        return new MappingResult(List.copyOf(rows), columnMapping(table.headers(), resolved), List.copyOf(errors));
+    }
+
+    /**
+     * 담당자가 지정한 매핑을 조회용 형태(정규화한 파일 열 이름 → 정규화한 표준 항목)로 바꾼다.
+     * 모르는 항목을 가리키면 무엇이 잘못됐는지 알리고 멈춘다 — 조용히 무시하면 지정한 줄 알고 넘어간다.
+     */
+    private static Map<String, String> resolveOverrides(Map<String, String> overrides) {
+        Map<String, String> resolved = new HashMap<>();
+        overrides.forEach((header, column) -> {
+            String standard = STANDARD_BY_NORMALIZED.get(normalize(column));
+            if (standard == null) {
+                throw new InvalidControlPointException("읽을 수 없는 항목입니다: " + column);
+            }
+            resolved.put(normalize(header), normalize(standard));
+        });
+        return resolved;
     }
 
     /** 파일 헤더를 표준 항목과 대조해 인식·무시로 가른다. 순서는 파일에 적힌 그대로 둔다. */
-    private static ColumnMapping columnMapping(List<String> headers) {
+    private static ColumnMapping columnMapping(List<String> headers, Map<String, String> overrides) {
         Map<String, String> recognized = new LinkedHashMap<>();
         List<String> ignored = new ArrayList<>();
         for (String header : headers) {
@@ -150,7 +180,7 @@ public final class SurveyTargetMapper {
             if (key.isEmpty()) {
                 continue;
             }
-            String standard = STANDARD_BY_NORMALIZED.get(ALIASES.getOrDefault(key, key));
+            String standard = STANDARD_BY_NORMALIZED.get(resolve(key, overrides));
             if (standard == null) {
                 ignored.add(header);
             } else {
@@ -160,17 +190,23 @@ public final class SurveyTargetMapper {
         return new ColumnMapping(Collections.unmodifiableMap(recognized), List.copyOf(ignored));
     }
 
-    /** 정규화한 열 이름 → 위치. 별칭은 표준 이름으로 접어 넣는다. */
-    private static Map<String, Integer> columnIndex(List<String> headers) {
+    /** 정규화한 열 이름 → 위치. 지정 매핑·별칭을 표준 이름으로 접어 넣는다. */
+    private static Map<String, Integer> columnIndex(List<String> headers, Map<String, String> overrides) {
         Map<String, Integer> index = new HashMap<>();
         for (int i = 0; i < headers.size(); i++) {
             String key = normalize(headers.get(i));
             if (key.isEmpty()) {
                 continue;
             }
-            index.putIfAbsent(ALIASES.getOrDefault(key, key), i);
+            index.putIfAbsent(resolve(key, overrides), i);
         }
         return index;
+    }
+
+    /** 지정 매핑이 별칭 사전보다 앞선다 — 사전은 추측이고 지정은 그 파일에 대한 사실이다. */
+    private static String resolve(String normalizedHeader, Map<String, String> overrides) {
+        String assigned = overrides.get(normalizedHeader);
+        return assigned != null ? assigned : ALIASES.getOrDefault(normalizedHeader, normalizedHeader);
     }
 
     /** 띄어쓰기·괄호·기호는 표기 흔들림일 뿐이므로 지우고 비교한다. */
