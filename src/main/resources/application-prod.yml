@@ -26,7 +26,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update # 운영 데이터 보존
+      ddl-auto: create
     show-sql: false
     properties:
       hibernate:

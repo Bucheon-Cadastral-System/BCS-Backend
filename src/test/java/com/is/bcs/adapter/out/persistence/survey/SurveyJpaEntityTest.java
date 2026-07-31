@@ -1,9 +1,9 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,16 +15,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /** 도메인 ↔ JPA 엔티티 매핑 왕복 검증. */
 class SurveyJpaEntityTest {
 
+    private static final LocalDate STARTED = LocalDate.of(2026, 7, 1);
+    private static final LocalDate ENDED = LocalDate.of(2026, 7, 31);
+
     @Test
-    @DisplayName("조사 프로젝트 왕복에서 유형·이름·비고가 보존된다")
+    @DisplayName("조사 프로젝트 왕복에서 기간·이름·비고가 보존된다")
     void projectRoundTrip_preservesAttributes() {
-        SurveyProject origin = SurveyProject.restore(
-                3L, SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사");
+        SurveyProject origin = SurveyProject.restore(3L, null, "2026 일제조사", STARTED, ENDED, "정기 조사");
 
         SurveyProject restored = SurveyProjectJpaEntity.fromDomain(origin).toDomain();
 
         assertEquals(3L, restored.getId());
-        assertEquals(SurveyProjectType.GENERAL, restored.getType());
+        assertEquals(STARTED, restored.getStartedOn());
+        assertEquals(ENDED, restored.getEndedOn());
         assertEquals("2026 일제조사", restored.getName());
         assertEquals("정기 조사", restored.getNote());
     }

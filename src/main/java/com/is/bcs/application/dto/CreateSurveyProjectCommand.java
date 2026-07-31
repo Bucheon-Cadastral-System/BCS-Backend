@@ -1,10 +1,11 @@
 package com.is.bcs.application.dto;
 
-import com.is.bcs.domain.survey.SurveyProjectType;
+import java.time.LocalDate;
 
 public record CreateSurveyProjectCommand(
-        SurveyProjectType type,
         String name,
+        LocalDate startedOn,
+        LocalDate endedOn,
         String note
 ) {
 }

@@ -49,7 +49,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
     @Override
     public SurveyProject create(CreateSurveyProjectCommand command) {
         return saveSurveyProjectPort.save(
-                SurveyProject.create(command.type(), command.name(), command.note()));
+                SurveyProject.create(command.name(), command.startedOn(), command.endedOn(), command.note()));
     }
 
     @Override

@@ -18,12 +18,12 @@ import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SurveyServiceTest {
 
+    private static final LocalDate STARTED = LocalDate.of(2026, 7, 1);
+
     private static final Instant FIXED_INSTANT = Instant.parse("2026-07-22T09:00:00Z");
     private static final OffsetDateTime FIXED_KST = OffsetDateTime.ofInstant(FIXED_INSTANT, TimeConfig.KST);
 
@@ -56,8 +58,7 @@ class SurveyServiceTest {
             store, store, store, store, store, store, pointStore, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
 
     private SurveyProject sampleProject() {
-        return service.create(new CreateSurveyProjectCommand(
-                SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사"));
+        return service.create(new CreateSurveyProjectCommand("2026 일제조사", STARTED, null, "정기 조사"));
     }
 
     @Test
@@ -270,7 +271,7 @@ class SurveyServiceTest {
         @Override
         public SurveyProject save(SurveyProject project) {
             long id = project.getId() != null ? project.getId() : ++projectSeq;
-            SurveyProject saved = SurveyProject.restore(id, project.getType(), project.getName(), project.getNote());
+            SurveyProject saved = SurveyProject.restore(id, project.getAuthorId(), project.getName(), project.getStartedOn(), project.getEndedOn(), project.getNote());
             projects.put(id, saved);
             return saved;
         }

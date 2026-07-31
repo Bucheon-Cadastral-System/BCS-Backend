@@ -19,7 +19,6 @@ import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
@@ -45,6 +44,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** 대상지 CSV 임포트 검증 — 픽스처는 고객사 실파일(49행·기존조사 44건). */
 class SurveyCsvImportServiceTest {
 
+    private static final LocalDate STARTED = LocalDate.of(2026, 7, 1);
+
     private final FakeControlPointStore pointStore = new FakeControlPointStore();
     private final FakeSurveyStore surveyStore = new FakeSurveyStore();
     private final FakeTargetStore targetStore = new FakeTargetStore();
@@ -64,7 +65,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("임포트 — 조사 프로젝트가 생기고 기준점 49개 등록, 기존조사 44건이 기록된다")
     void importCsv_createsProjectPointsAndRecords() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사", sampleCsv()));
+                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, "정기 조사", sampleCsv()));
 
         assertEquals(49, result.totalRows());
         assertEquals(49, result.newPoints());
@@ -73,7 +74,7 @@ class SurveyCsvImportServiceTest {
         assertEquals(44, result.createdRecords());
 
         SurveyProject project = surveyStore.projects.get(result.projectId());
-        assertEquals(SurveyProjectType.GENERAL, project.getType());
+        assertEquals(STARTED, project.getStartedOn());
         assertEquals("2026 일제조사", project.getName());
 
         assertEquals(49, pointStore.points.size());
@@ -84,16 +85,16 @@ class SurveyCsvImportServiceTest {
     @DisplayName("프로젝트 유형은 요청한 값을 따른다 — 같은 서식이라도 일반 조사로 임포트할 수 있다")
     void importCsv_usesRequestedProjectType() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 정기조사", null, sampleCsv()));
+                new ImportSurveyCsvCommand("2026 정기조사", STARTED, null, null, sampleCsv()));
 
-        assertEquals(SurveyProjectType.GENERAL, surveyStore.projects.get(result.projectId()).getType());
+        assertEquals(STARTED, surveyStore.projects.get(result.projectId()).getStartedOn());
     }
 
     @Test
     @DisplayName("조사기록의 시각은 기존조사일의 KST 자정이고 결과·비고가 보존된다")
     void importCsv_recordUsesPriorSurveyDate() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
+                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
 
         ControlPoint row1Point = pointStore.findByPointNo("41192D000001265").orElseThrow();
         SurveyRecord record = surveyStore.records.values().stream()
@@ -109,10 +110,10 @@ class SurveyCsvImportServiceTest {
     @Test
     @DisplayName("재임포트하면 기준점은 전부 기존으로 집계되고 마스터는 다시 만들지 않는다")
     void importCsv_again_reusesExistingPoints() throws Exception {
-        service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "1차", null, sampleCsv()));
+        service.importCsv(new ImportSurveyCsvCommand("1차", STARTED, null, null, sampleCsv()));
 
         SurveyCsvImportResult second = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2차", null, sampleCsv()));
+                new ImportSurveyCsvCommand("2차", STARTED, null, null, sampleCsv()));
 
         assertEquals(0, second.newPoints());
         assertEquals(49, second.existingPoints());
@@ -133,7 +134,7 @@ class SurveyCsvImportServiceTest {
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
                 new TraverseInfo("2", "ㅁ", "78", false)));
 
-        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
+        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
         assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
         assertEquals(48, result.newPoints());    // 나머지 48건은 신규
 
@@ -168,7 +169,7 @@ class SurveyCsvImportServiceTest {
                 new TraverseInfo("2", "ㅁ", "78", false)));
 
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
+                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
 
         assertEquals(1, result.updatedPoints()); // 관리번호가 같아도 성과가 달라 갱신
         ControlPoint merged = pointStore.points.values().stream()
@@ -184,7 +185,7 @@ class SurveyCsvImportServiceTest {
             basicCsv = in.readAllBytes();
         }
 
-        service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "기본 양식 조사", null, basicCsv));
+        service.importCsv(new ImportSurveyCsvCommand("기본 양식 조사", STARTED, null, null, basicCsv));
 
         ControlPoint first = pointStore.findByPointNo("41192D000001265").orElseThrow();
         // 같은 행의 경위도 열(담당자가 덧붙인 값)과 일치해야 한다
@@ -196,7 +197,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("임포트하면 모든 행이 프로젝트의 조사 대상으로 등록된다")
     void importCsv_registersAllRowsAsTargets() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
+                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
 
         assertEquals(49, targetStore.targets.size());
         assertTrue(targetStore.targets.stream().allMatch(t -> t.getProjectId().equals(result.projectId())));
@@ -281,7 +282,7 @@ class SurveyCsvImportServiceTest {
         @Override
         public SurveyProject save(SurveyProject project) {
             long id = project.getId() != null ? project.getId() : ++projectSeq;
-            SurveyProject saved = SurveyProject.restore(id, project.getType(), project.getName(), project.getNote());
+            SurveyProject saved = SurveyProject.restore(id, project.getAuthorId(), project.getName(), project.getStartedOn(), project.getEndedOn(), project.getNote());
             projects.put(id, saved);
             return saved;
         }

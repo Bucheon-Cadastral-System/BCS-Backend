@@ -71,7 +71,7 @@ class SurveyCsvImportApiTest {
                         .file(sampleFile())
                         .param("name", "2026 일제조사")
                         .param("note", "정기 조사")
-                        .param("type", "GENERAL"))
+                        .param("startedOn", "2026-07-01"))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -90,7 +90,7 @@ class SurveyCsvImportApiTest {
         MvcResult project = mockMvc.perform(get("/api/survey-projects/" + projectId))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"type\":\"GENERAL\""));
+        assertTrue(bodyOf(project).contains("\"startedOn\":\"2026-07-01\""));
 
         MvcResult points = mockMvc.perform(get("/api/control-points"))
                 .andExpect(status().isOk())
@@ -108,11 +108,11 @@ class SurveyCsvImportApiTest {
     @DisplayName("같은 파일을 다시 임포트하면 기준점은 재사용되고 새 프로젝트만 생긴다")
     void importTwice_reusesPoints() throws Exception {
         mockMvc.perform(multipart("/api/imports/survey-csv")
-                        .file(sampleFile()).param("name", "1차").param("type", "GENERAL"))
+                        .file(sampleFile()).param("name", "1차").param("startedOn", "2026-07-01"))
                 .andExpect(status().isCreated());
 
         MvcResult second = mockMvc.perform(multipart("/api/imports/survey-csv")
-                        .file(sampleFile()).param("name", "2차").param("type", "GENERAL"))
+                        .file(sampleFile()).param("name", "2차").param("startedOn", "2026-07-01"))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -122,12 +122,12 @@ class SurveyCsvImportApiTest {
     }
 
     @Test
-    @DisplayName("같은 서식이라도 요청한 유형으로 프로젝트가 생긴다")
-    void import_projectTypeFollowsRequest() throws Exception {
+    @DisplayName("요청한 조사 기간이 프로젝트에 반영된다")
+    void import_periodFollowsRequest() throws Exception {
         MvcResult typed = mockMvc.perform(multipart("/api/imports/survey-csv")
                         .file(sampleFile())
                         .param("name", "2026 정기조사")
-                        .param("type", "GENERAL"))
+                        .param("startedOn", "2026-07-01"))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -136,17 +136,17 @@ class SurveyCsvImportApiTest {
         MvcResult project = mockMvc.perform(get("/api/survey-projects/" + m.group(1)))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"type\":\"GENERAL\""));
+        assertTrue(bodyOf(project).contains("\"startedOn\":\"2026-07-01\""));
     }
 
     @Test
-    @DisplayName("조사명·유형 없이 업로드하면 400")
+    @DisplayName("조사명·시작일 없이 업로드하면 400")
     void import_withoutRequiredParams_400() throws Exception {
         mockMvc.perform(multipart("/api/imports/survey-csv").file(sampleFile()))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(multipart("/api/imports/survey-csv")
-                        .file(sampleFile()).param("name", "유형 누락"))
+                        .file(sampleFile()).param("name", "시작일 누락"))
                 .andExpect(status().isBadRequest());
     }
 

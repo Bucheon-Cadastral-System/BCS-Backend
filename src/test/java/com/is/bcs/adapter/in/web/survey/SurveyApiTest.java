@@ -55,7 +55,7 @@ class SurveyApiTest {
         MvcResult result = mockMvc.perform(post("/api/survey-projects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type": "GENERAL", "name": "2026 일제조사", "note": "정기 조사"}
+                                {"name": "2026 일제조사", "startedOn": "2026-07-01", "note": "정기 조사"}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -80,7 +80,7 @@ class SurveyApiTest {
         try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
             MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv")
                             .file(new MockMultipartFile("file", "대상지.csv", "text/csv", in.readAllBytes()))
-                            .param("name", "2026 일제조사").param("type", "GENERAL"))
+                            .param("name", "2026 일제조사").param("startedOn", "2026-07-01"))
                     .andExpect(status().isCreated())
                     .andReturn();
             Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(result));
@@ -103,7 +103,7 @@ class SurveyApiTest {
         MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(single).contains("\"type\":\"GENERAL\""));
+        assertTrue(bodyOf(single).contains("\"startedOn\":\"2026-07-01\""));
 
         mockMvc.perform(get("/api/survey-projects/999999")).andExpect(status().isNotFound());
     }

@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 
 /**
  * 대상지 파일(CSV·XLSX) 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
- * 프로젝트 유형은 요청이 정한다 — 파일 서식과 조사 계기는 별개 축이라, 같은 서식을 어떤 계기로든 임포트할 수 있어야 한다.
  * 이름·종류로 같은 물리적 점을 찾아 중복 등록을 막고(관리번호가 달라도), 기존 점의 성과가 다르면 CSV의 확정 성과로 갱신한다.
  */
 @Service
@@ -57,7 +56,7 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
         List<Row> rows = mapped.rows();
 
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
-                command.type(), command.name(), command.note()));
+                command.name(), command.startedOn(), command.endedOn(), command.note()));
 
         int newPoints = 0;
         int existingPoints = 0;

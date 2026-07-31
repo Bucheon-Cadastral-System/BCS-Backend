@@ -1,10 +1,10 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Transactional
 class SurveyPersistenceAdapterTest {
 
+    private static final LocalDate STARTED = LocalDate.of(2026, 7, 1);
+
     private static final OffsetDateTime SURVEYED_AT = OffsetDateTime.parse("2025-09-08T10:00:00+09:00");
 
     @Autowired
@@ -37,19 +39,18 @@ class SurveyPersistenceAdapterTest {
     private SurveyTargetPersistenceAdapter targetAdapter;
 
     private SurveyProject savedProject() {
-        return adapter.save(SurveyProject.create(
-                SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사"));
+        return adapter.save(SurveyProject.create("2026 일제조사", STARTED, null, "정기 조사"));
     }
 
     @Test
-    @DisplayName("프로젝트 저장 후 조회하면 유형·이름·비고가 보존된다")
+    @DisplayName("프로젝트 저장 후 조회하면 기간·이름·비고가 보존된다")
     void saveAndFindProject_preservesAttributes() {
         SurveyProject saved = savedProject();
 
         SurveyProject found = adapter.findProjectById(saved.getId()).orElseThrow();
 
         assertNotNull(found.getId());
-        assertEquals(SurveyProjectType.GENERAL, found.getType());
+        assertEquals(STARTED, found.getStartedOn());
         assertEquals("2026 일제조사", found.getName());
         assertEquals("정기 조사", found.getNote());
         assertEquals(1, adapter.findAllProjects().size());
@@ -97,8 +98,7 @@ class SurveyPersistenceAdapterTest {
     @DisplayName("결과별 개수는 해당 프로젝트의 대상 점 기록만 결과별로 센다")
     void countByResult_groupsOwnProjectRecords() {
         SurveyProject project = savedProject();
-        SurveyProject other = adapter.save(SurveyProject.create(
-                SurveyProjectType.GENERAL, "다른 조사", null));
+        SurveyProject other = adapter.save(SurveyProject.create("다른 조사", STARTED, null, null));
         for (long pointId : new long[]{10L, 11L, 12L}) {
             targetAdapter.save(SurveyTarget.create(project.getId(), pointId));
         }
