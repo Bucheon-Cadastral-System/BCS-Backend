@@ -4,6 +4,7 @@ import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
+import com.is.bcs.domain.survey.SurveyTarget;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +33,12 @@ class SurveyPersistenceAdapterTest {
     @Autowired
     private SurveyRecordJpaRepository recordRepository;
 
+    @Autowired
+    private SurveyTargetPersistenceAdapter targetAdapter;
+
     private SurveyProject savedProject() {
         return adapter.save(SurveyProject.create(
-                SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", "협의번호 2333"));
+                SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사"));
     }
 
     @Test
@@ -45,9 +49,9 @@ class SurveyPersistenceAdapterTest {
         SurveyProject found = adapter.findProjectById(saved.getId()).orElseThrow();
 
         assertNotNull(found.getId());
-        assertEquals(SurveyProjectType.EXCAVATION_CONSULTATION, found.getType());
-        assertEquals("2026 굴착협의", found.getName());
-        assertEquals("협의번호 2333", found.getNote());
+        assertEquals(SurveyProjectType.GENERAL, found.getType());
+        assertEquals("2026 일제조사", found.getName());
+        assertEquals("정기 조사", found.getNote());
         assertEquals(1, adapter.findAllProjects().size());
     }
 
@@ -90,19 +94,24 @@ class SurveyPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("결과별 개수는 해당 프로젝트의 기록만 결과별로 센다")
+    @DisplayName("결과별 개수는 해당 프로젝트의 대상 점 기록만 결과별로 센다")
     void countByResult_groupsOwnProjectRecords() {
         SurveyProject project = savedProject();
         SurveyProject other = adapter.save(SurveyProject.create(
                 SurveyProjectType.GENERAL, "다른 조사", null));
+        for (long pointId : new long[]{10L, 11L, 12L}) {
+            targetAdapter.save(SurveyTarget.create(project.getId(), pointId));
+        }
         adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
         adapter.save(SurveyRecord.create(project.getId(), 11L, SurveyResult.LOST, SURVEYED_AT, null));
         adapter.save(SurveyRecord.create(project.getId(), 12L, SurveyResult.INTACT, SURVEYED_AT, null));
         adapter.save(SurveyRecord.create(other.getId(), 10L, SurveyResult.ETC, SURVEYED_AT, null));
+        // 대상으로 지정되지 않은 점의 기록 — 진행률이 오탐되지 않도록 집계에서 빠져야 한다
+        adapter.save(SurveyRecord.create(project.getId(), 13L, SurveyResult.INTACT, SURVEYED_AT, null));
 
         Map<SurveyResult, Long> counts = adapter.countByResult(project.getId());
 
-        assertEquals(2, counts.get(SurveyResult.INTACT));
+        assertEquals(2, counts.get(SurveyResult.INTACT)); // 13번은 비대상이라 제외
         assertEquals(1, counts.get(SurveyResult.LOST));
         assertEquals(2, counts.size()); // 기록 없는 결과(기타)는 키가 없다 — 0 채움은 서비스 몫
     }

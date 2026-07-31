@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 대상지 CSV 임포트 API 검증 — DB 필요(bcs/docker-compose). 굴착협의 서식 실파일 업로드로 끝까지 확인한다. */
+/** 대상지 CSV 임포트 API 검증 — DB 필요(bcs/docker-compose). 고객사 실파일 업로드로 끝까지 확인한다. */
 @SpringBootTest
 @Transactional
 class SurveyCsvImportApiTest {
@@ -42,8 +42,8 @@ class SurveyCsvImportApiTest {
     }
 
     private MockMultipartFile sampleFile() throws Exception {
-        try (var in = getClass().getResourceAsStream("/excavation-sample.csv")) {
-            return new MockMultipartFile("file", "굴착협의_대상지.csv", "text/csv", in.readAllBytes());
+        try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
+            return new MockMultipartFile("file", "대상지.csv", "text/csv", in.readAllBytes());
         }
     }
 
@@ -52,9 +52,9 @@ class SurveyCsvImportApiTest {
     void importRealFile_endToEnd() throws Exception {
         MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv")
                         .file(sampleFile())
-                        .param("name", "2026 굴착협의")
-                        .param("note", "협의번호 2333")
-                        .param("type", "EXCAVATION_CONSULTATION"))
+                        .param("name", "2026 일제조사")
+                        .param("note", "정기 조사")
+                        .param("type", "GENERAL"))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -73,7 +73,7 @@ class SurveyCsvImportApiTest {
         MvcResult project = mockMvc.perform(get("/api/survey-projects/" + projectId))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"type\":\"EXCAVATION_CONSULTATION\""));
+        assertTrue(bodyOf(project).contains("\"type\":\"GENERAL\""));
 
         MvcResult points = mockMvc.perform(get("/api/control-points"))
                 .andExpect(status().isOk())
@@ -91,11 +91,11 @@ class SurveyCsvImportApiTest {
     @DisplayName("같은 파일을 다시 임포트하면 기준점은 재사용되고 새 프로젝트만 생긴다")
     void importTwice_reusesPoints() throws Exception {
         mockMvc.perform(multipart("/api/imports/survey-csv")
-                        .file(sampleFile()).param("name", "1차").param("type", "EXCAVATION_CONSULTATION"))
+                        .file(sampleFile()).param("name", "1차").param("type", "GENERAL"))
                 .andExpect(status().isCreated());
 
         MvcResult second = mockMvc.perform(multipart("/api/imports/survey-csv")
-                        .file(sampleFile()).param("name", "2차").param("type", "EXCAVATION_CONSULTATION"))
+                        .file(sampleFile()).param("name", "2차").param("type", "GENERAL"))
                 .andExpect(status().isCreated())
                 .andReturn();
 

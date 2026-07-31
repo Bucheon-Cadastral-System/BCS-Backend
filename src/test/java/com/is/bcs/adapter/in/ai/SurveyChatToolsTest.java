@@ -28,26 +28,26 @@ class SurveyChatToolsTest {
     @DisplayName("프로젝트 목록 — id·이름·유형(한글)·비고를 돌려준다")
     void getSurveyProjects_returnsSummaries() {
         fake.projects.put(1L, SurveyProject.restore(
-                1L, SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", "협의번호 2333"));
+                1L, SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사"));
 
         List<ProjectSummary> projects = tools.getSurveyProjects();
 
         assertEquals(1, projects.size());
         assertEquals(1L, projects.getFirst().id());
-        assertEquals("2026 굴착협의", projects.getFirst().name());
-        assertEquals("굴착협의", projects.getFirst().type());
-        assertEquals("협의번호 2333", projects.getFirst().note());
+        assertEquals("2026 일제조사", projects.getFirst().name());
+        assertEquals("일반 조사", projects.getFirst().type());
+        assertEquals("정기 조사", projects.getFirst().note());
     }
 
     @Test
     @DisplayName("조사 현황 — 유스케이스 진행 현황을 결과별 개수 필드로 펼쳐 준다")
     void getSurveyProgress_flattensCounts() {
-        fake.progress = new SurveyProgress("2026 굴착협의", 5, 3, 2, false,
+        fake.progress = new SurveyProgress("2026 일제조사", 5, 3, 2, false,
                 Map.of(SurveyResult.INTACT, 2L, SurveyResult.LOST, 1L, SurveyResult.ETC, 0L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
-        assertEquals("2026 굴착협의", progress.projectName());
+        assertEquals("2026 일제조사", progress.projectName());
         assertEquals(5, progress.totalPoints());
         assertEquals(3, progress.surveyedPoints());
         assertEquals(2, progress.notSurveyedPoints());
@@ -59,7 +59,7 @@ class SurveyChatToolsTest {
     @Test
     @DisplayName("결과 유형이 빠진 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
     void getSurveyProgress_missingResultKeys_defaultZero() {
-        fake.progress = new SurveyProgress("2026 굴착협의", 3, 1, 2, false, Map.of(SurveyResult.INTACT, 1L));
+        fake.progress = new SurveyProgress("2026 일제조사", 3, 1, 2, false, Map.of(SurveyResult.INTACT, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 

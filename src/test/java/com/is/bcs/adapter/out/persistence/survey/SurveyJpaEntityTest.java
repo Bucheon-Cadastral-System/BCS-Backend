@@ -19,14 +19,14 @@ class SurveyJpaEntityTest {
     @DisplayName("조사 프로젝트 왕복에서 유형·이름·비고가 보존된다")
     void projectRoundTrip_preservesAttributes() {
         SurveyProject origin = SurveyProject.restore(
-                3L, SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", "협의번호 2333");
+                3L, SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사");
 
         SurveyProject restored = SurveyProjectJpaEntity.fromDomain(origin).toDomain();
 
         assertEquals(3L, restored.getId());
-        assertEquals(SurveyProjectType.EXCAVATION_CONSULTATION, restored.getType());
-        assertEquals("2026 굴착협의", restored.getName());
-        assertEquals("협의번호 2333", restored.getNote());
+        assertEquals(SurveyProjectType.GENERAL, restored.getType());
+        assertEquals("2026 일제조사", restored.getName());
+        assertEquals("정기 조사", restored.getNote());
     }
 
     @Test

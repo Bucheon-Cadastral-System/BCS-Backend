@@ -6,7 +6,7 @@ import lombok.Getter;
 import java.util.Objects;
 
 /**
- * 조사 프로젝트 — 기준점 조사를 묶는 단위(예: 굴착협의 1건, 정기 조사 1회).
+ * 조사 프로젝트 — 기준점 조사를 묶는 단위(예: 정기 조사 1회, 협의 1건).
  * 점별 조사 여부·결과는 이 애그리거트가 아니라 조사기록(SurveyRecord)이 갖는다.
  */
 @Getter

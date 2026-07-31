@@ -37,11 +37,8 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 /*
-                 * CSRF 미사용.
-                 * 이 API 는 세션 쿠키가 아니라 Authorization 헤더의 액세스 토큰으로 인증하고,
-                 * 브라우저는 그 헤더를 자동으로 붙이지 않으므로 교차 사이트 요청이 남의 권한으로 실행되지 않는다.
-                 * 자동 전송되는 값은 리프레시 쿠키뿐인데 SameSite=Lax 라 교차 사이트 POST 에는 실리지 않는다.
-                 * 켜 두면 SPA 의 모든 POST·PUT·DELETE 가 토큰 없이 403 으로 막힌다.
+                 * 개발 중 임시 — 이 브랜치를 병합하기 전에 되돌릴 것.
+                 * 켜 두면 SPA 의 모든 POST·PUT·DELETE 가 CSRF 토큰이 없어 403 으로 막혀 화면을 쓸 수 없다.
                  */
                 .csrf(AbstractHttpConfigurer::disable)
 
@@ -64,12 +61,6 @@ public class SecurityConfig {
                                 "/api/auth/token/exchange",
                                 "/api/auth/token/refresh",
                                 "/api/auth/logout",
-
-                                /*
-                                 * 개발 중 전체 개방.
-                                 * 앞선 매처가 먼저 맞으므로 이 한 줄이 아래 ADMIN 규칙과 인증 요구를 모두 무력화한다.
-                                 * 지우기 전에 /error 를 열어 두어야 예외 응답이 401 로 바뀌지 않는다.
-                                 */
                                 "/**"
 
                         ).permitAll()

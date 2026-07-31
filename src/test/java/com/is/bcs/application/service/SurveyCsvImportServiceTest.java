@@ -1,5 +1,6 @@
 package com.is.bcs.application.service;
 
+import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.SurveyCsvImportResult;
 import com.is.bcs.application.dto.ImportSurveyCsvCommand;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
@@ -40,27 +41,28 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 대상지 CSV 임포트 검증 — 픽스처는 고객사 굴착협의 서식 실파일(49행·기존조사 44건). */
+/** 대상지 CSV 임포트 검증 — 픽스처는 고객사 실파일(49행·기존조사 44건). */
 class SurveyCsvImportServiceTest {
 
     private final FakeControlPointStore pointStore = new FakeControlPointStore();
     private final FakeSurveyStore surveyStore = new FakeSurveyStore();
     private final FakeTargetStore targetStore = new FakeTargetStore();
+    // 변환기는 입출력이 없는 순수 계산이라 실제 구현을 쓴다 — 파생된 경위도가 실제 값인지까지 확인된다
     private final SurveyCsvImportService service = new SurveyCsvImportService(
-            pointStore, pointStore, surveyStore, surveyStore, targetStore,
+            pointStore, pointStore, surveyStore, surveyStore, targetStore, new Proj4jCoordinateTransformer(),
             Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST));
 
     private byte[] sampleCsv() throws Exception {
-        try (var in = getClass().getResourceAsStream("/excavation-sample.csv")) {
+        try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
             return in.readAllBytes();
         }
     }
 
     @Test
-    @DisplayName("임포트 — 굴착협의 프로젝트가 생기고 기준점 49개 등록, 기존조사 44건이 기록된다")
+    @DisplayName("임포트 — 조사 프로젝트가 생기고 기준점 49개 등록, 기존조사 44건이 기록된다")
     void importCsv_createsProjectPointsAndRecords() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", "협의번호 2333", sampleCsv()));
+                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", "정기 조사", sampleCsv()));
 
         assertEquals(49, result.totalRows());
         assertEquals(49, result.newPoints());
@@ -69,8 +71,8 @@ class SurveyCsvImportServiceTest {
         assertEquals(44, result.createdRecords());
 
         SurveyProject project = surveyStore.projects.get(result.projectId());
-        assertEquals(SurveyProjectType.EXCAVATION_CONSULTATION, project.getType());
-        assertEquals("2026 굴착협의", project.getName());
+        assertEquals(SurveyProjectType.GENERAL, project.getType());
+        assertEquals("2026 일제조사", project.getName());
 
         assertEquals(49, pointStore.points.size());
         assertEquals(44, surveyStore.records.size());
@@ -89,7 +91,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("조사기록의 시각은 기존조사일의 KST 자정이고 결과·비고가 보존된다")
     void importCsv_recordUsesPriorSurveyDate() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", null, sampleCsv()));
+                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
 
         ControlPoint row1Point = pointStore.findByPointNo("41192D000001265").orElseThrow();
         SurveyRecord record = surveyStore.records.values().stream()
@@ -105,10 +107,10 @@ class SurveyCsvImportServiceTest {
     @Test
     @DisplayName("재임포트하면 기준점은 전부 기존으로 집계되고 마스터는 다시 만들지 않는다")
     void importCsv_again_reusesExistingPoints() throws Exception {
-        service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "1차", null, sampleCsv()));
+        service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "1차", null, sampleCsv()));
 
         SurveyCsvImportResult second = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "2차", null, sampleCsv()));
+                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2차", null, sampleCsv()));
 
         assertEquals(0, second.newPoints());
         assertEquals(49, second.existingPoints());
@@ -129,7 +131,7 @@ class SurveyCsvImportServiceTest {
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
                 new TraverseInfo("2", "ㅁ", "78", false)));
 
-        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", null, sampleCsv()));
+        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
         assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
         assertEquals(48, result.newPoints());    // 나머지 48건은 신규
 
@@ -164,7 +166,7 @@ class SurveyCsvImportServiceTest {
                 new TraverseInfo("2", "ㅁ", "78", false)));
 
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", null, sampleCsv()));
+                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
 
         assertEquals(1, result.updatedPoints()); // 관리번호가 같아도 성과가 달라 갱신
         ControlPoint merged = pointStore.points.values().stream()
@@ -173,10 +175,26 @@ class SurveyCsvImportServiceTest {
     }
 
     @Test
+    @DisplayName("경위도 열이 없는 기본 양식도 성과 좌표에서 파생한 경위도로 등록된다")
+    void importCsv_basicForm_derivesGeoFromTm() throws Exception {
+        byte[] basicCsv;
+        try (var in = getClass().getResourceAsStream("/survey-target-basic.csv")) {
+            basicCsv = in.readAllBytes();
+        }
+
+        service.importCsv(new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "기본 양식 조사", null, basicCsv));
+
+        ControlPoint first = pointStore.findByPointNo("41192D000001265").orElseThrow();
+        // 같은 행의 경위도 열(담당자가 덧붙인 값)과 일치해야 한다
+        assertEquals(126.794623, first.getGeo().longitude(), 1e-6);
+        assertEquals(37.506423, first.getGeo().latitude(), 1e-6);
+    }
+
+    @Test
     @DisplayName("임포트하면 모든 행이 프로젝트의 조사 대상으로 등록된다")
     void importCsv_registersAllRowsAsTargets() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand(SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", null, sampleCsv()));
+                new ImportSurveyCsvCommand(SurveyProjectType.GENERAL, "2026 일제조사", null, sampleCsv()));
 
         assertEquals(49, targetStore.targets.size());
         assertTrue(targetStore.targets.stream().allMatch(t -> t.getProjectId().equals(result.projectId())));

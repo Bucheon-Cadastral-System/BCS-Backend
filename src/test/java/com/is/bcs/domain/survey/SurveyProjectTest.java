@@ -14,11 +14,11 @@ class SurveyProjectTest {
     @DisplayName("생성 시 이름은 트림되고 유형·비고가 보존된다")
     void create_keepsAttributes() {
         SurveyProject project = SurveyProject.create(
-                SurveyProjectType.EXCAVATION_CONSULTATION, " 2026 굴착협의 ", "협의번호 2333");
+                SurveyProjectType.GENERAL, " 2026 일제조사 ", "정기 조사");
 
-        assertEquals("2026 굴착협의", project.getName());
-        assertEquals(SurveyProjectType.EXCAVATION_CONSULTATION, project.getType());
-        assertEquals("협의번호 2333", project.getNote());
+        assertEquals("2026 일제조사", project.getName());
+        assertEquals(SurveyProjectType.GENERAL, project.getType());
+        assertEquals("정기 조사", project.getNote());
         assertNull(project.getId());
     }
 

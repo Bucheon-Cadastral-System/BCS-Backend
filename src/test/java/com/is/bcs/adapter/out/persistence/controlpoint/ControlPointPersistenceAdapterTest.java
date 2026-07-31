@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 기준점 영속 왕복 검증 — DB 필요(bcs/docker-compose). 기대값은 굴착협의 CSV 실데이터. */
+/** 기준점 영속 왕복 검증 — DB 필요(bcs/docker-compose). 기대값은 고객사 대상지 CSV 실데이터. */
 @SpringBootTest
 @Transactional
 class ControlPointPersistenceAdapterTest {

@@ -55,7 +55,7 @@ class SurveyApiTest {
         MvcResult result = mockMvc.perform(post("/api/survey-projects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type": "EXCAVATION_CONSULTATION", "name": "2026 굴착협의", "note": "협의번호 2333"}
+                                {"type": "GENERAL", "name": "2026 일제조사", "note": "정기 조사"}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -75,12 +75,12 @@ class SurveyApiTest {
         return extractId(bodyOf(result));
     }
 
-    /** 실파일 굴착협의 임포트 — 프로젝트 49대상·44조사가 생기고 projectId를 돌려준다. */
+    /** 실파일 임포트 — 프로젝트 49대상·44조사가 생기고 projectId를 돌려준다. */
     private long importSample() throws Exception {
-        try (var in = getClass().getResourceAsStream("/excavation-sample.csv")) {
-            MvcResult result = mockMvc.perform(multipart("/api/imports/excavation-consultation")
-                            .file(new MockMultipartFile("file", "굴착협의_대상지.csv", "text/csv", in.readAllBytes()))
-                            .param("name", "2026 굴착협의"))
+        try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
+            MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv")
+                            .file(new MockMultipartFile("file", "대상지.csv", "text/csv", in.readAllBytes()))
+                            .param("name", "2026 일제조사").param("type", "GENERAL"))
                     .andExpect(status().isCreated())
                     .andReturn();
             Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(result));
@@ -98,12 +98,12 @@ class SurveyApiTest {
                 .andExpect(status().isOk())
                 .andReturn();
         assertTrue(bodyOf(list).contains("\"content\":["));
-        assertTrue(bodyOf(list).contains("\"name\":\"2026 굴착협의\""));
+        assertTrue(bodyOf(list).contains("\"name\":\"2026 일제조사\""));
 
         MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(single).contains("\"type\":\"EXCAVATION_CONSULTATION\""));
+        assertTrue(bodyOf(single).contains("\"type\":\"GENERAL\""));
 
         mockMvc.perform(get("/api/survey-projects/999999")).andExpect(status().isNotFound());
     }
