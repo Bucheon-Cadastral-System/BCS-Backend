@@ -1,7 +1,8 @@
 package com.is.bcs.adapter.out.geo;
 
-import com.is.bcs.application.service.SurveyCsvParser;
-import com.is.bcs.application.service.SurveyCsvParser.Row;
+import com.is.bcs.adapter.out.file.SpreadsheetTableExtractor;
+import com.is.bcs.application.service.SurveyTargetMapper;
+import com.is.bcs.application.service.SurveyTargetMapper.Row;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +32,7 @@ class Proj4jCoordinateTransformerTest {
     @Test
     @DisplayName("실파일 49행의 성과 좌표를 변환하면 같은 행에 적힌 경위도와 일치한다")
     void toWgs84_matchesLongLatInFile() throws Exception {
-        List<Row> rows = SurveyCsvParser.parse(sampleCsv());
+        List<Row> rows = SurveyTargetMapper.map(new SpreadsheetTableExtractor().extract(sampleCsv()));
 
         for (Row row : rows) {
             GeoCoordinate geo = transformer.toWgs84(new TmCoordinate(row.crs(), row.northing(), row.easting()));

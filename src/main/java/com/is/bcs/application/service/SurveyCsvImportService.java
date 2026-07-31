@@ -7,9 +7,10 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
+import com.is.bcs.application.port.out.file.TableExtractor;
 import com.is.bcs.application.port.out.geo.CoordinateTransformer;
 import com.is.bcs.application.port.out.survey.SaveSurveyTargetPort;
-import com.is.bcs.application.service.SurveyCsvParser.Row;
+import com.is.bcs.application.service.SurveyTargetMapper.Row;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
@@ -26,7 +27,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 대상지 CSV 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
+ * 대상지 파일(CSV·XLSX) 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
  * 프로젝트 유형은 요청이 정한다 — 파일 서식과 조사 계기는 별개 축이라, 같은 서식을 어떤 계기로든 임포트할 수 있어야 한다.
  * 이름·종류로 같은 물리적 점을 찾아 중복 등록을 막고(관리번호가 달라도), 기존 점의 성과가 다르면 CSV의 확정 성과로 갱신한다.
  */
@@ -40,12 +41,13 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
     private final SaveSurveyProjectPort saveSurveyProjectPort;
     private final SaveSurveyRecordPort saveSurveyRecordPort;
     private final SaveSurveyTargetPort saveSurveyTargetPort;
+    private final TableExtractor tableExtractor;
     private final CoordinateTransformer coordinateTransformer;
     private final Clock clock;
 
     @Override
     public SurveyCsvImportResult importCsv(ImportSurveyCsvCommand command) {
-        List<Row> rows = SurveyCsvParser.parse(command.content());
+        List<Row> rows = SurveyTargetMapper.map(tableExtractor.extract(command.content()));
 
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
                 command.type(), command.name(), command.note()));

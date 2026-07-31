@@ -1,5 +1,6 @@
 package com.is.bcs.application.service;
 
+import com.is.bcs.adapter.out.file.SpreadsheetTableExtractor;
 import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.SurveyCsvImportResult;
 import com.is.bcs.application.dto.ImportSurveyCsvCommand;
@@ -49,7 +50,8 @@ class SurveyCsvImportServiceTest {
     private final FakeTargetStore targetStore = new FakeTargetStore();
     // 변환기는 입출력이 없는 순수 계산이라 실제 구현을 쓴다 — 파생된 경위도가 실제 값인지까지 확인된다
     private final SurveyCsvImportService service = new SurveyCsvImportService(
-            pointStore, pointStore, surveyStore, surveyStore, targetStore, new Proj4jCoordinateTransformer(),
+            pointStore, pointStore, surveyStore, surveyStore, targetStore,
+            new SpreadsheetTableExtractor(), new Proj4jCoordinateTransformer(),
             Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST));
 
     private byte[] sampleCsv() throws Exception {
