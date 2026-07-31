@@ -13,6 +13,12 @@ spring:
     problemdetails:
       enabled: true # Spring 기본 예외도 ProblemDetail로 응답
 
+  # 대상지 파일 업로드 — 기본값(파일 1MB·요청 10MB)은 2천 점짜리 대상지에 못 미친다
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
