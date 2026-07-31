@@ -17,11 +17,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 굴착협의 대상지 CSV(EUC-KR) 파서.
+ * 대상지 CSV(EUC-KR) 파서.
  * 축 관례 주의: 원본 X좌표=북방향(northing), Y좌표=동방향(easting).
  * 어휘(종류·좌표계·재질·설치·교차·조사결과)는 등록된 값만 허용하고, 알 수 없는 값은 행 번호와 함께 거부한다.
  */
-public final class ExcavationCsvParser {
+public final class SurveyCsvParser {
 
     private static final Charset EUC_KR = Charset.forName("EUC-KR");
 
@@ -33,8 +33,8 @@ public final class ExcavationCsvParser {
             CoordinateSystem crs,
             BigDecimal northing,
             BigDecimal easting,
-            double longitude,
-            double latitude,
+            Double longitude,
+            Double latitude,
             String regionCode,
             String regionName,
             String address,
@@ -48,13 +48,11 @@ public final class ExcavationCsvParser {
     ) {
     }
 
-    private ExcavationCsvParser() {
+    private SurveyCsvParser() {
     }
 
     private static final List<String> REQUIRED_COLUMNS = List.of(
-            "기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표",
-            "토지소재지", "상세주소", "표지재질", "도선등급", "도선명", "도호",
-            "교차구분", "설치구분", "설치일자", "기존조사내", "기존조사일", "조사대상여", "경도(X)", "위도(Y)");
+            "기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표");
 
     public static List<Row> parse(byte[] content) {
         List<String> lines = new String(content, EUC_KR).lines().filter(l -> !l.isBlank()).toList();
@@ -94,8 +92,8 @@ public final class ExcavationCsvParser {
                 crs(cell(cells, header, "좌표계구분"), rowNum),
                 decimal(cell(cells, header, "X좌표"), "X좌표", rowNum),
                 decimal(cell(cells, header, "Y좌표"), "Y좌표", rowNum),
-                number(cell(cells, header, "경도(X)"), "경도", rowNum),
-                number(cell(cells, header, "위도(Y)"), "위도", rowNum),
+                optionalNumber(cell(cells, header, "경도(X)"), "경도", rowNum),
+                optionalNumber(cell(cells, header, "위도(Y)"), "위도", rowNum),
                 regionCode,
                 regionName,
                 cell(cells, header, "상세주소"),
@@ -190,9 +188,13 @@ public final class ExcavationCsvParser {
         }
     }
 
-    private static double number(String value, String field, int rowNum) {
+    /** 경위도는 기본 양식에 없는 열이라 비어 있을 수 있다. 없으면 성과 좌표에서 파생한다. */
+    private static Double optionalNumber(String value, String field, int rowNum) {
+        if (value == null) {
+            return null;
+        }
         try {
-            return Double.parseDouble(require(value, field, rowNum));
+            return Double.parseDouble(value);
         } catch (NumberFormatException e) {
             throw unknown(field, value, rowNum);
         }
@@ -228,10 +230,11 @@ public final class ExcavationCsvParser {
         return index;
     }
 
+    /** 필수 열은 parse 에서 이미 검증했으므로, 여기서 없는 열은 선택 항목이다 — 거부하지 않고 비운다. */
     private static String cell(List<String> cells, Map<String, Integer> header, String name) {
         Integer at = header.get(name);
         if (at == null) {
-            throw new InvalidControlPointException("CSV 헤더에 '" + name + "' 컬럼이 없습니다.");
+            return null;
         }
         if (at >= cells.size()) {
             return null;

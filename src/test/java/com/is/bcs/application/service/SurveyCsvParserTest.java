@@ -1,6 +1,6 @@
 package com.is.bcs.application.service;
 
-import com.is.bcs.application.service.ExcavationCsvParser.Row;
+import com.is.bcs.application.service.SurveyCsvParser.Row;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.InstallType;
 import com.is.bcs.domain.controlpoint.MarkerMaterial;
@@ -19,14 +19,15 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 굴착협의 CSV 파싱 검증 — 픽스처는 고객사 실파일(EUC-KR) 그대로. */
-class ExcavationCsvParserTest {
+/** 대상지 CSV 파싱 검증 — 픽스처는 고객사 실파일(EUC-KR) 그대로. */
+class SurveyCsvParserTest {
 
     private static final Charset EUC_KR = Charset.forName("EUC-KR");
 
     private byte[] sampleCsv() throws Exception {
-        try (var in = getClass().getResourceAsStream("/excavation-sample.csv")) {
+        try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
             return in.readAllBytes();
         }
     }
@@ -34,7 +35,7 @@ class ExcavationCsvParserTest {
     @Test
     @DisplayName("실파일 49행이 전부 파싱되고 첫 행의 모든 필드가 원본 값과 일치한다")
     void parse_realFile_firstRow() throws Exception {
-        List<Row> rows = ExcavationCsvParser.parse(sampleCsv());
+        List<Row> rows = SurveyCsvParser.parse(sampleCsv());
 
         assertEquals(49, rows.size());
 
@@ -62,7 +63,7 @@ class ExcavationCsvParserTest {
     @Test
     @DisplayName("어휘 매핑 집계 — 완전 40·망실 3·기타 1·미조사 5, 삼각보조점 1")
     void parse_realFile_vocabularyCounts() throws Exception {
-        List<Row> rows = ExcavationCsvParser.parse(sampleCsv());
+        List<Row> rows = SurveyCsvParser.parse(sampleCsv());
 
         assertEquals(40, rows.stream().filter(r -> r.priorResult() == SurveyResult.INTACT).count());
         assertEquals(3, rows.stream().filter(r -> r.priorResult() == SurveyResult.LOST).count());
@@ -75,7 +76,7 @@ class ExcavationCsvParserTest {
     @Test
     @DisplayName("교차구분 라벨 — '도근점'은 일반(false), 빈값은 미기재(null)로 해석한다")
     void parse_intersectionLabel() throws Exception {
-        List<Row> rows = ExcavationCsvParser.parse(sampleCsv());
+        List<Row> rows = SurveyCsvParser.parse(sampleCsv());
 
         assertEquals(42, rows.stream()
                 .filter(r -> r.traverse() != null && Boolean.FALSE.equals(r.traverse().intersection()))
@@ -84,11 +85,61 @@ class ExcavationCsvParserTest {
     }
 
     @Test
-    @DisplayName("필수 컬럼이 없는 헤더는 데이터 행이 없어도 거부한다")
+    @DisplayName("기본 양식(경위도 열이 없는 20열)도 파싱되고 경위도는 비어 있다")
+    void parse_basicForm() throws Exception {
+        byte[] csv;
+        try (var in = getClass().getResourceAsStream("/survey-target-basic.csv")) {
+            csv = in.readAllBytes();
+        }
+
+        List<Row> rows = SurveyCsvParser.parse(csv);
+
+        assertEquals(49, rows.size());
+        Row first = rows.get(0);
+        assertNull(first.longitude());
+        assertNull(first.latitude());
+        // 나머지 항목은 22열 파일과 동일하게 읽힌다
+        assertEquals("41192D000001265", first.pointNo());
+        assertEquals(new BigDecimal("545236.77"), first.northing());
+        assertEquals(new BigDecimal("181840.96"), first.easting());
+        assertEquals(SurveyResult.INTACT, first.priorResult());
+    }
+
+    @Test
+    @DisplayName("필수 6열만 있어도 파싱되고, 열 순서가 달라도 이름으로 찾는다")
+    void parse_minimalColumns() throws Exception {
+        byte[] csv;
+        try (var in = getClass().getResourceAsStream("/survey-target-minimal.csv")) {
+            csv = in.readAllBytes();
+        }
+
+        List<Row> rows = SurveyCsvParser.parse(csv);
+
+        assertEquals(3, rows.size());
+        Row first = rows.get(0);
+        assertEquals("41192D000001265", first.pointNo());
+        assertEquals(PointType.DOGEUN, first.type());
+        assertEquals("1465공", first.name());
+        assertEquals(CoordinateSystem.GRS80_CENTRAL, first.crs());
+        assertEquals(new BigDecimal("545236.77"), first.northing());
+        assertEquals(new BigDecimal("181840.96"), first.easting());
+        // 없는 열은 값이 비어 있을 뿐 거부하지 않는다
+        assertNull(first.address());
+        assertNull(first.markerMaterial());
+        assertNull(first.installedDate());
+        assertNull(first.traverse());
+        assertNull(first.priorResult());
+    }
+
+    @Test
+    @DisplayName("필수 컬럼이 없는 헤더는 데이터 행이 없어도 거부하고, 빠진 열 이름을 알려준다")
     void parse_missingRequiredColumns_throws() {
         byte[] wrongHeader = "foo,bar\n".getBytes(EUC_KR);
 
-        assertThrows(InvalidControlPointException.class, () -> ExcavationCsvParser.parse(wrongHeader));
+        InvalidControlPointException thrown = assertThrows(
+                InvalidControlPointException.class, () -> SurveyCsvParser.parse(wrongHeader));
+
+        assertTrue(thrown.getMessage().contains("기준점번호"), thrown.getMessage());
     }
 
     @Test
@@ -99,6 +150,6 @@ class ExcavationCsvParserTest {
 
         byte[] csv = (header + "\n" + badType).getBytes(EUC_KR);
 
-        assertThrows(InvalidControlPointException.class, () -> ExcavationCsvParser.parse(csv));
+        assertThrows(InvalidControlPointException.class, () -> SurveyCsvParser.parse(csv));
     }
 }
