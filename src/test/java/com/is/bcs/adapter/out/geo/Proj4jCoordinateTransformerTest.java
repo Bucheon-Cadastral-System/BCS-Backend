@@ -32,7 +32,7 @@ class Proj4jCoordinateTransformerTest {
     @Test
     @DisplayName("실파일 49행의 성과 좌표를 변환하면 같은 행에 적힌 경위도와 일치한다")
     void toWgs84_matchesLongLatInFile() throws Exception {
-        List<Row> rows = SurveyTargetMapper.map(new SpreadsheetTableExtractor().extract(sampleCsv()));
+        List<Row> rows = SurveyTargetMapper.map(new SpreadsheetTableExtractor().extract(sampleCsv())).rows();
 
         for (Row row : rows) {
             GeoCoordinate geo = transformer.toWgs84(new TmCoordinate(row.crs(), row.northing(), row.easting()));

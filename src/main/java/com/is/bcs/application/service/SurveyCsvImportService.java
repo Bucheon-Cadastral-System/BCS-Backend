@@ -14,6 +14,7 @@ import com.is.bcs.application.service.SurveyTargetMapper.Row;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
+import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyTarget;
@@ -25,6 +26,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 대상지 파일(CSV·XLSX) 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
@@ -45,9 +47,14 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
     private final CoordinateTransformer coordinateTransformer;
     private final Clock clock;
 
+    /** 거부 메시지에 실을 오류 건수 상한. */
+    private static final int ERRORS_IN_MESSAGE = 5;
+
     @Override
     public SurveyCsvImportResult importCsv(ImportSurveyCsvCommand command) {
-        List<Row> rows = SurveyTargetMapper.map(tableExtractor.extract(command.content()));
+        SurveyTargetMapper.MappingResult mapped = SurveyTargetMapper.map(tableExtractor.extract(command.content()));
+        rejectIfAnyRowFailed(mapped.errors());
+        List<Row> rows = mapped.rows();
 
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
                 command.type(), command.name(), command.note()));
@@ -89,6 +96,24 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
 
         return new SurveyCsvImportResult(
                 project.getId(), rows.size(), newPoints, existingPoints, updatedPoints, createdRecords);
+    }
+
+    /**
+     * 한 행이라도 읽지 못하면 아무것도 등록하지 않는다 — 일부만 들어간 조사는 담당자가 무엇을 다시 올려야 할지 알 수 없다.
+     * 오류가 많을 때 메시지가 끝없이 길어지지 않도록 앞쪽 몇 건만 싣는다(전체 목록은 미리보기가 보여 준다).
+     */
+    private void rejectIfAnyRowFailed(List<SurveyTargetMapper.RowError> errors) {
+        if (errors.isEmpty()) {
+            return;
+        }
+        String detail = errors.stream()
+                .limit(ERRORS_IN_MESSAGE)
+                .map(e -> e.row() + "행: " + e.message())
+                .collect(Collectors.joining(" / "));
+        if (errors.size() > ERRORS_IN_MESSAGE) {
+            detail += " 외 " + (errors.size() - ERRORS_IN_MESSAGE) + "건";
+        }
+        throw new InvalidControlPointException(detail);
     }
 
     private ControlPoint register(Row row, TmCoordinate tm, GeoCoordinate geo) {

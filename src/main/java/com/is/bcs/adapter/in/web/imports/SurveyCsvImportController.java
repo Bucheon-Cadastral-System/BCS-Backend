@@ -2,7 +2,9 @@ package com.is.bcs.adapter.in.web.imports;
 
 import com.is.bcs.application.dto.ImportSurveyCsvCommand;
 import com.is.bcs.application.dto.SurveyCsvImportResult;
+import com.is.bcs.application.dto.SurveyCsvPreviewResult;
 import com.is.bcs.application.port.in.imports.ImportSurveyCsvUseCase;
+import com.is.bcs.application.port.in.imports.PreviewSurveyCsvUseCase;
 import com.is.bcs.domain.survey.SurveyProjectType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,13 @@ import java.net.URI;
 public class SurveyCsvImportController {
 
     private final ImportSurveyCsvUseCase importSurveyCsvUseCase;
+    private final PreviewSurveyCsvUseCase previewSurveyCsvUseCase;
+
+    /** 확정 전에 파일만 읽어 본다 — 등록은 일어나지 않으므로 확정할 때 파일을 다시 보낸다. */
+    @PostMapping("/survey-csv/preview")
+    public SurveyCsvPreviewResult preview(@RequestPart("file") MultipartFile file) throws IOException {
+        return previewSurveyCsvUseCase.preview(file.getBytes());
+    }
 
     @PostMapping("/survey-csv")
     public ResponseEntity<SurveyCsvImportResponse> importSurveyCsv(

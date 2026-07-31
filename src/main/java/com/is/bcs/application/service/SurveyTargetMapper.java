@@ -12,9 +12,12 @@ import com.is.bcs.domain.survey.SurveyResult;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 대상지 표의 각 행을 도메인 값으로 읽는다.
@@ -73,6 +76,15 @@ public final class SurveyTargetMapper {
     private static final List<String> REQUIRED_COLUMNS =
             List.of(POINT_NO, TYPE, NAME, CRS, NORTHING, EASTING);
 
+    /** 이 매퍼가 읽을 줄 아는 항목 전부 — 여기 없는 열은 무시된다. */
+    private static final List<String> KNOWN_COLUMNS = List.of(
+            POINT_NO, TYPE, NAME, CRS, NORTHING, EASTING, LONGITUDE, LATITUDE, REGION, ADDRESS,
+            MATERIAL, TRAVERSE_GRADE, TRAVERSE_NAME, TRAVERSE_NO, INTERSECTION,
+            INSTALL_TYPE, INSTALLED_DATE, PRIOR_RESULT, PRIOR_SURVEY_DATE, TARGET_NOTE);
+
+    private static final Map<String, String> STANDARD_BY_NORMALIZED = KNOWN_COLUMNS.stream()
+            .collect(Collectors.toUnmodifiableMap(SurveyTargetMapper::normalize, column -> column));
+
     /**
      * 같은 항목을 가리키는 다른 표기 — 키·값 모두 정규화한 형태로 둔다(조회도 정규화한 이름으로 하므로).
      * 5자에서 잘린 이름(기존조사내·조사대상여)은 고객사 내보내기가 실제로 그렇게 준다.
@@ -84,23 +96,68 @@ public final class SurveyTargetMapper {
             normalize("경도"), normalize(LONGITUDE),
             normalize("위도"), normalize(LATITUDE));
 
+    /**
+     * 읽은 행과 함께, 어떻게 읽었는지(열 매핑)와 읽지 못한 행(오류)을 돌려준다.
+     * 오류에서 멈추지 않고 끝까지 훑는다 — 담당자가 파일을 한 번에 고칠 수 있어야 한다.
+     */
+    public record MappingResult(List<Row> rows, ColumnMapping columns, List<RowError> errors) {
+
+        /** 표의 데이터 행 수 — 읽힌 행과 오류 행을 합한 값. */
+        public int totalRows() {
+            return rows.size() + errors.size();
+        }
+    }
+
+    /** 파일의 열 이름이 어떤 항목으로 읽혔는지. 사전에 없는 이름은 조용히 버리지 않고 무시 목록으로 알린다. */
+    public record ColumnMapping(Map<String, String> recognized, List<String> ignored) {
+    }
+
+    public record RowError(int row, String message) {
+    }
+
     private SurveyTargetMapper() {
     }
 
-    public static List<Row> map(Table table) {
+    public static MappingResult map(Table table) {
         Map<String, Integer> columns = columnIndex(table.headers());
 
         List<String> missing = REQUIRED_COLUMNS.stream().filter(c -> !columns.containsKey(normalize(c))).toList();
         if (!missing.isEmpty()) {
-            // 데이터 행이 없어도(빈 목록 → 빈 조사) 조용히 성공하지 않도록 헤더를 먼저 검증한다
+            // 파일 전체를 읽을 수 없는 상태라 행 오류로 표현할 수 없다 — 데이터 행이 없어도 여기서 멈춘다
             throw new InvalidControlPointException("필수 열이 없습니다: " + String.join(", ", missing));
         }
 
         List<Row> rows = new ArrayList<>();
+        List<RowError> errors = new ArrayList<>();
         for (int i = 0; i < table.rows().size(); i++) {
-            rows.add(mapRow(table.rows().get(i), columns, i + 2)); // 헤더가 1행이므로 데이터는 2행부터
+            int rowNumber = i + 2; // 헤더가 1행이므로 데이터는 2행부터
+            try {
+                rows.add(mapRow(table.rows().get(i), columns));
+            } catch (InvalidControlPointException e) {
+                // 한 행이 잘못됐다고 멈추면 담당자가 고치고 올리기를 반복해야 한다 — 모아서 한 번에 보여준다
+                errors.add(new RowError(rowNumber, e.getMessage()));
+            }
         }
-        return rows;
+        return new MappingResult(List.copyOf(rows), columnMapping(table.headers()), List.copyOf(errors));
+    }
+
+    /** 파일 헤더를 표준 항목과 대조해 인식·무시로 가른다. 순서는 파일에 적힌 그대로 둔다. */
+    private static ColumnMapping columnMapping(List<String> headers) {
+        Map<String, String> recognized = new LinkedHashMap<>();
+        List<String> ignored = new ArrayList<>();
+        for (String header : headers) {
+            String key = normalize(header);
+            if (key.isEmpty()) {
+                continue;
+            }
+            String standard = STANDARD_BY_NORMALIZED.get(ALIASES.getOrDefault(key, key));
+            if (standard == null) {
+                ignored.add(header);
+            } else {
+                recognized.putIfAbsent(header, standard);
+            }
+        }
+        return new ColumnMapping(Collections.unmodifiableMap(recognized), List.copyOf(ignored));
     }
 
     /** 정규화한 열 이름 → 위치. 별칭은 표준 이름으로 접어 넣는다. */
@@ -121,7 +178,7 @@ public final class SurveyTargetMapper {
         return header.replaceAll("[\\s()\\[\\]_.\\-/]", "").toLowerCase();
     }
 
-    private static Row mapRow(List<String> cells, Map<String, Integer> columns, int rowNum) {
+    private static Row mapRow(List<String> cells, Map<String, Integer> columns) {
         String regionRaw = cell(cells, columns, REGION);
         String regionCode = null;
         String regionName = regionRaw;
@@ -133,88 +190,88 @@ public final class SurveyTargetMapper {
 
         return new Row(
                 cell(cells, columns, POINT_NO),
-                pointType(cell(cells, columns, TYPE), rowNum),
+                pointType(cell(cells, columns, TYPE)),
                 cell(cells, columns, NAME),
-                crs(cell(cells, columns, CRS), rowNum),
-                decimal(cell(cells, columns, NORTHING), NORTHING, rowNum),
-                decimal(cell(cells, columns, EASTING), EASTING, rowNum),
-                optionalNumber(cell(cells, columns, LONGITUDE), "경도", rowNum),
-                optionalNumber(cell(cells, columns, LATITUDE), "위도", rowNum),
+                crs(cell(cells, columns, CRS)),
+                decimal(cell(cells, columns, NORTHING), NORTHING),
+                decimal(cell(cells, columns, EASTING), EASTING),
+                optionalNumber(cell(cells, columns, LONGITUDE), "경도"),
+                optionalNumber(cell(cells, columns, LATITUDE), "위도"),
                 regionCode,
                 regionName,
                 cell(cells, columns, ADDRESS),
-                material(cell(cells, columns, MATERIAL), rowNum),
-                install(cell(cells, columns, INSTALL_TYPE), rowNum),
-                date(cell(cells, columns, INSTALLED_DATE), INSTALLED_DATE, rowNum),
-                traverse(cells, columns, rowNum),
-                priorResult(cell(cells, columns, PRIOR_RESULT), rowNum),
-                date(cell(cells, columns, PRIOR_SURVEY_DATE), PRIOR_SURVEY_DATE, rowNum),
+                material(cell(cells, columns, MATERIAL)),
+                install(cell(cells, columns, INSTALL_TYPE)),
+                date(cell(cells, columns, INSTALLED_DATE), INSTALLED_DATE),
+                traverse(cells, columns),
+                priorResult(cell(cells, columns, PRIOR_RESULT)),
+                date(cell(cells, columns, PRIOR_SURVEY_DATE), PRIOR_SURVEY_DATE),
                 cell(cells, columns, TARGET_NOTE)
         );
     }
 
-    private static TraverseInfo traverse(List<String> cells, Map<String, Integer> columns, int rowNum) {
+    private static TraverseInfo traverse(List<String> cells, Map<String, Integer> columns) {
         String grade = cell(cells, columns, TRAVERSE_GRADE);
         String lineName = cell(cells, columns, TRAVERSE_NAME);
         String lineNo = cell(cells, columns, TRAVERSE_NO);
-        Boolean intersection = intersection(cell(cells, columns, INTERSECTION), rowNum);
+        Boolean intersection = intersection(cell(cells, columns, INTERSECTION));
         if (grade == null && lineName == null && lineNo == null && intersection == null) {
             return null;
         }
         return new TraverseInfo(grade, lineName, lineNo, intersection);
     }
 
-    private static PointType pointType(String value, int rowNum) {
-        return switch (require(value, TYPE, rowNum)) {
+    private static PointType pointType(String value) {
+        return switch (require(value, TYPE)) {
             case "도근점", "지적도근점" -> PointType.DOGEUN;
             case "삼각보조점", "지적삼각보조점" -> PointType.TRIANGULATION_AUX;
             case "삼각점", "지적삼각점" -> PointType.TRIANGULATION;
-            default -> throw unknown(TYPE, value, rowNum);
+            default -> throw unknown(TYPE, value);
         };
     }
 
-    private static CoordinateSystem crs(String value, int rowNum) {
+    private static CoordinateSystem crs(String value) {
         // 부천 현행 성과는 세계측지계 중부원점 — 다른 좌표계구분이 나오면 데이터 확인이 먼저다
-        return switch (require(value, CRS, rowNum)) {
+        return switch (require(value, CRS)) {
             case "세계" -> CoordinateSystem.GRS80_CENTRAL;
-            default -> throw unknown(CRS, value, rowNum);
+            default -> throw unknown(CRS, value);
         };
     }
 
-    private static MarkerMaterial material(String value, int rowNum) {
+    private static MarkerMaterial material(String value) {
         if (value == null) {
             return null;
         }
         return switch (value) {
             case "표석" -> MarkerMaterial.STONE;
             case "철재" -> MarkerMaterial.STEEL;
-            default -> throw unknown(MATERIAL, value, rowNum);
+            default -> throw unknown(MATERIAL, value);
         };
     }
 
-    private static InstallType install(String value, int rowNum) {
+    private static InstallType install(String value) {
         if (value == null) {
             return null;
         }
         return switch (value) {
             case "설치" -> InstallType.INSTALLED;
             case "재설", "재설치" -> InstallType.REINSTALLED;
-            default -> throw unknown(INSTALL_TYPE, value, rowNum);
+            default -> throw unknown(INSTALL_TYPE, value);
         };
     }
 
-    private static Boolean intersection(String value, int rowNum) {
+    private static Boolean intersection(String value) {
         if (value == null) {
             return null;
         }
         return switch (value) {
             case "도근점" -> Boolean.FALSE;
             case "교차점" -> Boolean.TRUE;
-            default -> throw unknown(INTERSECTION, value, rowNum);
+            default -> throw unknown(INTERSECTION, value);
         };
     }
 
-    private static SurveyResult priorResult(String value, int rowNum) {
+    private static SurveyResult priorResult(String value) {
         if (value == null) {
             return null;
         }
@@ -222,38 +279,38 @@ public final class SurveyTargetMapper {
             case "완전" -> SurveyResult.INTACT;
             case "망실" -> SurveyResult.LOST;
             case "기타" -> SurveyResult.ETC;
-            default -> throw unknown(PRIOR_RESULT, value, rowNum);
+            default -> throw unknown(PRIOR_RESULT, value);
         };
     }
 
-    private static BigDecimal decimal(String value, String field, int rowNum) {
+    private static BigDecimal decimal(String value, String field) {
         try {
-            return new BigDecimal(require(value, field, rowNum));
+            return new BigDecimal(require(value, field));
         } catch (NumberFormatException e) {
-            throw unknown(field, value, rowNum);
+            throw unknown(field, value);
         }
     }
 
     /** 경위도는 기본 양식에 없는 열이라 비어 있을 수 있다. 없으면 성과 좌표에서 파생한다. */
-    private static Double optionalNumber(String value, String field, int rowNum) {
+    private static Double optionalNumber(String value, String field) {
         if (value == null) {
             return null;
         }
         try {
             return Double.parseDouble(value);
         } catch (NumberFormatException e) {
-            throw unknown(field, value, rowNum);
+            throw unknown(field, value);
         }
     }
 
-    private static LocalDate date(String value, String field, int rowNum) {
+    private static LocalDate date(String value, String field) {
         if (value == null) {
             return null;
         }
         try {
             return LocalDate.parse(value);
         } catch (Exception e) {
-            throw unknown(field, value, rowNum);
+            throw unknown(field, value);
         }
     }
 
@@ -267,14 +324,14 @@ public final class SurveyTargetMapper {
         return value.isEmpty() ? null : value;
     }
 
-    private static String require(String value, String field, int rowNum) {
+    private static String require(String value, String field) {
         if (value == null) {
-            throw new InvalidControlPointException(rowNum + "행: " + field + "이(가) 비어 있습니다.");
+            throw new InvalidControlPointException(field + "이(가) 비어 있습니다.");
         }
         return value;
     }
 
-    private static InvalidControlPointException unknown(String field, String value, int rowNum) {
-        return new InvalidControlPointException(rowNum + "행: 알 수 없는 " + field + ": " + value);
+    private static InvalidControlPointException unknown(String field, String value) {
+        return new InvalidControlPointException("알 수 없는 " + field + ": " + value);
     }
 }

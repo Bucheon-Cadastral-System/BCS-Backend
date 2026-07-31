@@ -48,6 +48,23 @@ class SurveyCsvImportApiTest {
     }
 
     @Test
+    @DisplayName("미리보기 — 200과 건수·열 매핑을 돌려주고 아무것도 등록하지 않는다")
+    void preview_readsWithoutImporting() throws Exception {
+        MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv/preview").file(sampleFile()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"totalRows\":49"), body);
+        assertTrue(body.contains("\"기존조사내\":\"기존조사내용\""), body);
+        assertTrue(body.contains("\"errors\":[]"), body);
+
+        // 미리보기는 조사 프로젝트를 만들지 않는다
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects")).andExpect(status().isOk()).andReturn();
+        assertTrue(bodyOf(projects).contains("\"content\":[]"), bodyOf(projects));
+    }
+
+    @Test
     @DisplayName("실파일 업로드 — 201과 요약(49점·조사 44건), 프로젝트·기준점·기록이 조회된다")
     void importRealFile_endToEnd() throws Exception {
         MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv")
