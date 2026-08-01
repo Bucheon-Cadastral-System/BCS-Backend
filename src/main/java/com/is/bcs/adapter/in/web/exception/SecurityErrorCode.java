@@ -18,7 +18,9 @@ public enum SecurityErrorCode implements ErrorCode {
 
     OAUTH_EXCHANGE_CODE_INVALID(HttpStatus.UNAUTHORIZED),
 
-    OAUTH_EXCHANGE_CODE_EXPIRED(HttpStatus.UNAUTHORIZED);
+    OAUTH_EXCHANGE_CODE_EXPIRED(HttpStatus.UNAUTHORIZED),
+
+    AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED);
 
     private final HttpStatus status;
 

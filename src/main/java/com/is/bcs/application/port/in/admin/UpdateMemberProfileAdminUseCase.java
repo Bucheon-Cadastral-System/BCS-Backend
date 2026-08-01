@@ -6,7 +6,7 @@ import com.is.bcs.domain.member.Team;
 
 public interface UpdateMemberProfileAdminUseCase {
 
-    void updateProfile(Long memberId, Command command);
+    void updateProfile(Long actorAdminId, Long memberId, Command command);
 
     record Command(
             String name,

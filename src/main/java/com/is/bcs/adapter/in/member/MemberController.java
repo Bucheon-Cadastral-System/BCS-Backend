@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.member;
 
+import com.is.bcs.adapter.in.security.CurrentMemberIdResolver;
 import com.is.bcs.adapter.in.security.oauth2.BcsOAuth2Principal;
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
@@ -37,6 +38,7 @@ public class MemberController {
     private final GetMemberStateUseCase getMemberStateUseCase;
     private final GetMyProfileUseCase getMyProfileUseCase;
     private final UpdateMemberProfileUseCase updateMemberProfileUseCase;
+    private final CurrentMemberIdResolver currentMemberIdResolver;
 
     @Operation(summary = "내 정보 조회", security = @SecurityRequirement(name = "Bearer Authentication"))
     @GetMapping("/me")
@@ -53,8 +55,7 @@ public class MemberController {
     @PutMapping("/me/registration")
     public ResponseEntity<Void> completeRegistration(Authentication authentication, @Valid @RequestBody CompleteRegistrationRequest request
     ) {
-        BcsOAuth2Principal principal =(BcsOAuth2Principal) authentication.getPrincipal();
-        Long memberId = principal != null ? principal.getMemberId() : null;
+        Long memberId = currentMemberIdResolver.resolve(authentication);
 
         completeMemberProfileUseCase.complete(
                 memberId,
@@ -67,8 +68,7 @@ public class MemberController {
     @Operation(summary = "내 정보 변경 (ACTIVE 유저만)", security = @SecurityRequirement(name = "Bearer Authentication"))
     @PatchMapping("/me/update")
     public ResponseEntity<Void> updateMyProfile(Authentication authentication, @Valid @RequestBody UpdateProfileRequest request) {
-        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
-        Long memberId = principal.memberId();
+        Long memberId = currentMemberIdResolver.resolve(authentication);
 
         updateMemberProfileUseCase.update(
                 memberId,
@@ -87,8 +87,7 @@ public class MemberController {
     @Operation(summary = "내 가입 상태 조회")
     @GetMapping("/me/state")
     public ResponseEntity<MemberStateResponse> getMyState(Authentication authentication) {
-        BcsOAuth2Principal principal =(BcsOAuth2Principal) authentication.getPrincipal();
-        Long memberId = principal != null ? principal.getMemberId() : null;
+        Long memberId = currentMemberIdResolver.resolve(authentication);
 
         GetMemberStateUseCase.Result result = getMemberStateUseCase.getState(memberId);
 

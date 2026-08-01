@@ -1,5 +1,7 @@
 package com.is.bcs.adapter.in.admin;
 
+import com.is.bcs.adapter.in.security.CurrentMemberIdResolver;
+import com.is.bcs.adapter.in.security.oauth2.BcsOAuth2Principal;
 import com.is.bcs.application.port.in.admin.*;
 import com.is.bcs.domain.member.*;
 import com.is.bcs.domain.page.PageResponse;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -30,6 +33,7 @@ public class MemberAdminController {
     private final UpdateMemberProfileAdminUseCase updateMemberProfileAdminUseCase;
     private final PromoteMemberAdminUseCase promoteMemberAdminUseCase;
     private final DemoteMemberAdminUseCase demoteMemberAdminUseCase;
+    private final CurrentMemberIdResolver currentMemberIdResolver;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -71,24 +75,27 @@ public class MemberAdminController {
 
     @Operation(summary = "회원 가입 승인")
     @PatchMapping("/{memberId}/approve")
-    public ResponseEntity<Void> approveMember(@PathVariable Long memberId) {
-        approveMemberAdminUseCase.approve(memberId);
+    public ResponseEntity<Void> approveMember(Authentication authentication, @PathVariable Long memberId) {
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        approveMemberAdminUseCase.approve(adminId, memberId);
         return ResponseEntity.noContent().build();
     }
 
 
     @Operation(summary = "회원 가입 거절")
     @PatchMapping("/{memberId}/reject")
-    public ResponseEntity<Void> rejectMember(@PathVariable Long memberId) {
-        rejectMemberAdminUseCase.reject(memberId);
+    public ResponseEntity<Void> rejectMember(Authentication authentication, @PathVariable Long memberId) {
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        rejectMemberAdminUseCase.reject(adminId, memberId);
         return ResponseEntity.noContent().build();
     }
 
 
     @Operation(summary = "회원 비활성화")
     @PatchMapping("/{memberId}/deactivate")
-    public ResponseEntity<Void> deactivateMember(@PathVariable Long memberId) {
-        deactivateMemberAdminUseCase.deactivate(memberId);
+    public ResponseEntity<Void> deactivateMember(Authentication authentication, @PathVariable Long memberId) {
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        deactivateMemberAdminUseCase.deactivate(adminId, memberId);
 
         return ResponseEntity.noContent().build();
     }
@@ -96,8 +103,9 @@ public class MemberAdminController {
 
     @Operation(summary = "회원 활성화")
     @PatchMapping("/{memberId}/activate")
-    public ResponseEntity<Void> activateMember(@PathVariable Long memberId) {
-        activateMemberAdminUseCase.activate(memberId);
+    public ResponseEntity<Void> activateMember(Authentication authentication, @PathVariable Long memberId) {
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        activateMemberAdminUseCase.activate(adminId, memberId);
 
         return ResponseEntity.noContent().build();
     }
@@ -105,25 +113,28 @@ public class MemberAdminController {
 
     @Operation(summary = "회원 개인정보 강제 변경")
     @PatchMapping("/{memberId}/profile")
-    public ResponseEntity<Void> updateMemberProfile(@PathVariable Long memberId,
+    public ResponseEntity<Void> updateMemberProfile(Authentication authentication, @PathVariable Long memberId,
                                         @Valid @RequestBody UpdateMemberProfileAdminRequest request) {
-        updateMemberProfileAdminUseCase.updateProfile(memberId, request.toCommand());
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        updateMemberProfileAdminUseCase.updateProfile(adminId, memberId, request.toCommand());
 
         return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "회원 관리자 권한 부여")
     @PatchMapping("/{memberId}/role/admin")
-    public ResponseEntity<Void> promoteMember(@PathVariable Long memberId) {
-        promoteMemberAdminUseCase.promote(memberId);
+    public ResponseEntity<Void> promoteMember(Authentication authentication, @PathVariable Long memberId) {
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        promoteMemberAdminUseCase.promote(adminId, memberId);
 
         return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "회원 관리자 권한 회수")
     @PatchMapping("/{memberId}/role/user")
-    public ResponseEntity<Void> demoteMember(@PathVariable Long memberId) {
-        demoteMemberAdminUseCase.demote(memberId);
+    public ResponseEntity<Void> demoteMember(Authentication authentication, @PathVariable Long memberId) {
+        Long adminId = currentMemberIdResolver.resolve(authentication);
+        demoteMemberAdminUseCase.demote(adminId, memberId);
 
         return ResponseEntity.noContent().build();
     }

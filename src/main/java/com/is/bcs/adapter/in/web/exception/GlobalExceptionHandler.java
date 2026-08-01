@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.*;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -212,6 +213,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidMemberRoleException.class)
     public ProblemDetail handleInvalidMemberRoleException(InvalidMemberRoleException e) {
         return problem(MemberErrorCode.MEMBER_INVALID_ROLE, e.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    public ProblemDetail handleAuthenticationCredentialsNotFoundException(AuthenticationCredentialsNotFoundException e) {
+        return problem(SecurityErrorCode.AUTHENTICATION_REQUIRED, e.getMessage());
     }
 
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
