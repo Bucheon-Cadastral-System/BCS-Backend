@@ -154,6 +154,15 @@ public class MemberJpaEntity extends BaseTime {
         this.approvedAt = null;
     }
 
+    public void deactivate() {
+        if (this.status != MemberStatus.ACTIVE) {
+            throw new InvalidMemberStateException("ACTIVE 상태의 회원만 비활성화할 수 있습니다. 현재 상태=" + this.status);
+        }
+
+        this.status = MemberStatus.INACTIVE;
+        this.deactivatedAt = OffsetDateTime.now();
+    }
+
     public static MemberJpaEntity fromDomain(Member member) {
         return new MemberJpaEntity(
                 member.getId(),

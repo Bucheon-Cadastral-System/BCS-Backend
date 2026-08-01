@@ -1,6 +1,7 @@
 package com.is.bcs.adapter.in.admin;
 
 import com.is.bcs.application.port.in.admin.ApproveMemberAdminUseCase;
+import com.is.bcs.application.port.in.admin.DeactivateMemberAdminUseCase;
 import com.is.bcs.application.port.in.admin.GetMemberAdminUseCase;
 import com.is.bcs.application.port.in.admin.RejectMemberAdminUseCase;
 import com.is.bcs.domain.member.*;
@@ -26,6 +27,7 @@ public class MemberAdminController {
     private final GetMemberAdminUseCase getMemberAdminUseCase;
     private final ApproveMemberAdminUseCase approveMemberAdminUseCase;
     private final RejectMemberAdminUseCase rejectMemberAdminUseCase;
+    private final DeactivateMemberAdminUseCase deactivateMemberAdminUseCase;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -83,6 +85,13 @@ public class MemberAdminController {
 
 
     // TODO : 유저 ACTIVE -> INACTIVE 비활성화 API
+    @Operation(summary = "회원 비활성화")
+    @PatchMapping("/{memberId}/deactivate")
+    public ResponseEntity<Void> deactivateMember(@PathVariable Long memberId) {
+        deactivateMemberAdminUseCase.deactivate(memberId);
+
+        return ResponseEntity.noContent().build();
+    }
 
 
     // TODO : 유저 INACTIVE -> ACTIVE 활성화 API
