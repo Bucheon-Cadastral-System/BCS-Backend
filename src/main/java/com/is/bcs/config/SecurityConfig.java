@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -36,11 +35,13 @@ public class SecurityConfig {
 
                 .cors(Customizer.withDefaults())
 
-                /*
-                 * 개발 중 임시 — 이 브랜치를 병합하기 전에 되돌릴 것.
-                 * 켜 두면 SPA 의 모든 POST·PUT·DELETE 가 CSRF 토큰이 없어 403 으로 막혀 화면을 쓸 수 없다.
-                 */
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers(
+                                "/api/auth/token/exchange",
+                                "/api/auth/token/refresh",
+                                "/api/auth/logout"
+                        )
+                )
 
                 .authorizeHttpRequests(auth -> auth
                         /** 모두 사용 가능 ! */
