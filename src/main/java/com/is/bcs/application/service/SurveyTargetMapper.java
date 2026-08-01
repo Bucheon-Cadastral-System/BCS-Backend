@@ -151,7 +151,8 @@ public final class SurveyTargetMapper {
         Set<String> seenPointNos = new HashSet<>();
         Set<String> seenPoints = new HashSet<>();
         for (int i = 0; i < table.rows().size(); i++) {
-            int rowNumber = i + 2; // 헤더가 1행이므로 데이터는 2행부터
+            // 제목 행·빈 줄을 건너뛰고 헤더를 찾으므로 순서가 아니라 원본 줄 번호로 알린다
+            int rowNumber = table.sourceRowNumbers().get(i);
             try {
                 Row row = mapRow(table.rows().get(i), columns, table.headers(), extraPositions);
                 String duplicated = duplicated(row, seenPointNos, seenPoints);
@@ -241,13 +242,18 @@ public final class SurveyTargetMapper {
 
     private static Row mapRow(
             List<String> cells, Map<String, Integer> columns, List<String> headers, List<Integer> extraPositions) {
+        // 소재지는 "10300-춘의동" 처럼 법정동 코드와 이름이 붙어 온다.
+        // 앞이 숫자일 때만 나눈다 — "춘의동 102-16" 같은 지번을 코드와 이름으로 잘못 가르지 않게.
         String regionRaw = cell(cells, columns, REGION);
         String regionCode = null;
         String regionName = regionRaw;
-        if (regionRaw != null && regionRaw.contains("-")) {
+        if (regionRaw != null) {
             int at = regionRaw.indexOf('-');
-            regionCode = regionRaw.substring(0, at);
-            regionName = regionRaw.substring(at + 1);
+            String prefix = at > 0 ? regionRaw.substring(0, at) : "";
+            if (prefix.chars().allMatch(Character::isDigit) && !prefix.isEmpty()) {
+                regionCode = prefix;
+                regionName = regionRaw.substring(at + 1);
+            }
         }
 
         return new Row(

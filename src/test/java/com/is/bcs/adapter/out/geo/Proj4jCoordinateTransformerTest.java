@@ -34,6 +34,8 @@ class Proj4jCoordinateTransformerTest {
     void toWgs84_matchesLongLatInFile() throws Exception {
         List<Row> rows = SurveyTargetMapper.map(new SpreadsheetTableExtractor().extract(sampleCsv())).rows();
 
+        // 행이 사라지면 아래 반복이 통째로 건너뛰어져 회귀를 놓친다
+        assertEquals(49, rows.size());
         for (Row row : rows) {
             GeoCoordinate geo = transformer.toWgs84(new TmCoordinate(row.crs(), row.northing(), row.easting()));
 

@@ -80,23 +80,25 @@ public class SpreadsheetTableExtractor implements TableExtractor {
     }
 
     private static Table fromCsv(String text) {
-        List<List<String>> records = splitCsv(text);
+        List<CsvRecord> records = splitCsv(text);
 
         // 헤더 찾는 규칙은 XLSX 와 같다 — 같은 양식을 CSV 로 내보내도 제목 행이 첫 줄에 남는다
         int headerAt = 0;
-        while (headerAt < records.size() && filledCount(records.get(headerAt)) < HEADER_MIN_FILLED_CELLS) {
+        while (headerAt < records.size() && filledCount(records.get(headerAt).values()) < HEADER_MIN_FILLED_CELLS) {
             headerAt++;
         }
         if (headerAt == records.size()) {
             throw new InvalidControlPointException("파일에 헤더가 없습니다.");
         }
 
-        List<String> headers = trimTrailingEmpty(records.get(headerAt));
+        List<String> headers = trimTrailingEmpty(records.get(headerAt).values());
         List<List<String>> rows = new ArrayList<>();
-        for (List<String> record : records.subList(headerAt + 1, records.size())) {
-            rows.add(fit(record, headers.size()));
+        List<Integer> rowNumbers = new ArrayList<>();
+        for (CsvRecord record : records.subList(headerAt + 1, records.size())) {
+            rows.add(fit(record.values(), headers.size()));
+            rowNumbers.add(record.line());
         }
-        return new Table(headers, rows);
+        return new Table(headers, rows, rowNumbers);
     }
 
     private static Table fromWorkbook(byte[] content) {
@@ -109,6 +111,7 @@ public class SpreadsheetTableExtractor implements TableExtractor {
 
             List<String> headers = null;
             List<List<String>> rows = new ArrayList<>();
+            List<Integer> rowNumbers = new ArrayList<>();
             for (Row row : sheet) {
                 List<String> values = readRow(row);
                 if (headers == null) {
@@ -120,12 +123,13 @@ public class SpreadsheetTableExtractor implements TableExtractor {
                 }
                 if (filledCount(values) > 0) {
                     rows.add(fit(values, headers.size()));
+                    rowNumbers.add(row.getRowNum() + 1);
                 }
             }
             if (headers == null) {
                 throw new InvalidControlPointException("파일에 헤더가 없습니다.");
             }
-            return new Table(headers, rows);
+            return new Table(headers, rows, rowNumbers);
         } catch (InvalidControlPointException e) {
             throw e;
         } catch (EncryptedDocumentException e) {
@@ -187,16 +191,25 @@ public class SpreadsheetTableExtractor implements TableExtractor {
      * 따옴표 안의 콤마와 줄바꿈을 보존하는 CSV 분해.
      * 줄 단위로 자르면 값 안에 줄바꿈이 든 행이 두 행으로 갈라지므로 문자 단위로 훑는다.
      */
-    private static List<List<String>> splitCsv(String text) {
-        List<List<String>> records = new ArrayList<>();
+    /** 한 레코드와 그것이 시작한 원본 줄 번호(1부터). 값 안의 줄바꿈 때문에 레코드 수와 줄 수가 다르다. */
+    private record CsvRecord(int line, List<String> values) {
+    }
+
+    private static List<CsvRecord> splitCsv(String text) {
+        List<CsvRecord> records = new ArrayList<>();
         List<String> current = new ArrayList<>();
         StringBuilder field = new StringBuilder();
         boolean quoted = false;
+        int line = 1;
+        int recordLine = 1;
 
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (quoted) {
                 if (c != '"') {
+                    if (c == '\n') {
+                        line++; // 값 안의 줄바꿈도 파일에서는 한 줄이다
+                    }
                     field.append(c);
                 } else if (i + 1 < text.length() && text.charAt(i + 1) == '"') {
                     field.append('"');
@@ -216,9 +229,11 @@ public class SpreadsheetTableExtractor implements TableExtractor {
                 current.add(field.toString().trim());
                 field.setLength(0);
                 if (filledCount(current) > 0) {
-                    records.add(List.copyOf(current));
+                    records.add(new CsvRecord(recordLine, List.copyOf(current)));
                 }
                 current.clear();
+                line++;
+                recordLine = line;
             } else {
                 field.append(c);
             }
@@ -231,7 +246,7 @@ public class SpreadsheetTableExtractor implements TableExtractor {
 
         current.add(field.toString().trim());
         if (filledCount(current) > 0) {
-            records.add(List.copyOf(current));
+            records.add(new CsvRecord(recordLine, List.copyOf(current)));
         }
         return records;
     }
