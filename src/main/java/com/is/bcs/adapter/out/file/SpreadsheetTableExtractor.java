@@ -224,6 +224,11 @@ public class SpreadsheetTableExtractor implements TableExtractor {
             }
         }
 
+        if (quoted) {
+            // 따옴표를 닫지 않으면 그 뒤 줄들이 한 값으로 합쳐져 행 수가 조용히 줄어든다
+            throw new InvalidControlPointException("따옴표가 닫히지 않았습니다. 파일이 온전한지 확인해 주세요.");
+        }
+
         current.add(field.toString().trim());
         if (filledCount(current) > 0) {
             records.add(List.copyOf(current));

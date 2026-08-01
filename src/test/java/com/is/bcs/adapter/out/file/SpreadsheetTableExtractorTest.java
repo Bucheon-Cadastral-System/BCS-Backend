@@ -109,6 +109,19 @@ class SpreadsheetTableExtractorTest {
     }
 
     @Test
+    @DisplayName("따옴표가 닫히지 않은 CSV 는 거부한다 — 뒷줄이 한 값으로 합쳐져 행 수가 줄어든다")
+    void extract_unclosedQuote_isRejected() {
+        String csv = "이름,주소\n"
+                + "1465공,\"춘의동\n"
+                + "1466공,상동\n";
+
+        InvalidControlPointException thrown = assertThrows(InvalidControlPointException.class,
+                () -> extractor.extract(csv.getBytes(StandardCharsets.UTF_8)));
+
+        assertTrue(thrown.getMessage().contains("따옴표"), thrown.getMessage());
+    }
+
+    @Test
     @DisplayName("헤더 뒤쪽의 빈 칸은 열로 세지 않는다 — 엑셀이 남긴 빈 셀")
     void extract_trailingEmptyHeaders() {
         Table table = extractor.extract("이름,주소,,\n가,나,,\n".getBytes(StandardCharsets.UTF_8));
