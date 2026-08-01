@@ -28,6 +28,9 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
+      data-source-properties:
+        # 배치로 묶은 INSERT 를 드라이버가 한 문장(VALUES 여러 벌)으로 다시 쓴다 — 임포트가 수천 행을 넣는다
+        reWriteBatchedInserts: true
 
   jpa:
     open-in-view: false
