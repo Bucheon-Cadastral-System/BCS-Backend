@@ -8,6 +8,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
 
 @Getter
@@ -161,6 +162,19 @@ public class MemberJpaEntity extends BaseTime {
 
         this.status = MemberStatus.INACTIVE;
         this.deactivatedAt = OffsetDateTime.now();
+    }
+
+    public void activate() {
+        if (this.status != MemberStatus.INACTIVE) {
+            throw new InvalidMemberStateException("INACTIVE 상태의 회원만 활성화할 수 있습니다. 현재 상태=" + this.status);
+        }
+
+        this.status = MemberStatus.ACTIVE;
+        this.deactivatedAt = null;
+
+        if (this.approvedAt == null) {
+            this.approvedAt = OffsetDateTime.now();
+        }
     }
 
     public static MemberJpaEntity fromDomain(Member member) {
