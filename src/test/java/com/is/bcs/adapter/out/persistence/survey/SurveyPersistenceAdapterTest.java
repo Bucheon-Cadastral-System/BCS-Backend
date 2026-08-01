@@ -1,9 +1,12 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
+import com.is.bcs.domain.survey.ExtraColumn;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
+import com.is.bcs.domain.survey.SurveyTarget;
+import jakarta.persistence.EntityManager;
+import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +15,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Transactional
 class SurveyPersistenceAdapterTest {
 
+    private static final LocalDate STARTED = LocalDate.of(2026, 7, 1);
+
     private static final OffsetDateTime SURVEYED_AT = OffsetDateTime.parse("2025-09-08T10:00:00+09:00");
 
     @Autowired
@@ -32,22 +38,30 @@ class SurveyPersistenceAdapterTest {
     @Autowired
     private SurveyRecordJpaRepository recordRepository;
 
+    @Autowired
+    private SurveyTargetPersistenceAdapter targetAdapter;
+
+    @Autowired
+    private SurveyTargetJpaRepository targetRepository;
+
+    @Autowired
+    private EntityManager entityManager;
+
     private SurveyProject savedProject() {
-        return adapter.save(SurveyProject.create(
-                SurveyProjectType.EXCAVATION_CONSULTATION, "2026 굴착협의", "협의번호 2333"));
+        return adapter.save(SurveyProject.create("2026 일제조사", STARTED, null, "정기 조사"));
     }
 
     @Test
-    @DisplayName("프로젝트 저장 후 조회하면 유형·이름·비고가 보존된다")
+    @DisplayName("프로젝트 저장 후 조회하면 기간·이름·비고가 보존된다")
     void saveAndFindProject_preservesAttributes() {
         SurveyProject saved = savedProject();
 
         SurveyProject found = adapter.findProjectById(saved.getId()).orElseThrow();
 
         assertNotNull(found.getId());
-        assertEquals(SurveyProjectType.EXCAVATION_CONSULTATION, found.getType());
-        assertEquals("2026 굴착협의", found.getName());
-        assertEquals("협의번호 2333", found.getNote());
+        assertEquals(STARTED, found.getStartedOn());
+        assertEquals("2026 일제조사", found.getName());
+        assertEquals("정기 조사", found.getNote());
         assertEquals(1, adapter.findAllProjects().size());
     }
 
@@ -90,20 +104,58 @@ class SurveyPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("결과별 개수는 해당 프로젝트의 기록만 결과별로 센다")
+    @DisplayName("결과별 개수는 해당 프로젝트의 대상 점 기록만 결과별로 센다")
     void countByResult_groupsOwnProjectRecords() {
         SurveyProject project = savedProject();
-        SurveyProject other = adapter.save(SurveyProject.create(
-                SurveyProjectType.GENERAL, "다른 조사", null));
+        SurveyProject other = adapter.save(SurveyProject.create("다른 조사", STARTED, null, null));
+        for (long pointId : new long[]{10L, 11L, 12L}) {
+            targetAdapter.save(SurveyTarget.create(project.getId(), pointId));
+        }
         adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
         adapter.save(SurveyRecord.create(project.getId(), 11L, SurveyResult.LOST, SURVEYED_AT, null));
         adapter.save(SurveyRecord.create(project.getId(), 12L, SurveyResult.INTACT, SURVEYED_AT, null));
         adapter.save(SurveyRecord.create(other.getId(), 10L, SurveyResult.ETC, SURVEYED_AT, null));
+        // 대상으로 지정되지 않은 점의 기록 — 진행률이 오탐되지 않도록 집계에서 빠져야 한다
+        adapter.save(SurveyRecord.create(project.getId(), 13L, SurveyResult.INTACT, SURVEYED_AT, null));
 
         Map<SurveyResult, Long> counts = adapter.countByResult(project.getId());
 
-        assertEquals(2, counts.get(SurveyResult.INTACT));
+        assertEquals(2, counts.get(SurveyResult.INTACT)); // 13번은 비대상이라 제외
         assertEquals(1, counts.get(SurveyResult.LOST));
         assertEquals(2, counts.size()); // 기록 없는 결과(기타)는 키가 없다 — 0 채움은 서비스 몫
+    }
+
+    @Test
+    @DisplayName("조사 대상에 보관한 열은 이름·값·순서가 그대로 돌아온다")
+    void saveAndFindTarget_preservesExtraColumns() {
+        SurveyProject project = savedProject();
+        SurveyTarget saved = targetAdapter.save(SurveyTarget.create(project.getId(), 10L, List.of(
+                new ExtraColumn("순번", "131"),
+                new ExtraColumn("점검자", "김주무관"),
+                new ExtraColumn("field_20", null))));
+
+        targetRepository.flush();
+        entityManager.clear(); // 1차 캐시가 아니라 DB에서 다시 읽는다
+
+        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        assertEquals(List.of(
+                new ExtraColumn("순번", "131"),
+                new ExtraColumn("점검자", "김주무관"),
+                new ExtraColumn("field_20", null)), found.getExtras());
+    }
+
+    @Test
+    @DisplayName("보관 열 값은 길이 제한 없이 들어간다 — 뜻을 모르는 열이라 길이를 예상할 수 없다")
+    void saveTarget_acceptsLongExtraValue() {
+        SurveyProject project = savedProject();
+        String longValue = "가".repeat(5000);
+
+        SurveyTarget saved = targetAdapter.save(
+                SurveyTarget.create(project.getId(), 10L, List.of(new ExtraColumn("현장 메모", longValue))));
+        targetRepository.flush();
+        entityManager.clear();
+
+        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        assertEquals(longValue, found.getExtras().getFirst().value());
     }
 }

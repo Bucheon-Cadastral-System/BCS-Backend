@@ -57,6 +57,12 @@ public class SurveyController {
         return SurveyProgressResponse.from(getSurveyRecordsUseCase.getProgress(projectId));
     }
 
+    /** 조사 대상 점 id 목록 — 화면이 지도·목록을 그 조사의 대상으로만 좁히는 데 쓴다. */
+    @GetMapping("/{projectId}/targets")
+    public ContentResponse<Long> listTargets(@PathVariable("projectId") Long projectId) {
+        return new ContentResponse<>(getSurveyRecordsUseCase.getTargetPointIds(projectId));
+    }
+
     @GetMapping("/{projectId}/records")
     public ContentResponse<SurveyRecordResponse> listRecords(@PathVariable("projectId") Long projectId) {
         return new ContentResponse<>(getSurveyRecordsUseCase.getByProjectId(projectId).stream()

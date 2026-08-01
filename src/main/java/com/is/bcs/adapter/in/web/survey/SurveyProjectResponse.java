@@ -1,17 +1,20 @@
 package com.is.bcs.adapter.in.web.survey;
 
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyProjectType;
+
+import java.time.LocalDate;
 
 public record SurveyProjectResponse(
         Long id,
-        SurveyProjectType type,
         String name,
+        LocalDate startedOn,
+        LocalDate endedOn,
         String note
 ) {
 
     public static SurveyProjectResponse from(SurveyProject project) {
         return new SurveyProjectResponse(
-                project.getId(), project.getType(), project.getName(), project.getNote());
+                project.getId(), project.getName(),
+                project.getStartedOn(), project.getEndedOn(), project.getNote());
     }
 }

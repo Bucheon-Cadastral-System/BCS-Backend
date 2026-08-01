@@ -3,6 +3,7 @@ package com.is.bcs.application.port.out.controlpoint;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.PointType;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,6 +16,12 @@ public interface LoadControlPointPort {
 
     /** 이름·종류로 조회 — 임포트 시 관리번호가 달라도 같은 물리적 점을 찾아 중복 등록을 막는다(부천 도근점은 이름 유일). */
     Optional<ControlPoint> findByNameAndType(String name, PointType type);
+
+    /**
+     * 임포트가 맞춰 볼 기존 점 — 이름이 겹치는 점(같은 점 찾기)과 관리번호가 겹치는 점(충돌 확인)을 한 번에 읽는다.
+     * 행마다 찾으면 질의가 파일 크기만큼 늘어난다.
+     */
+    List<ControlPoint> findAllByNameInOrPointNoIn(Collection<String> names, Collection<String> pointNos);
 
     List<ControlPoint> findAll();
 

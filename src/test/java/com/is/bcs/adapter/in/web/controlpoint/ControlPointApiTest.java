@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 기준점 API 계약 검증 — DB 필요(bcs/docker-compose). 데이터는 굴착협의 CSV 실측값. */
+/** 기준점 API 계약 검증 — DB 필요(bcs/docker-compose). 데이터는 고객사 대상지 CSV 실측값. */
 @SpringBootTest
 @Transactional
 class ControlPointApiTest {

@@ -25,13 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** 기준점 챗봇 도구 검증 — 기대값은 굴착협의 CSV 실측값으로 고정한다. */
+/** 기준점 챗봇 도구 검증 — 기대값은 고객사 대상지 CSV 실측값으로 고정한다. */
 class ControlPointChatToolsTest {
 
     private final FakePoints fake = new FakePoints();
     private final ControlPointChatTools tools = new ControlPointChatTools(fake);
 
-    /** 굴착협의 CSV 1행 실측값. */
+    /** 대상지 CSV 1행 실측값. */
     private static ControlPoint csvRow1Point() {
         return ControlPoint.restore(
                 1L, "41192D000001265", PointType.DOGEUN, "1465공",

@@ -21,7 +21,7 @@ public class SurveyChatTools {
     private final GetSurveyProjectsUseCase getSurveyProjectsUseCase;
     private final GetSurveyRecordsUseCase getSurveyRecordsUseCase;
 
-    @Tool(description = "조사 프로젝트 전체 목록을 조회한다(각 항목: id·이름name·유형type·비고note). 유형은 한글 표시명으로 반환한다(예: 일반·굴착협의). 사용자가 특정 프로젝트나 조사 현황을 물으면, 먼저 이 도구로 목록을 받아 이름·유형으로 해당 프로젝트를 찾고 그 id를 getSurveyProgress에 넘긴다")
+    @Tool(description = "조사 프로젝트 전체 목록을 조회한다(각 항목: id·이름name·시작일startedOn·종료일endedOn·비고note). 종료일이 비어 있으면 진행 중인 조사다. 사용자가 특정 프로젝트나 조사 현황을 물으면, 먼저 이 도구로 목록을 받아 이름으로 해당 프로젝트를 찾고 그 id를 getSurveyProgress에 넘긴다")
     public List<ProjectSummary> getSurveyProjects() {
         return getSurveyProjectsUseCase.getAll().stream().map(ProjectSummary::from).toList();
     }

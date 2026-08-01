@@ -16,6 +16,9 @@ public enum CommonErrorCode implements ErrorCode {
     /** 그 외 잘못된 요청(405·415 등 미분류 4xx) — 상태 기반 fallback */
     COMMON_BAD_REQUEST(HttpStatus.BAD_REQUEST),
 
+    /** 저장 제약 위반 — 도메인 검증을 지나친 중복·충돌이 서버 오류로 나가지 않게 받는 자리 */
+    COMMON_CONFLICT(HttpStatus.CONFLICT),
+
     /** 미처리 예외·미분류 5xx fallback */
     COMMON_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
 

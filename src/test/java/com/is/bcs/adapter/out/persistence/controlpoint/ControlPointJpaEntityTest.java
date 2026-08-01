@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** 도메인 ↔ JPA 엔티티 매핑 왕복 검증 — 기대값은 굴착협의 CSV 실데이터. */
+/** 도메인 ↔ JPA 엔티티 매핑 왕복 검증 — 기대값은 고객사 대상지 CSV 실데이터. */
 class ControlPointJpaEntityTest {
 
     private static ControlPoint csvRow1(Long id) {

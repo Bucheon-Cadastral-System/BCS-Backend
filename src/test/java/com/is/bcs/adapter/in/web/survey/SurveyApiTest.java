@@ -55,7 +55,7 @@ class SurveyApiTest {
         MvcResult result = mockMvc.perform(post("/api/survey-projects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type": "EXCAVATION_CONSULTATION", "name": "2026 굴착협의", "note": "협의번호 2333"}
+                                {"name": "2026 일제조사", "startedOn": "2026-07-01", "note": "정기 조사"}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -75,18 +75,36 @@ class SurveyApiTest {
         return extractId(bodyOf(result));
     }
 
-    /** 실파일 굴착협의 임포트 — 프로젝트 49대상·44조사가 생기고 projectId를 돌려준다. */
+    /** 실파일 임포트 — 프로젝트 49대상·44조사가 생기고 projectId를 돌려준다. */
     private long importSample() throws Exception {
-        try (var in = getClass().getResourceAsStream("/excavation-sample.csv")) {
-            MvcResult result = mockMvc.perform(multipart("/api/imports/excavation-consultation")
-                            .file(new MockMultipartFile("file", "굴착협의_대상지.csv", "text/csv", in.readAllBytes()))
-                            .param("name", "2026 굴착협의"))
+        try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
+            MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv")
+                            .file(new MockMultipartFile("file", "대상지.csv", "text/csv", in.readAllBytes()))
+                            .param("name", "2026 일제조사").param("startedOn", "2026-07-01"))
                     .andExpect(status().isCreated())
                     .andReturn();
             Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(result));
             assertTrue(m.find());
             return Long.parseLong(m.group(1));
         }
+    }
+
+    @Test
+    @DisplayName("조사 대상 목록 — 임포트한 프로젝트의 대상 49건을 돌려준다")
+    void listTargets() throws Exception {
+        long projectId = importSample();
+
+        MvcResult result = mockMvc.perform(get("/api/survey-projects/" + projectId + "/targets"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"content\":["));
+        // 응답 전체의 콤마를 세면 필드가 하나 늘 때마다 값이 달라진다 — 목록 안만 잘라 센다
+        String content = body.substring(body.indexOf('[') + 1, body.lastIndexOf(']'));
+        assertEquals(49, content.split(",").length);
+
+        mockMvc.perform(get("/api/survey-projects/999999/targets")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -98,12 +116,12 @@ class SurveyApiTest {
                 .andExpect(status().isOk())
                 .andReturn();
         assertTrue(bodyOf(list).contains("\"content\":["));
-        assertTrue(bodyOf(list).contains("\"name\":\"2026 굴착협의\""));
+        assertTrue(bodyOf(list).contains("\"name\":\"2026 일제조사\""));
 
         MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(single).contains("\"type\":\"EXCAVATION_CONSULTATION\""));
+        assertTrue(bodyOf(single).contains("\"startedOn\":\"2026-07-01\""));
 
         mockMvc.perform(get("/api/survey-projects/999999")).andExpect(status().isNotFound());
     }

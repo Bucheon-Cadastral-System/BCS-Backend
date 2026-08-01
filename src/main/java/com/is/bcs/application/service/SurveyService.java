@@ -49,7 +49,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
     @Override
     public SurveyProject create(CreateSurveyProjectCommand command) {
         return saveSurveyProjectPort.save(
-                SurveyProject.create(command.type(), command.name(), command.note()));
+                SurveyProject.create(command.name(), command.startedOn(), command.endedOn(), command.note()));
     }
 
     @Override
@@ -97,6 +97,14 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
     public List<SurveyRecord> getByProjectId(Long projectId) {
         requireProject(projectId);
         return loadSurveyRecordPort.findRecordsByProjectId(projectId);
+    }
+
+    /** 프로젝트의 조사 대상 점 id — 없는 프로젝트면 거부한다. */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getTargetPointIds(Long projectId) {
+        requireProject(projectId);
+        return loadSurveyTargetPort.findPointIdsByProjectId(projectId);
     }
 
     @Override

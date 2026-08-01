@@ -16,6 +16,8 @@ import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -29,9 +31,15 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -167,6 +175,57 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DuplicateControlPointException.class)
     public ProblemDetail handleDuplicateControlPoint(DuplicateControlPointException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
+    }
+
+    /**
+     * 저장 제약 위반 — 중복만 409 로 알린다.
+     * 외래키·필수값·CHECK 위반까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
+     * 제약 이름·SQL 은 사용자에게 뜻이 없고 노출하면 스키마가 드러나므로 어느 쪽이든 로그로만 남긴다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        if (isUniqueViolation(e)) {
+            log.warn("중복 저장 시도", e);
+            return problem(CommonErrorCode.COMMON_CONFLICT, "이미 등록된 값이라 저장할 수 없습니다.");
+        }
+        log.error("저장 제약 위반", e);
+        return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
+    }
+
+    /** SQL 표준의 unique_violation. 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
+    private static final String UNIQUE_VIOLATION = "23505";
+
+    /**
+     * 중복 저장으로 실패한 것인지.
+     * 원인 예외가 없는 DuplicateKeyException 은 상태 코드를 볼 수 없으므로 타입으로 먼저 가른다.
+     * 배치로 묶어 저장하면 진짜 원인이 cause 가 아니라 SQLException 의 다음 예외 사슬에 담기므로 둘 다 훑는다.
+     */
+    private static boolean isUniqueViolation(DataIntegrityViolationException e) {
+        if (e instanceof DuplicateKeyException) {
+            return true;
+        }
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<Throwable> pending = new ArrayDeque<>(List.of(e));
+        while (!pending.isEmpty()) {
+            Throwable current = pending.pop();
+            if (!visited.add(current)) {
+                continue; // 예외가 서로를 가리켜도 멈춘다
+            }
+            if (current instanceof SQLException sql) {
+                if (UNIQUE_VIOLATION.equals(sql.getSQLState())) {
+                    return true;
+                }
+                pushIfPresent(pending, sql.getNextException());
+            }
+            pushIfPresent(pending, current.getCause());
+        }
+        return false;
+    }
+
+    private static void pushIfPresent(Deque<Throwable> pending, Throwable candidate) {
+        if (candidate != null) {
+            pending.push(candidate);
+        }
     }
 
     @ExceptionHandler(SurveyProjectNotFoundException.class)

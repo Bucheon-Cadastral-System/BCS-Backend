@@ -1,0 +1,360 @@
+package com.is.bcs.application.service;
+
+import com.is.bcs.adapter.out.file.SpreadsheetTableExtractor;
+import com.is.bcs.application.port.out.file.Table;
+import com.is.bcs.application.service.SurveyTargetMapper.ColumnMapping;
+import com.is.bcs.application.service.SurveyTargetMapper.MappingResult;
+import com.is.bcs.application.service.SurveyTargetMapper.Row;
+import com.is.bcs.domain.controlpoint.CoordinateSystem;
+import com.is.bcs.domain.controlpoint.InstallType;
+import com.is.bcs.domain.controlpoint.MarkerMaterial;
+import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.controlpoint.TraverseInfo;
+import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.survey.ExtraColumn;
+import com.is.bcs.domain.survey.SurveyResult;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** 표 → 도메인 행 매핑 검증 — 열은 위치가 아니라 이름으로 찾는다. */
+class SurveyTargetMapperTest {
+
+    private final SpreadsheetTableExtractor extractor = new SpreadsheetTableExtractor();
+
+    private Table tableOf(String resource) throws Exception {
+        try (var in = getClass().getResourceAsStream(resource)) {
+            return extractor.extract(in.readAllBytes());
+        }
+    }
+
+    private Table sampleTable() throws Exception {
+        return tableOf("/survey-target-sample.csv");
+    }
+
+    @Test
+    @DisplayName("실파일 49행이 전부 읽히고 첫 행의 모든 값이 원본과 일치한다")
+    void map_realFile() throws Exception {
+        List<Row> rows = SurveyTargetMapper.map(sampleTable()).rows();
+
+        assertEquals(49, rows.size());
+        Row first = rows.getFirst();
+        assertEquals("41192D000001265", first.pointNo());
+        assertEquals(PointType.DOGEUN, first.type());
+        assertEquals("1465공", first.name());
+        assertEquals(CoordinateSystem.GRS80_CENTRAL, first.crs());
+        assertEquals(0, new BigDecimal("545236.77").compareTo(first.northing())); // X좌표=북방향
+        assertEquals(0, new BigDecimal("181840.96").compareTo(first.easting())); // Y좌표=동방향
+        assertEquals(126.794623, first.longitude());
+        assertEquals(37.506423, first.latitude());
+        assertEquals("10300", first.regionCode());
+        assertEquals("춘의동", first.regionName());
+        assertEquals("경기도 부천시 춘의동 102-16", first.address());
+        assertEquals(MarkerMaterial.STONE, first.markerMaterial());
+        assertEquals(InstallType.INSTALLED, first.installType());
+        assertEquals(LocalDate.of(2018, 2, 21), first.installedDate());
+        assertEquals(new TraverseInfo("1", null, null, null), first.traverse());
+        assertEquals(SurveyResult.INTACT, first.priorResult());
+        assertEquals(LocalDate.of(2025, 9, 8), first.priorSurveyDate());
+        assertEquals("대상", first.note());
+    }
+
+    @Test
+    @DisplayName("어휘 매핑 집계 — 완전 40·망실 3·기타 1·미조사 5, 삼각보조점 1")
+    void map_vocabularyCounts() throws Exception {
+        List<Row> rows = SurveyTargetMapper.map(sampleTable()).rows();
+
+        assertEquals(40, rows.stream().filter(r -> r.priorResult() == SurveyResult.INTACT).count());
+        assertEquals(3, rows.stream().filter(r -> r.priorResult() == SurveyResult.LOST).count());
+        assertEquals(1, rows.stream().filter(r -> r.priorResult() == SurveyResult.ETC).count());
+        assertEquals(5, rows.stream().filter(r -> r.priorResult() == null).count());
+        assertEquals(1, rows.stream().filter(r -> r.type() == PointType.TRIANGULATION_AUX).count());
+        assertEquals(48, rows.stream().filter(r -> r.type() == PointType.DOGEUN).count());
+    }
+
+    @Test
+    @DisplayName("교차구분 라벨 — '도근점'은 일반(false), 빈값은 미기재(null)로 해석한다")
+    void map_intersectionLabel() throws Exception {
+        List<Row> rows = SurveyTargetMapper.map(sampleTable()).rows();
+
+        assertEquals(42, rows.stream()
+                .filter(r -> r.traverse() != null && Boolean.FALSE.equals(r.traverse().intersection()))
+                .count());
+        assertNull(rows.getFirst().traverse().intersection()); // 행1은 교차구분 빈값
+    }
+
+    @Test
+    @DisplayName("기본 양식(경위도 열이 없는 20열)도 읽히고 경위도는 비어 있다")
+    void map_basicForm() throws Exception {
+        List<Row> rows = SurveyTargetMapper.map(tableOf("/survey-target-basic.csv")).rows();
+
+        assertEquals(49, rows.size());
+        Row first = rows.getFirst();
+        assertNull(first.longitude());
+        assertNull(first.latitude());
+        assertEquals("41192D000001265", first.pointNo());
+        assertEquals(SurveyResult.INTACT, first.priorResult());
+    }
+
+    @Test
+    @DisplayName("필수 6열만 있어도 읽히고 나머지 항목은 비어 있다")
+    void map_minimalColumns() throws Exception {
+        List<Row> rows = SurveyTargetMapper.map(tableOf("/survey-target-minimal.csv")).rows();
+
+        assertEquals(3, rows.size());
+        Row first = rows.getFirst();
+        assertEquals("41192D000001265", first.pointNo());
+        assertEquals(PointType.DOGEUN, first.type());
+        assertEquals(CoordinateSystem.GRS80_CENTRAL, first.crs());
+        assertNull(first.address());
+        assertNull(first.markerMaterial());
+        assertNull(first.installedDate());
+        assertNull(first.traverse());
+        assertNull(first.priorResult());
+    }
+
+    @Test
+    @DisplayName("잘못된 행에서 멈추지 않고 끝까지 훑어 오류를 행 번호와 함께 모은다")
+    void map_collectsRowErrors() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "정상1", "세계", "545000", "181000"),
+                        List.of("41192D000000002", "수준점", "이상", "세계", "545000", "181000"),
+                        List.of("41192D000000003", "도근점", "정상2", "세계", "545000", "181000"),
+                        List.of("41192D000000004", "도근점", "숫자아님", "세계", "좌표", "181000")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(4, result.totalRows());
+        assertEquals(2, result.rows().size()); // 읽힌 행만 남는다
+        assertEquals(2, result.errors().size());
+
+        // 첫 오류에서 멈췄다면 뒤쪽 오류(5행)는 나오지 않는다
+        assertEquals(3, result.errors().getFirst().row());
+        assertTrue(result.errors().getFirst().message().contains("수준점"), result.errors().getFirst().message());
+        assertEquals(5, result.errors().getLast().row());
+    }
+
+    @Test
+    @DisplayName("파일의 열이 어떤 항목으로 읽혔는지와 값만 보관하는 열을 함께 알린다")
+    void map_reportsColumnMapping() throws Exception {
+        ColumnMapping columns = SurveyTargetMapper.map(sampleTable()).columns();
+
+        assertEquals("기준점번호", columns.recognized().get("기준점번호"));
+        assertEquals("기존조사내용", columns.recognized().get("기존조사내")); // 잘린 이름 → 표준 항목
+        assertEquals("조사대상여부", columns.recognized().get("조사대상여"));
+        assertEquals(List.of("순번", "field_20"), columns.extra()); // 파일에 적힌 순서 그대로
+    }
+
+    @Test
+    @DisplayName("기본 양식에 없는 열도 이름·값 그대로 남는다 — 빈 칸이어도 열은 사라지지 않는다")
+    void map_keepsUnrecognizedColumnValues() throws Exception {
+        Row first = SurveyTargetMapper.map(sampleTable()).rows().getFirst();
+
+        assertEquals(List.of(new ExtraColumn("순번", "131"), new ExtraColumn("field_20", null)), first.extras());
+    }
+
+    @Test
+    @DisplayName("고객사가 열을 더해도 코드를 고치지 않고 그 값까지 보관한다")
+    void map_columnsAddedByCustomer_areKept() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "점검자", "재조사 사유"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "김주무관", "표지 훼손")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertTrue(result.errors().isEmpty());
+        assertEquals(List.of("점검자", "재조사 사유"), result.columns().extra());
+        assertEquals(
+                List.of(new ExtraColumn("점검자", "김주무관"), new ExtraColumn("재조사 사유", "표지 훼손")),
+                result.rows().getFirst().extras());
+    }
+
+    @Test
+    @DisplayName("5자에서 잘린 열 이름(기존조사내·조사대상여)도 온전한 이름과 같은 항목으로 읽는다")
+    void map_truncatedHeaders() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "기존조사내", "조사대상여"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "망실", "대상")));
+
+        Row row = SurveyTargetMapper.map(table).rows().getFirst();
+
+        assertEquals(SurveyResult.LOST, row.priorResult());
+        assertEquals("대상", row.note());
+    }
+
+    @Test
+    @DisplayName("별칭(관리번호)과 표기 흔들림(띄어쓰기·괄호)을 같은 항목으로 흡수한다")
+    void map_aliasesAndSpacing() {
+        Table table = new Table(
+                List.of("관리번호", "종류", "기준점명", "좌표계 구분", "X 좌표", "Y 좌표", "경도", "위도"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "126.794623", "37.506423")));
+
+        Row row = SurveyTargetMapper.map(table).rows().getFirst();
+
+        assertEquals("41192D000001265", row.pointNo());
+        assertEquals(CoordinateSystem.GRS80_CENTRAL, row.crs());
+        assertEquals(0, new BigDecimal("545236.77").compareTo(row.northing()));
+        assertEquals(126.794623, row.longitude());
+        assertEquals(37.506423, row.latitude());
+    }
+
+    @Test
+    @DisplayName("열 순서가 달라도 읽히고, 모르는 열은 제자리 순서대로 보관된다")
+    void map_columnOrderDoesNotMatter() {
+        Table table = new Table(
+                List.of("메모", "Y좌표", "종류", "field_20", "기준점명", "X좌표", "좌표계구분", "기준점번호"),
+                List.of(List.of("아무거나", "181840.96", "도근점", "", "1465공", "545236.77", "세계", "41192D000001265")));
+
+        Row row = SurveyTargetMapper.map(table).rows().getFirst();
+
+        assertEquals("41192D000001265", row.pointNo());
+        assertEquals("1465공", row.name());
+        assertEquals(0, new BigDecimal("181840.96").compareTo(row.easting()));
+        assertNull(row.address()); // 없는 열은 비어 있을 뿐 거부하지 않는다
+        assertEquals(List.of(new ExtraColumn("메모", "아무거나"), new ExtraColumn("field_20", null)), row.extras());
+    }
+
+    @Test
+    @DisplayName("필수 열의 칸이 비어 있으면 행 오류로 알린다 — 등록 단계까지 미루지 않고 미리보기에서 보이게")
+    void map_requiredCellEmpty_isRowError() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("", "도근점", "1465공", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000002", "도근점", "", "세계", "545000.00", "181000.00")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(0, result.rows().size());
+        assertEquals(2, result.errors().size());
+        assertTrue(result.errors().getFirst().message().contains("기준점번호"), result.errors().getFirst().message());
+        assertTrue(result.errors().getLast().message().contains("기준점명"), result.errors().getLast().message());
+    }
+
+    @Test
+    @DisplayName("같은 기준점이 두 번 나오면 뒤 행을 오류로 알린다 — 뒤 행이 앞 행의 성과를 덮어쓰지 않게")
+    void map_duplicatePointInSameFile_isRowError() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "1465공", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000002", "도근점", "1465공", "세계", "545000.00", "181000.00")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(1, result.rows().size());
+        assertEquals(1, result.errors().size());
+        assertEquals(3, result.errors().getFirst().row());
+        assertTrue(result.errors().getFirst().message().contains("1465공"), result.errors().getFirst().message());
+    }
+
+    @Test
+    @DisplayName("같은 관리번호가 두 번 나오면 뒤 행을 오류로 알린다 — 기준점 관리번호는 유일하다")
+    void map_duplicatePointNoInSameFile_isRowError() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "1465공", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000001", "도근점", "1466공", "세계", "545000.00", "181000.00")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(1, result.rows().size());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().getFirst().message().contains("41192D000000001"),
+                result.errors().getFirst().message());
+    }
+
+    @Test
+    @DisplayName("모르는 어휘·형식은 어느 항목이 문제인지와 함께 행 오류로 모인다")
+    void map_unknownVocabularyAndFormats_areRowErrors() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표",
+                        "표지재질", "설치구분", "교차구분", "기존조사내용", "설치일자", "경도(X)"),
+                List.of(
+                        row("1", "도근점", "재질", "세계", "목재", "설치", "도근점", "완전", "2018-02-21", "126.79"),
+                        row("2", "도근점", "설치", "세계", "표석", "이설", "도근점", "완전", "2018-02-21", "126.79"),
+                        row("3", "도근점", "교차", "세계", "표석", "설치", "삼각점", "완전", "2018-02-21", "126.79"),
+                        row("4", "도근점", "결과", "세계", "표석", "설치", "도근점", "반파", "2018-02-21", "126.79"),
+                        row("5", "도근점", "날짜", "세계", "표석", "설치", "도근점", "완전", "2018년 2월", "126.79"),
+                        row("6", "도근점", "경도", "세계", "표석", "설치", "도근점", "완전", "2018-02-21", "동경"),
+                        row("7", "도근점", "좌표계", "지역", "표석", "설치", "도근점", "완전", "2018-02-21", "126.79")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(0, result.rows().size());
+        assertEquals(7, result.errors().size());
+        List<String> messages = result.errors().stream().map(SurveyTargetMapper.RowError::message).toList();
+        assertTrue(messages.get(0).contains("표지재질"), messages.get(0));
+        assertTrue(messages.get(1).contains("설치구분"), messages.get(1));
+        assertTrue(messages.get(2).contains("교차구분"), messages.get(2));
+        assertTrue(messages.get(3).contains("기존조사내용"), messages.get(3));
+        assertTrue(messages.get(4).contains("설치일자"), messages.get(4));
+        assertTrue(messages.get(5).contains("경도"), messages.get(5));
+        assertTrue(messages.get(6).contains("좌표계구분"), messages.get(6));
+    }
+
+    /** 위 표의 한 행 — 좌표는 어느 행에서도 문제 삼지 않으므로 같은 값을 쓴다. */
+    private static List<String> row(String no, String type, String name, String crs,
+                                    String material, String install, String intersection,
+                                    String priorResult, String installedDate, String longitude) {
+        return List.of("41192D00000000" + no, type, name, crs, "545236.77", "181840.96",
+                material, install, intersection, priorResult, installedDate, longitude);
+    }
+
+    @Test
+    @DisplayName("삼각점·삼각보조점 어휘도 읽고, 재설치는 '재설'·'재설치' 둘 다 받는다")
+    void map_remainingVocabulary() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "설치구분"),
+                List.of(
+                        List.of("41192D000000001", "지적삼각점", "삼각1", "세계", "545236.77", "181840.96", "재설"),
+                        List.of("41192D000000002", "삼각보조점", "보조1", "세계", "545236.77", "181840.96", "재설치")));
+
+        List<Row> rows = SurveyTargetMapper.map(table).rows();
+
+        assertEquals(PointType.TRIANGULATION, rows.getFirst().type());
+        assertEquals(InstallType.REINSTALLED, rows.getFirst().installType());
+        assertEquals(PointType.TRIANGULATION_AUX, rows.getLast().type());
+        assertEquals(InstallType.REINSTALLED, rows.getLast().installType());
+    }
+
+    @Test
+    @DisplayName("이름 없는 열은 건너뛰고, 헤더보다 짧은 행은 뒤쪽 열이 빈 것으로 읽는다")
+    void map_blankHeaderAndShortRow() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "", "상세주소"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "짧은행", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000002", "도근점", "온전한행", "세계", "545236.77", "181840.96", "", "춘의동 1-1")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(2, result.rows().size());
+        assertNull(result.rows().getFirst().address()); // 행이 짧아 상세주소 칸이 아예 없다
+        assertEquals("춘의동 1-1", result.rows().getLast().address());
+        assertTrue(result.columns().extra().isEmpty()); // 이름 없는 열은 되살릴 근거가 없어 보관하지 않는다
+    }
+
+    @Test
+    @DisplayName("필수 열이 없으면 표준 이름으로 무엇이 빠졌는지 알린다")
+    void map_missingRequiredColumns_throws() {
+        Table table = new Table(List.of("종류", "기준점명"), List.of());
+
+        InvalidControlPointException thrown = assertThrows(
+                InvalidControlPointException.class, () -> SurveyTargetMapper.map(table));
+
+        assertTrue(thrown.getMessage().contains("기준점번호"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("좌표계구분"), thrown.getMessage());
+    }
+}

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 기준점 영속 왕복 검증 — DB 필요(bcs/docker-compose). 기대값은 굴착협의 CSV 실데이터. */
+/** 기준점 영속 왕복 검증 — DB 필요(bcs/docker-compose). 기대값은 고객사 대상지 CSV 실데이터. */
 @SpringBootTest
 @Transactional
 class ControlPointPersistenceAdapterTest {
@@ -47,6 +47,28 @@ class ControlPointPersistenceAdapterTest {
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", null, null, false)
         );
+    }
+
+    @Test
+    @DisplayName("이름이나 관리번호가 겹치는 점을 한 번에 조회한다 — 임포트가 행마다 찾지 않도록")
+    void findAllByNameInOrPointNoIn_returnsMatchingPoints() {
+        adapter.save(csvRow1());
+        adapter.save(ControlPoint.register(
+                "41192D000001267", PointType.DOGEUN, "1466공",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545201.74"), new BigDecimal("181833.69")),
+                new GeoCoordinate(126.794541, 37.506107),
+                "10300", "춘의동", "경기도 부천시 춘의동 102-16",
+                MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21), null));
+
+        // 이름으로 하나, 관리번호로 다른 하나 — 둘 다 걸린다
+        List<ControlPoint> found =
+                adapter.findAllByNameInOrPointNoIn(List.of("1465공", "없는점"), List.of("41192D000001267"));
+
+        assertEquals(2, found.size());
+        assertTrue(found.stream().anyMatch(p -> "1465공".equals(p.getName())));
+        assertTrue(found.stream().anyMatch(p -> "1466공".equals(p.getName())));
+        assertTrue(adapter.findAllByNameInOrPointNoIn(List.of(), List.of()).isEmpty()); // 빈 목록은 질의하지 않는다
     }
 
     @Test

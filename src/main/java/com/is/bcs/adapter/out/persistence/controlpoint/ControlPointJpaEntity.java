@@ -17,6 +17,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -36,14 +37,18 @@ import java.time.LocalDate;
         },
         indexes = {
                 @Index(name = "idx_control_points_type", columnList = "type"),
-                @Index(name = "idx_control_points_region_code", columnList = "region_code")
+                @Index(name = "idx_control_points_region_code", columnList = "region_code"),
+                // 임포트가 파일에 나온 이름을 한 번에 조회한다
+                @Index(name = "idx_control_points_name", columnList = "name")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ControlPointJpaEntity extends BaseTime {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // IDENTITY 는 넣자마자 생성된 id 를 받아야 해서 INSERT 를 묶지 못한다 — 임포트가 수천 행을 한 번에 넣으므로 시퀀스로 미리 받는다
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "control_points_seq")
+    @SequenceGenerator(name = "control_points_seq", sequenceName = "control_points_seq", schema = "bcs", allocationSize = 50)
     private Long id;
 
     @Column(name = "point_no", nullable = false, length = 20)

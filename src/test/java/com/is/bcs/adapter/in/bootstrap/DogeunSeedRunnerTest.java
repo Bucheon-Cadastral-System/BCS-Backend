@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,14 @@ class DogeunSeedRunnerTest {
         @Override
         public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
             return saved.stream().filter(p -> p.getName().equals(name) && p.getType() == type).findFirst();
+        }
+
+        @Override
+        public List<ControlPoint> findAllByNameInOrPointNoIn(
+                Collection<String> names, Collection<String> pointNos) {
+            return saved.stream()
+                    .filter(p -> names.contains(p.getName()) || pointNos.contains(p.getPointNo()))
+                    .toList();
         }
 
         @Override
