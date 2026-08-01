@@ -29,6 +29,7 @@ public class MemberAdminController {
     private final ActivateMemberAdminUseCase activateMemberAdminUseCase;
     private final UpdateMemberProfileAdminUseCase updateMemberProfileAdminUseCase;
     private final PromoteMemberAdminUseCase promoteMemberAdminUseCase;
+    private final DemoteMemberAdminUseCase demoteMemberAdminUseCase;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -119,8 +120,13 @@ public class MemberAdminController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "회원 관리자 권한 회수")
+    @PatchMapping("/{memberId}/role/user")
+    public ResponseEntity<Void> demoteMember(@PathVariable Long memberId) {
+        demoteMemberAdminUseCase.demote(memberId);
 
-    // TODO : 사용자 권한 ADMIN -> USER 변경 API
+        return ResponseEntity.noContent().build();
+    }
 
 
     // TODO : 관리자 활동 조회 API (로그)

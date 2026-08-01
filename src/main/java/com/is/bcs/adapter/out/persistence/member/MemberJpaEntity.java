@@ -214,6 +214,14 @@ public class MemberJpaEntity extends BaseTime {
         this.role = MemberRole.ADMIN;
     }
 
+    public void demoteToUser() {
+        if (this.role != MemberRole.ADMIN) {
+            throw new InvalidMemberRoleException("ADMIN 권한의 회원만 USER로 변경할 수 있습니다. 현재 권한=" + this.role);
+        }
+
+        this.role = MemberRole.USER;
+    }
+
     public static MemberJpaEntity fromDomain(Member member) {
         return new MemberJpaEntity(
                 member.getId(),
