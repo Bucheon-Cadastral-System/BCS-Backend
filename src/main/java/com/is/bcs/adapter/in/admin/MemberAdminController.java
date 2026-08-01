@@ -2,6 +2,7 @@ package com.is.bcs.adapter.in.admin;
 
 import com.is.bcs.adapter.in.security.CurrentMemberIdResolver;
 import com.is.bcs.adapter.in.security.oauth2.BcsOAuth2Principal;
+import com.is.bcs.adapter.in.web.exception.InvalidPageRequestException;
 import com.is.bcs.application.port.in.admin.*;
 import com.is.bcs.domain.member.*;
 import com.is.bcs.domain.page.PageResponse;
@@ -43,6 +44,7 @@ public class MemberAdminController {
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "ASC") Sort.Direction direction,
             @RequestParam(required = false) String name,
+            @RequestParam(required = false) String phone,
             @RequestParam(required = false) String email,
             @RequestParam(required = false) District district,
             @RequestParam(required = false) Team team,
@@ -58,6 +60,7 @@ public class MemberAdminController {
                 new GetMemberAdminUseCase.Command(
                         name,
                         email,
+                        phone,
                         district,
                         team,
                         position,
@@ -67,7 +70,7 @@ public class MemberAdminController {
 
         Page<MemberAdminResponse> response = getMemberAdminUseCase
                 .getMembers(pageable, command)
-                .map(MemberAdminResponse::from);
+                .map(result -> MemberAdminResponse.from(result));
 
         return ResponseEntity.ok(PageResponse.from(response));
     }
@@ -142,11 +145,11 @@ public class MemberAdminController {
 
     private void validatePageRequest(int page, int size) {
         if (page < 0) {
-            throw new IllegalArgumentException("page는 0 이상이어야 합니다.");
+            throw new InvalidPageRequestException("page는 0 이상이어야 합니다. 입력값=" + page);
         }
 
         if (size < 1 || size > 100) {
-            throw new IllegalArgumentException("size는 1 이상 100 이하여야 합니다.");
+            throw new InvalidPageRequestException("size는 1 이상 100 이하여야 합니다. 입력값=" + size);
         }
     }
 
@@ -166,7 +169,5 @@ public class MemberAdminController {
             );
         };
     }
-
-
 
 }

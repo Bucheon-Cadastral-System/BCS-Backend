@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.admin;
 
+import com.is.bcs.adapter.in.web.exception.InvalidPageRequestException;
 import com.is.bcs.application.port.in.admin.GetAdminActivityUseCase;
 import com.is.bcs.domain.admin.AdminActivityType;
 import com.is.bcs.domain.page.PageResponse;
@@ -46,15 +47,11 @@ public class AdminActivityController {
 
     private void validatePageRequest(int page, int size) {
         if (page < 0) {
-            throw new IllegalArgumentException(
-                    "page는 0 이상이어야 합니다."
-            );
+            throw new InvalidPageRequestException("page는 0 이상이어야 합니다. 입력값=" + page);
         }
 
         if (size < 1 || size > 100) {
-            throw new IllegalArgumentException(
-                    "size는 1 이상 100 이하여야 합니다."
-            );
+            throw new InvalidPageRequestException("size는 1 이상 100 이하여야 합니다. 입력값=" + size);
         }
     }
 }

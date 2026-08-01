@@ -63,6 +63,7 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
         return new GetMemberAdminUseCase.Result(
                 entity.getId(),
                 entity.getName(),
+                entity.getPhone(),
                 entity.getEmail(),
                 entity.getDistrict(),
                 entity.getTeam(),
@@ -81,6 +82,10 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
 
         if (hasText(command.email())) {
             builder.and(memberJpaEntity.email.containsIgnoreCase(command.email().trim()));
+        }
+
+        if (hasText(command.phone())) {
+            builder.and(memberJpaEntity.phone.containsIgnoreCase(command.phone().trim()));
         }
 
         if (command.district() != null) {

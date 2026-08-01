@@ -10,6 +10,7 @@ import com.is.bcs.domain.member.Team;
 public record MemberAdminResponse(
         Long id,
         String name,
+        String phone,
         String email,
         District district,
         Team team,
@@ -22,6 +23,7 @@ public record MemberAdminResponse(
         return new MemberAdminResponse(
                 result.id(),
                 result.name(),
+                result.phone(),
                 result.email(),
                 result.district(),
                 result.team(),

@@ -15,6 +15,7 @@ public interface GetMemberAdminUseCase {
     record Command(
             String name,
             String email,
+            String phone,
             District district,
             Team team,
             Position position,
@@ -27,6 +28,7 @@ public interface GetMemberAdminUseCase {
             Long id,
             String name,
             String email,
+            String phone,
             District district,
             Team team,
             Position position,

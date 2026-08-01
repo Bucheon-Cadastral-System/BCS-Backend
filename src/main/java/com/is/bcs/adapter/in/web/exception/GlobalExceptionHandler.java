@@ -200,11 +200,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_INVALID, e.getMessage());
     }
 
-    @ExceptionHandler(InvalidMemberProfileException.class)
-    public ProblemDetail handleInvalidMemberProfileException(InvalidMemberProfileException e) {
-        return problem(MemberErrorCode.MEMBER_PROFILE_INVALID, e.getMessage());
-    }
-
     @ExceptionHandler(DuplicateMemberEmailException.class)
     public ProblemDetail handleDuplicateMemberEmailException(DuplicateMemberEmailException e) {
         return problem(MemberErrorCode.MEMBER_EMAIL_DUPLICATE, e.getMessage());
