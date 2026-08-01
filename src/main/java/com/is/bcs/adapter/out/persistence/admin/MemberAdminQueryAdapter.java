@@ -27,10 +27,7 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Page<GetMemberAdminUseCase.Result> findMembers(
-            Pageable pageable,
-            GetMemberAdminUseCase.Command command
-    ) {
+    public Page<GetMemberAdminUseCase.Result> findMembers(Pageable pageable, GetMemberAdminUseCase.Command command) {
         // 1. 동적 쿼리 모으기
         BooleanBuilder conditions = createConditions(command);
 

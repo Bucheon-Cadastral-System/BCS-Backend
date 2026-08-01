@@ -36,20 +36,5 @@ public record MemberProfileResponse(
         );
     }
 
-    public static MemberProfileResponse from(GetMemberAdminUseCase.Result result) {
-        return new MemberProfileResponse(
-                result.id(),
-                result.name(),
-                result.phone(),
-                result.email(),
-                result.district(),
-                result.department(),
-                result.team(),
-                result.position(),
-                result.role(),
-                result.status()
-        );
-    }
-
 
 }

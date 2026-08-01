@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.member;
 
+import com.is.bcs.adapter.in.security.oauth2.BcsOAuth2Principal;
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
 import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
@@ -52,8 +53,8 @@ public class MemberController {
     @PutMapping("/me/registration")
     public ResponseEntity<Void> completeRegistration(Authentication authentication, @Valid @RequestBody CompleteRegistrationRequest request
     ) {
-        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
-        Long memberId = principal.memberId();
+        BcsOAuth2Principal principal =(BcsOAuth2Principal) authentication.getPrincipal();
+        Long memberId = principal != null ? principal.getMemberId() : null;
 
         completeMemberProfileUseCase.complete(
                 memberId,
@@ -86,8 +87,8 @@ public class MemberController {
     @Operation(summary = "내 가입 상태 조회")
     @GetMapping("/me/state")
     public ResponseEntity<MemberStateResponse> getMyState(Authentication authentication) {
-        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
-        Long memberId = principal.memberId();
+        BcsOAuth2Principal principal =(BcsOAuth2Principal) authentication.getPrincipal();
+        Long memberId = principal != null ? principal.getMemberId() : null;
 
         GetMemberStateUseCase.Result result = getMemberStateUseCase.getState(memberId);
 
