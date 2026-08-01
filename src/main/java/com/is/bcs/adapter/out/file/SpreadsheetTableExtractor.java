@@ -37,7 +37,8 @@ public class SpreadsheetTableExtractor implements TableExtractor {
     /** OLE2 복합 문서 서명 — 옛 엑셀(.xls)과 **암호가 걸린 xlsx** 가 이 형식이다. */
     private static final byte[] OLE2_MAGIC =
             {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
-    private static final String UTF8_BOM = "﻿";
+    /** 눈에 보이지 않는 문자라 리터럴로 두면 편집·저장 과정에서 조용히 훼손될 수 있다. */
+    private static final String UTF8_BOM = "\uFEFF";
     /** 제목 행은 보통 한 칸만 채워져 있어, 두 칸 이상 채워진 첫 행을 헤더로 본다. */
     private static final int HEADER_MIN_FILLED_CELLS = 2;
 
@@ -80,12 +81,19 @@ public class SpreadsheetTableExtractor implements TableExtractor {
 
     private static Table fromCsv(String text) {
         List<List<String>> records = splitCsv(text);
-        if (records.isEmpty()) {
+
+        // 헤더 찾는 규칙은 XLSX 와 같다 — 같은 양식을 CSV 로 내보내도 제목 행이 첫 줄에 남는다
+        int headerAt = 0;
+        while (headerAt < records.size() && filledCount(records.get(headerAt)) < HEADER_MIN_FILLED_CELLS) {
+            headerAt++;
+        }
+        if (headerAt == records.size()) {
             throw new InvalidControlPointException("파일에 헤더가 없습니다.");
         }
-        List<String> headers = trimTrailingEmpty(records.getFirst());
+
+        List<String> headers = trimTrailingEmpty(records.get(headerAt));
         List<List<String>> rows = new ArrayList<>();
-        for (List<String> record : records.subList(1, records.size())) {
+        for (List<String> record : records.subList(headerAt + 1, records.size())) {
             rows.add(fit(record, headers.size()));
         }
         return new Table(headers, rows);

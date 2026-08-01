@@ -249,7 +249,8 @@ class SurveyCsvImportServiceTest {
     @Test
     @DisplayName("중복으로 거부한 행의 값이 뒤 행의 판정을 오염시키지 않는다")
     void importCsv_rejectedRowDoesNotBlockLaterRow() throws Exception {
-        // 2행은 관리번호가 1행과 겹쳐 거부된다. 3행은 그 2행과 이름만 같을 뿐 관리번호가 고유하다.
+        // 행 번호는 오류 메시지와 같게 헤더를 1행으로 센다.
+        // 3행은 관리번호가 2행과 겹쳐 거부되고, 4행은 그 3행과 이름만 같을 뿐 관리번호가 고유하다.
         byte[] csv = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96

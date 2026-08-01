@@ -23,13 +23,15 @@ class SurveyChatToolsTest {
 
     private static final LocalDate STARTED = LocalDate.of(2026, 7, 1);
 
+    private static final LocalDate ENDED = LocalDate.of(2026, 7, 31);
+
     private final FakeSurveys fake = new FakeSurveys();
     private final SurveyChatTools tools = new SurveyChatTools(fake, fake);
 
     @Test
     @DisplayName("프로젝트 목록 — id·이름·기간·비고를 돌려준다")
     void getSurveyProjects_returnsSummaries() {
-        fake.projects.put(1L, SurveyProject.restore(1L, null, "2026 일제조사", STARTED, null, "정기 조사"));
+        fake.projects.put(1L, SurveyProject.restore(1L, null, "2026 일제조사", STARTED, ENDED, "정기 조사"));
 
         List<ProjectSummary> projects = tools.getSurveyProjects();
 
@@ -37,6 +39,7 @@ class SurveyChatToolsTest {
         assertEquals(1L, projects.getFirst().id());
         assertEquals("2026 일제조사", projects.getFirst().name());
         assertEquals(STARTED, projects.getFirst().startedOn());
+        assertEquals(ENDED, projects.getFirst().endedOn());
         assertEquals("정기 조사", projects.getFirst().note());
     }
 

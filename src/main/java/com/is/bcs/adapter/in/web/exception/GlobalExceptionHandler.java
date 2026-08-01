@@ -30,6 +30,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -171,13 +172,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * 저장 제약 위반(유니크 등) — 도메인 검증을 지나쳐 왔더라도 서버 오류로 내리지 않는다.
-     * 제약 이름·SQL 은 사용자에게 뜻이 없고 노출하면 스키마가 드러나므로 로그로만 남긴다.
+     * 저장 제약 위반 — 중복만 409 로 알린다.
+     * 외래키·필수값·CHECK 위반까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
+     * 제약 이름·SQL 은 사용자에게 뜻이 없고 노출하면 스키마가 드러나므로 어느 쪽이든 로그로만 남긴다.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        if (isUniqueViolation(e)) {
+            log.warn("중복 저장 시도", e);
+            return problem(CommonErrorCode.COMMON_CONFLICT, "이미 등록된 값이라 저장할 수 없습니다.");
+        }
         log.error("저장 제약 위반", e);
-        return problem(CommonErrorCode.COMMON_CONFLICT, "이미 등록된 값이라 저장할 수 없습니다.");
+        return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
+    }
+
+    /** SQL 표준의 unique_violation(23505) — 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
+    private static boolean isUniqueViolation(Throwable e) {
+        for (Throwable cause = e; cause != null && cause != cause.getCause(); cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @ExceptionHandler(SurveyProjectNotFoundException.class)

@@ -98,8 +98,11 @@ class SurveyApiTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        assertTrue(bodyOf(result).contains("\"content\":["));
-        assertEquals(49, bodyOf(result).split(",").length); // 대상 49건
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"content\":["));
+        // 응답 전체의 콤마를 세면 필드가 하나 늘 때마다 값이 달라진다 — 목록 안만 잘라 센다
+        String content = body.substring(body.indexOf('[') + 1, body.lastIndexOf(']'));
+        assertEquals(49, content.split(",").length);
 
         mockMvc.perform(get("/api/survey-projects/999999/targets")).andExpect(status().isNotFound());
     }

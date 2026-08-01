@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -66,13 +67,25 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("저장 제약 위반은 409 로 내리고 제약 이름·SQL 은 응답에 싣지 않는다")
-    void dataIntegrityViolation() {
-        ProblemDetail problem = handler.handleDataIntegrityViolation(
-                new DataIntegrityViolationException("uk_control_points_point_no 위반: insert into ..."));
+    @DisplayName("중복 저장은 409 로 내리고 제약 이름·SQL 은 응답에 싣지 않는다")
+    void duplicateViolation() {
+        ProblemDetail problem = handler.handleDataIntegrityViolation(new DataIntegrityViolationException(
+                "uk_control_points_point_no 위반: insert into ...",
+                new SQLException("duplicate key", "23505")));
 
         assertMapped(problem, HttpStatus.CONFLICT, CommonErrorCode.COMMON_CONFLICT,
                 "이미 등록된 값이라 저장할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("중복이 아닌 제약 위반은 500 이다 — 도메인 검증이 빠진 자리를 정상 응답으로 감추지 않는다")
+    void otherIntegrityViolation() {
+        // 23503 = foreign_key_violation
+        ProblemDetail problem = handler.handleDataIntegrityViolation(new DataIntegrityViolationException(
+                "fk_survey_targets_project 위반", new SQLException("no referenced row", "23503")));
+
+        assertMapped(problem, HttpStatus.INTERNAL_SERVER_ERROR, CommonErrorCode.COMMON_INTERNAL_ERROR,
+                "서버 내부 오류가 발생했습니다");
     }
 
     @Test
