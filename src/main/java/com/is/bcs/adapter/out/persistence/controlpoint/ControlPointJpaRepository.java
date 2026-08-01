@@ -16,7 +16,9 @@ public interface ControlPointJpaRepository extends JpaRepository<ControlPointJpa
 
     Optional<ControlPointJpaEntity> findFirstByNameAndType(String name, PointType type);
 
-    List<ControlPointJpaEntity> findAllByNameInOrPointNoIn(Collection<String> names, Collection<String> pointNos);
+    List<ControlPointJpaEntity> findAllByNameIn(Collection<String> names);
+
+    List<ControlPointJpaEntity> findAllByPointNoIn(Collection<String> pointNos);
 
     boolean existsByPointNo(String pointNo);
 

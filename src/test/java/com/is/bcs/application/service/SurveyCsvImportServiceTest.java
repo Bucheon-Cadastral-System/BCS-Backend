@@ -209,7 +209,7 @@ class SurveyCsvImportServiceTest {
         service.importCsv(new ImportSurveyCsvCommand("기본 양식 조사", STARTED, null, null, basicCsv));
 
         ControlPoint first = pointStore.findByPointNo("41192D000001265").orElseThrow();
-        // 같은 행의 경위도 열(담당자가 덧붙인 값)과 일치해야 한다
+        // 기준값은 경위도 열이 덧붙은 확장 양식(/survey-target-sample.csv)의 같은 행에 적힌 값이다
         assertEquals(126.794623, first.getGeo().longitude(), 1e-6);
         assertEquals(37.506423, first.getGeo().latitude(), 1e-6);
     }
@@ -261,7 +261,7 @@ class SurveyCsvImportServiceTest {
         InvalidControlPointException thrown = assertThrows(InvalidControlPointException.class,
                 () -> service.importCsv(new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
 
-        // 거부는 2행 하나뿐이어야 한다 — 3행까지 '같은 기준점'으로 걸리면 담당자가 멀쩡한 행을 고치게 된다
+        // 거부는 3행 하나뿐이어야 한다 — 4행까지 '같은 기준점'으로 걸리면 담당자가 멀쩡한 행을 고치게 된다
         assertTrue(thrown.getMessage().contains("3행"), thrown.getMessage());
         assertTrue(!thrown.getMessage().contains("4행"), thrown.getMessage());
     }

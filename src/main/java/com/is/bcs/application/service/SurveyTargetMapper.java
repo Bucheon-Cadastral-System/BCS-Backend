@@ -138,10 +138,12 @@ public final class SurveyTargetMapper {
             throw new InvalidControlPointException("필수 열이 없습니다: " + String.join(", ", missing));
         }
 
-        // 보관할 열은 위치로 붙잡아 둔다 — 알리는 열 이름과 행별 값이 같은 판단에서 나오게
-        List<Integer> extraPositions = extraPositions(table.headers());
+        // 이름 있는 열은 해석하거나 보관하거나 둘 중 하나다.
+        // 같은 항목으로 풀리는 열이 둘이면 뒤엣것은 해석에 쓰이지 않으므로 보관 쪽으로 넘겨 값이 사라지지 않게 한다.
+        Set<Integer> interpreted = Set.copyOf(columns.values());
+        List<Integer> extraPositions = extraPositions(table.headers(), interpreted);
         ColumnMapping mapping = new ColumnMapping(
-                recognizedColumns(table.headers()),
+                recognizedColumns(table.headers(), interpreted),
                 extraPositions.stream().map(table.headers()::get).toList());
 
         List<Row> rows = new ArrayList<>();
@@ -184,24 +186,23 @@ public final class SurveyTargetMapper {
         return null;
     }
 
-    /** 표준 항목으로 읽히는 열 — 파일의 열 이름 → 표준 이름. 순서는 파일에 적힌 그대로 둔다. */
-    private static Map<String, String> recognizedColumns(List<String> headers) {
+    /** 실제로 해석에 쓰인 열 — 파일의 열 이름 → 표준 이름. 순서는 파일에 적힌 그대로 둔다. */
+    private static Map<String, String> recognizedColumns(List<String> headers, Set<Integer> interpreted) {
         Map<String, String> recognized = new LinkedHashMap<>();
-        for (String header : headers) {
-            String standard = standardOf(header);
-            if (standard != null) {
-                recognized.putIfAbsent(header, standard);
+        for (int i = 0; i < headers.size(); i++) {
+            if (interpreted.contains(i)) {
+                recognized.putIfAbsent(headers.get(i), standardOf(headers.get(i)));
             }
         }
         return Collections.unmodifiableMap(recognized);
     }
 
     /** 값만 보관할 열의 위치 — 행마다 헤더를 다시 훑지 않도록 한 번만 구한다. */
-    private static List<Integer> extraPositions(List<String> headers) {
+    private static List<Integer> extraPositions(List<String> headers, Set<Integer> interpreted) {
         List<Integer> positions = new ArrayList<>();
         for (int i = 0; i < headers.size(); i++) {
             // 이름이 없는 열은 무엇으로 되살릴지 알 수 없어 보관 대상에서 뺀다
-            if (standardOf(headers.get(i)) == null && !normalize(headers.get(i)).isEmpty()) {
+            if (!interpreted.contains(i) && !normalize(headers.get(i)).isEmpty()) {
                 positions.add(i);
             }
         }
@@ -214,15 +215,17 @@ public final class SurveyTargetMapper {
         return key.isEmpty() ? null : STANDARD_BY_NORMALIZED.get(resolve(key));
     }
 
-    /** 정규화한 열 이름 → 위치. 별칭을 표준 이름으로 접어 넣는다. */
+    /**
+     * 표준 항목(정규화한 이름) → 위치. 별칭은 표준 이름으로 접어 넣는다.
+     * 같은 항목으로 풀리는 열이 둘이면 앞엣것만 쓴다 — 뒤엣것은 해석에 쓰이지 않으므로 보관 대상이 된다.
+     */
     private static Map<String, Integer> columnIndex(List<String> headers) {
         Map<String, Integer> index = new HashMap<>();
         for (int i = 0; i < headers.size(); i++) {
-            String key = normalize(headers.get(i));
-            if (key.isEmpty()) {
-                continue;
+            String standard = standardOf(headers.get(i));
+            if (standard != null) {
+                index.putIfAbsent(normalize(standard), i);
             }
-            index.putIfAbsent(resolve(key), i);
         }
         return index;
     }

@@ -17,7 +17,8 @@ spring:
   servlet:
     multipart:
       max-file-size: 20MB
-      max-request-size: 20MB
+      # 요청 한도에는 파일 외에 경계 문자열·파트 헤더·조사명 같은 파라미터도 들어간다
+      max-request-size: 25MB
 
   datasource:
     url: ${SPRING_DATASOURCE_URL}

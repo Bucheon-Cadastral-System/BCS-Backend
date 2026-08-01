@@ -52,6 +52,15 @@ class SurveyProjectTest {
     }
 
     @Test
+    @DisplayName("시작일과 종료일이 같은 하루짜리 조사는 허용한다")
+    void create_allowsSameDayPeriod() {
+        SurveyProject project = SurveyProject.create("당일 조사", STARTED, STARTED, null);
+
+        assertEquals(STARTED, project.getStartedOn());
+        assertEquals(STARTED, project.getEndedOn());
+    }
+
+    @Test
     @DisplayName("이름이 비어 있으면 생성·개명할 수 없다")
     void blankName_throws() {
         assertThrows(InvalidSurveyException.class, () -> SurveyProject.create(" ", STARTED, null, null));

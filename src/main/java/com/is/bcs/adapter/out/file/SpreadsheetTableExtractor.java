@@ -129,10 +129,11 @@ public class SpreadsheetTableExtractor implements TableExtractor {
         } catch (InvalidControlPointException e) {
             throw e;
         } catch (EncryptedDocumentException e) {
-            throw new InvalidControlPointException("암호가 걸린 엑셀 파일은 읽을 수 없습니다. 암호를 풀고 올려 주세요.");
+            throw new InvalidControlPointException("암호가 걸린 엑셀 파일은 읽을 수 없습니다. 암호를 풀고 올려 주세요.", e);
         } catch (IOException | RuntimeException e) {
-            // POI 는 열지 못한 파일을 형식마다 다른 런타임 예외로 알린다 — 어느 쪽이든 잘못된 업로드이지 서버 오류가 아니다
-            throw new InvalidControlPointException("엑셀 파일을 읽지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.");
+            // POI 는 열지 못한 파일을 형식마다 다른 런타임 예외로 알린다 — 어느 쪽이든 잘못된 업로드이지 서버 오류가 아니다.
+            // 다만 여기에 우리 결함이 섞여 들어올 수 있으므로 원인은 버리지 않고 함께 남긴다.
+            throw new InvalidControlPointException("엑셀 파일을 읽지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.", e);
         }
     }
 

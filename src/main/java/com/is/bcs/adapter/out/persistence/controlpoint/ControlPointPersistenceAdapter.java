@@ -8,9 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Component
@@ -35,14 +37,26 @@ public class ControlPointPersistenceAdapter
         return repository.findFirstByNameAndType(name, type).map(ControlPointJpaEntity::toDomain);
     }
 
+    /**
+     * IN 목록은 값 하나가 바인드 변수 하나라, 큰 파일을 통째로 넘기면 드라이버·DB 한도에 걸려 조회 단계에서 실패한다.
+     * 나눠 조회하고 id 로 합친다 — 이름과 관리번호 양쪽에 걸린 점이 두 번 담기지 않게.
+     */
     @Override
     public List<ControlPoint> findAllByNameInOrPointNoIn(Collection<String> names, Collection<String> pointNos) {
-        if (names.isEmpty() && pointNos.isEmpty()) {
-            return List.of();
+        Map<Long, ControlPointJpaEntity> found = new LinkedHashMap<>();
+        forEachChunk(names, chunk -> repository.findAllByNameIn(chunk).forEach(e -> found.put(e.getId(), e)));
+        forEachChunk(pointNos, chunk -> repository.findAllByPointNoIn(chunk).forEach(e -> found.put(e.getId(), e)));
+        return found.values().stream().map(ControlPointJpaEntity::toDomain).toList();
+    }
+
+    /** PostgreSQL 의 바인드 변수 상한(65,535)에 여유를 두고 나눈다. */
+    private static final int CHUNK_SIZE = 1_000;
+
+    private static void forEachChunk(Collection<String> values, Consumer<List<String>> query) {
+        List<String> all = List.copyOf(values);
+        for (int from = 0; from < all.size(); from += CHUNK_SIZE) {
+            query.accept(all.subList(from, Math.min(from + CHUNK_SIZE, all.size())));
         }
-        return repository.findAllByNameInOrPointNoIn(names, pointNos).stream()
-                .map(ControlPointJpaEntity::toDomain)
-                .toList();
     }
 
     @Override
