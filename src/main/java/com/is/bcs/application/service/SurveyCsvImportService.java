@@ -22,7 +22,7 @@ import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyTarget;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
@@ -36,10 +36,12 @@ import java.util.stream.IntStream;
 /**
  * 대상지 파일(CSV·XLSX) 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
  * 이름·종류로 같은 물리적 점을 찾아 중복 등록을 막고(관리번호가 달라도), 기존 점의 성과가 다르면 CSV의 확정 성과로 갱신한다.
+ *
+ * 파일 파싱은 DB 를 건드리지 않으므로 트랜잭션 밖에서 끝낸다 — 수천 행 xlsx 를 읽는 동안 커넥션을 잡고 있으면
+ * 동시에 다른 담당자가 올릴 때 풀이 마른다. 트랜잭션은 실제로 쓰는 구간(store)에만 건다.
  */
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
 
     private final LoadControlPointPort loadControlPointPort;
@@ -49,6 +51,7 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
     private final SaveSurveyTargetPort saveSurveyTargetPort;
     private final TableExtractor tableExtractor;
     private final CoordinateTransformer coordinateTransformer;
+    private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     /** 거부 메시지에 실을 오류 건수 상한. */
@@ -56,10 +59,15 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
 
     @Override
     public SurveyCsvImportResult importCsv(ImportSurveyCsvCommand command) {
+        // 파싱·검증은 읽기만 하므로 트랜잭션 밖 — 여기서 거부되면 DB 는 시작조차 하지 않는다
         SurveyTargetMapper.MappingResult mapped = SurveyTargetMapper.map(tableExtractor.extract(command.content()));
         rejectIfAnyRowFailed(mapped.errors());
-        List<Row> rows = mapped.rows();
 
+        return transactionTemplate.execute(status -> store(command, mapped.rows()));
+    }
+
+    /** 읽어 둔 행을 한 트랜잭션으로 저장한다 — 한 행이라도 실패하면 조사째로 되돌린다. */
+    private SurveyCsvImportResult store(ImportSurveyCsvCommand command, List<Row> rows) {
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
                 command.name(), command.startedOn(), command.endedOn(), command.note()));
 

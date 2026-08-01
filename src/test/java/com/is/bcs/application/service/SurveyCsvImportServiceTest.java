@@ -27,6 +27,11 @@ import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -58,8 +63,27 @@ class SurveyCsvImportServiceTest {
     // 변환기는 입출력이 없는 순수 계산이라 실제 구현을 쓴다 — 파생된 경위도가 실제 값인지까지 확인된다
     private final SurveyCsvImportService service = new SurveyCsvImportService(
             pointStore, pointStore, surveyStore, surveyStore, targetStore,
-            new SpreadsheetTableExtractor(), new Proj4jCoordinateTransformer(),
+            new SpreadsheetTableExtractor(), new Proj4jCoordinateTransformer(), directTransaction(),
             Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST));
+
+    /** 페이크 저장소에는 트랜잭션이 없다 — 경계만 통과시키고 커밋·롤백은 하지 않는다. */
+    private static TransactionTemplate directTransaction() {
+        return new TransactionTemplate(new PlatformTransactionManager() {
+
+            @Override
+            public TransactionStatus getTransaction(TransactionDefinition definition) {
+                return new SimpleTransactionStatus();
+            }
+
+            @Override
+            public void commit(TransactionStatus status) {
+            }
+
+            @Override
+            public void rollback(TransactionStatus status) {
+            }
+        });
+    }
 
     private byte[] sampleCsv() throws Exception {
         try (var in = getClass().getResourceAsStream("/survey-target-sample.csv")) {
