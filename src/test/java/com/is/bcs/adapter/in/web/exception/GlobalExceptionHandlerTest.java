@@ -11,9 +11,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
+import java.sql.BatchUpdateException;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
@@ -75,6 +77,42 @@ class GlobalExceptionHandlerTest {
 
         assertMapped(problem, HttpStatus.CONFLICT, CommonErrorCode.COMMON_CONFLICT,
                 "이미 등록된 값이라 저장할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("원인 예외가 없는 중복 예외도 409 다 — 상태 코드를 볼 수 없으면 타입으로 가른다")
+    void duplicateKeyExceptionWithoutCause() {
+        ProblemDetail problem = handler.handleDataIntegrityViolation(
+                new DuplicateKeyException("uk_control_points_point_no"));
+
+        assertMapped(problem, HttpStatus.CONFLICT, CommonErrorCode.COMMON_CONFLICT,
+                "이미 등록된 값이라 저장할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("배치 저장 실패도 409 다 — 진짜 원인이 cause 가 아니라 다음 예외 사슬에 담긴다")
+    void batchedDuplicateViolation() {
+        BatchUpdateException batch = new BatchUpdateException("batch entry 3 failed", new int[0]);
+        batch.setNextException(new SQLException("duplicate key", "23505"));
+
+        ProblemDetail problem = handler.handleDataIntegrityViolation(
+                new DataIntegrityViolationException("could not execute batch", batch));
+
+        assertMapped(problem, HttpStatus.CONFLICT, CommonErrorCode.COMMON_CONFLICT,
+                "이미 등록된 값이라 저장할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("서로를 가리키는 예외 사슬에서도 멈춘다")
+    void selfReferencingCause() {
+        SQLException looping = new SQLException("무결성 위반", "23000");
+        looping.setNextException(looping);
+
+        ProblemDetail problem = handler.handleDataIntegrityViolation(
+                new DataIntegrityViolationException("제약 위반", looping));
+
+        assertMapped(problem, HttpStatus.INTERNAL_SERVER_ERROR, CommonErrorCode.COMMON_INTERNAL_ERROR,
+                "서버 내부 오류가 발생했습니다");
     }
 
     @Test

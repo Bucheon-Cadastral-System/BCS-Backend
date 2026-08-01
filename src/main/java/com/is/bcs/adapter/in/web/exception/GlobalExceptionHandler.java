@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -33,7 +34,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -186,14 +192,40 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
     }
 
-    /** SQL 표준의 unique_violation(23505) — 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
-    private static boolean isUniqueViolation(Throwable e) {
-        for (Throwable cause = e; cause != null && cause != cause.getCause(); cause = cause.getCause()) {
-            if (cause instanceof SQLException sql && "23505".equals(sql.getSQLState())) {
-                return true;
+    /** SQL 표준의 unique_violation. 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
+    private static final String UNIQUE_VIOLATION = "23505";
+
+    /**
+     * 중복 저장으로 실패한 것인지.
+     * 원인 예외가 없는 DuplicateKeyException 은 상태 코드를 볼 수 없으므로 타입으로 먼저 가른다.
+     * 배치로 묶어 저장하면 진짜 원인이 cause 가 아니라 SQLException 의 다음 예외 사슬에 담기므로 둘 다 훑는다.
+     */
+    private static boolean isUniqueViolation(DataIntegrityViolationException e) {
+        if (e instanceof DuplicateKeyException) {
+            return true;
+        }
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<Throwable> pending = new ArrayDeque<>(List.of(e));
+        while (!pending.isEmpty()) {
+            Throwable current = pending.pop();
+            if (!visited.add(current)) {
+                continue; // 예외가 서로를 가리켜도 멈춘다
             }
+            if (current instanceof SQLException sql) {
+                if (UNIQUE_VIOLATION.equals(sql.getSQLState())) {
+                    return true;
+                }
+                pushIfPresent(pending, sql.getNextException());
+            }
+            pushIfPresent(pending, current.getCause());
         }
         return false;
+    }
+
+    private static void pushIfPresent(Deque<Throwable> pending, Throwable candidate) {
+        if (candidate != null) {
+            pending.push(candidate);
+        }
     }
 
     @ExceptionHandler(SurveyProjectNotFoundException.class)
