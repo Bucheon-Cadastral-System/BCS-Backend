@@ -8,7 +8,10 @@ public interface ExchangeOAuthCodeUseCase {
 
     record ExchangeOAuthCodeResult(
             String accessToken,
-            Instant accessTokenExpiresAt
+            Instant accessTokenExpiresAt,
+            String refreshToken,
+            Instant refreshTokenExpiresAt
     ) {
     }
+
 }

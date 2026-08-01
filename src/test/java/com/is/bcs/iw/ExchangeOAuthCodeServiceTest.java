@@ -3,7 +3,6 @@ package com.is.bcs.iw;
 import com.is.bcs.application.port.in.auth.ExchangeOAuthCodeUseCase.ExchangeOAuthCodeResult;
 import com.is.bcs.application.port.out.token.OAuthCodeStore;
 import com.is.bcs.application.service.auth.ExchangeOAuthCodeService;
-import com.is.bcs.domain.token.OAuthExchangeToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

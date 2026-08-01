@@ -65,10 +65,17 @@ public class AuthController {
 
     @Operation(summary = "일회용 임시 코드로 액세스 토큰(바디) & 리프레시 토큰 교환(쿠키)")
     @PostMapping("/token/exchange")
-    public ResponseEntity<OAuthCodeExchangeResponse> exchange(@Valid @RequestBody OAuthCodeExchangeRequest request) {
+    public ResponseEntity<OAuthCodeExchangeResponse> exchange(@Valid @RequestBody OAuthCodeExchangeRequest request, HttpServletResponse response) {
+
         ExchangeOAuthCodeUseCase.ExchangeOAuthCodeResult result = exchangeOAuthCodeUseCase.exchange(request.code(), request.codeVerifier());
 
-        OAuthCodeExchangeResponse response =
+        addRefreshTokenCookie(
+                response,
+                result.refreshToken(),
+                result.refreshTokenExpiresAt()
+        );
+
+        OAuthCodeExchangeResponse responseBody =
                 new OAuthCodeExchangeResponse(
                         result.accessToken(),
                         "Bearer",
@@ -77,7 +84,7 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(response);
+                .body(responseBody);
     }
 
     @Operation(summary = "리프레시 토큰으로 로그아웃")

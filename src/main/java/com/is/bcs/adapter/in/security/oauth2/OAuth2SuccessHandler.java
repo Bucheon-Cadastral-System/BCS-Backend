@@ -1,17 +1,13 @@
 package com.is.bcs.adapter.in.security.oauth2;
 
 import com.is.bcs.adapter.in.security.oauth2.exception.InvalidOAuth2PrincipalException;
-import com.is.bcs.application.port.out.token.*;
+import com.is.bcs.application.port.in.auth.CompleteOAuth2LoginUseCase;
 import com.is.bcs.domain.member.MemberStatus;
-import com.is.bcs.domain.token.OAuthExchangeToken;
-import com.is.bcs.domain.token.RefreshToken;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -20,44 +16,24 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.UUID;
 
 @Slf4j
 @Component
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private final String frontendBaseUrl;
-    private final boolean refreshCookieSecure;
-    private final TokenProvider tokenProvider;
-    private final RefreshTokenStore refreshTokenStore;
-    private final TokenHasher tokenHasher;
-    private final OAuthCodeStore oauthCodeStore;
-    private final Clock clock;
+    private final CompleteOAuth2LoginUseCase completeOAuth2LoginUseCase;
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
     private static final String CODE_CHALLENGE_SESSION_ATTRIBUTE = "OAUTH_CODE_CHALLENGE";
 
     public OAuth2SuccessHandler(
             @Value("${app.frontend-base-url}")
             String frontendBaseUrl,
-            @Value("${app.auth.refresh-cookie.secure}")
-            boolean refreshCookieSecure,
-            TokenProvider tokenProvider,
-            RefreshTokenStore refreshTokenStore,
-            TokenHasher tokenHasher,
-            OAuthCodeStore oauthCodeStore,
-            Clock clock,
+            CompleteOAuth2LoginUseCase completeOAuth2LoginUseCase,
             OAuth2LoginFailureHandler oauth2LoginFailureHandler
     ) {
         this.frontendBaseUrl = frontendBaseUrl;
-        this.refreshCookieSecure = refreshCookieSecure;
-        this.tokenProvider = tokenProvider;
-        this.refreshTokenStore = refreshTokenStore;
-        this.tokenHasher = tokenHasher;
-        this.oauthCodeStore = oauthCodeStore;
-        this.clock = clock;
+        this.completeOAuth2LoginUseCase = completeOAuth2LoginUseCase;
         this.oauth2LoginFailureHandler = oauth2LoginFailureHandler;
     }
 
@@ -104,67 +80,28 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private void handleActive(HttpServletRequest request, HttpServletResponse response, BcsOAuth2Principal principal) throws IOException {
 
-        // 1. Access/Refresh Token 발급
-        IssuedTokenPair issuedTokens = tokenProvider.issue(
-                principal.getMemberId(),
-                principal.getRole()
-        );
-
-        // 2. Refresh Token 해시와 메타데이터 저장
-        RefreshToken refreshToken = new RefreshToken(
-                issuedTokens.refreshTokenId(),
-                principal.getMemberId(),
-                tokenHasher.hash(
-                        issuedTokens.refreshToken()
-                ),
-                issuedTokens.refreshTokenExpiresAt()
-        );
-
-        refreshTokenStore.save(refreshToken);
-
-        // 3. Refresh Token 원문을 HttpOnly 쿠키로 전달
-        addRefreshTokenCookie(
-                response,
-                issuedTokens.refreshToken(),
-                issuedTokens.refreshTokenExpiresAt()
-        );
-
-        // 4. Access Token을 일회용 코드에 연결해 임시 저장
-        String exchangeCode = UUID.randomUUID().toString();
-
-        OAuthExchangeToken exchangeToken =
-                new OAuthExchangeToken(
-                        issuedTokens.accessToken(),
-                        issuedTokens.accessTokenExpiresAt(),
-                        clock.instant().plusSeconds(60),
+        // 1. 객체 변환
+        CompleteOAuth2LoginUseCase.Command command =
+                new CompleteOAuth2LoginUseCase.Command(
+                        principal.getMemberId(),
                         getCodeChallenge(request)
                 );
 
-        oauthCodeStore.save(
-                exchangeCode,
-                exchangeToken
-        );
+        // 2. 액세스 토큰 & 리프레시 토큰 발행 후 <일회용 코드, OAuthExchangeToken> 캐시 저장
+        CompleteOAuth2LoginUseCase.Result result = completeOAuth2LoginUseCase.complete(command);
 
-
-        // 5. 기존 OAuth 세션 제거
+        // 3. HttpSession Clear
         clearAuthenticationSession(request);
 
-        // 6. 프론트로 일회용 코드 전달
-        String encodedCode = URLEncoder.encode(
-                exchangeCode,
-                StandardCharsets.UTF_8
-        );
+        // 4. 일회용 코드 Encode
+        String encodedCode = URLEncoder.encode(result.exchangeCode(), StandardCharsets.UTF_8);
 
+        // 5. 리다이 렉트 (일회용 코드 포함)
         response.sendRedirect(
                 frontendBaseUrl
                         + "/oauth/success?code="
                         + encodedCode
         );
-
-        /** 개발용 일회용코드, AccessToken, RefreshToken 출력 */
-        log.info("일회용 코드 : {}", exchangeCode);
-        log.info("액세스 토큰 : {}", issuedTokens.accessToken());
-        log.info("리프레시 토큰 : {}", issuedTokens.refreshToken());
 
     }
 
@@ -182,30 +119,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         );
     }
 
-    private void addRefreshTokenCookie(
-            HttpServletResponse response,
-            String refreshToken,
-            Instant expiresAt
-    ) {
-        Duration maxAge = Duration.between(
-                clock.instant(),
-                expiresAt
-        );
-
-        ResponseCookie cookie = ResponseCookie
-                .from("refresh_token", refreshToken)
-                .httpOnly(true)
-                .secure(refreshCookieSecure)
-                .sameSite("Lax")
-                .path("/api/auth")
-                .maxAge(maxAge)
-                .build();
-
-        response.addHeader(
-                HttpHeaders.SET_COOKIE,
-                cookie.toString()
-        );
-    }
 
     private void clearAuthenticationSession(
             HttpServletRequest request
@@ -231,8 +144,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         if (!(value instanceof String codeChallenge) || codeChallenge.isBlank()) {
             throw new InvalidOAuth2PrincipalException("코드 챌린지가 없습니다.");
         }
-
-        log.info("세션에서 코드챌린지 꺼내기 = {}", codeChallenge);
 
         return codeChallenge;
     }
