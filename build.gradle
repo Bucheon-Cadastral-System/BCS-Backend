@@ -118,6 +118,9 @@ tasks.named('jacocoTestReport') {
 }
 
 tasks.named('jacocoTestCoverageVerification') {
+    // check 는 둘 다 포함하지만 순서는 보장하지 않는다 — 실행 데이터가 없는 채로 검증하지 않게 잡는다.
+    // dependsOn 이 아니라 mustRunAfter 라 테스트를 다시 돌리지 않고 기존 데이터로 확인할 수도 있다.
+    mustRunAfter tasks.named('test')
     violationRules {
         rule {
             limit {

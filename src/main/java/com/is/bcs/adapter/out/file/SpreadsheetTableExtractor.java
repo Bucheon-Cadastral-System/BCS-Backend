@@ -34,7 +34,7 @@ public class SpreadsheetTableExtractor implements TableExtractor {
     /** 관공서 내보내기가 흔히 쓰는 인코딩. CP949 는 EUC-KR 을 포함하므로 이것 하나로 둘 다 읽힌다. */
     private static final Charset CP949 = Charset.forName("MS949");
     private static final byte[] ZIP_MAGIC = {0x50, 0x4B, 0x03, 0x04}; // xlsx 는 zip 이다
-    /** OLE2 복합 문서 서명 — 옛 엑셀(.xls)·한글 문서 등이 이 형식이다. */
+    /** OLE2 복합 문서 서명 — 옛 엑셀(.xls)과 **암호가 걸린 xlsx** 가 이 형식이다. */
     private static final byte[] OLE2_MAGIC =
             {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
     private static final String UTF8_BOM = "﻿";
@@ -46,11 +46,10 @@ public class SpreadsheetTableExtractor implements TableExtractor {
         if (content == null || content.length == 0) {
             throw new InvalidControlPointException("빈 파일입니다.");
         }
-        if (startsWith(content, OLE2_MAGIC)) {
-            // CSV 로 읽으면 깨진 글자에서 "필수 열이 없습니다"가 나와 원인을 짐작할 수 없다
-            throw new InvalidControlPointException("예전 엑셀 형식(.xls)은 읽을 수 없습니다. .xlsx 로 저장해 올려 주세요.");
-        }
-        return startsWith(content, ZIP_MAGIC) ? fromXlsx(content) : fromCsv(decode(content));
+        // 통합 문서인지는 POI 가 판단한다 — 암호가 걸린 xlsx 는 zip 이 아니라 OLE2 로 저장되므로
+        // 서명만 보고 옛 형식이라 단정하면 "암호를 푸세요" 대신 엉뚱한 안내가 나간다
+        boolean workbook = startsWith(content, ZIP_MAGIC) || startsWith(content, OLE2_MAGIC);
+        return workbook ? fromWorkbook(content) : fromCsv(decode(content));
     }
 
     private static boolean startsWith(byte[] content, byte[] magic) {
@@ -92,7 +91,7 @@ public class SpreadsheetTableExtractor implements TableExtractor {
         return new Table(headers, rows);
     }
 
-    private static Table fromXlsx(byte[] content) {
+    private static Table fromWorkbook(byte[] content) {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content))) {
             if (workbook.getNumberOfSheets() == 0) {
                 throw new InvalidControlPointException("엑셀 파일에 시트가 없습니다.");

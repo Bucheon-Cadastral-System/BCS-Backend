@@ -2,6 +2,11 @@ package com.is.bcs.adapter.out.file;
 
 import com.is.bcs.application.port.out.file.Table;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.poifs.crypt.EncryptionInfo;
+import org.apache.poi.poifs.crypt.EncryptionMode;
+import org.apache.poi.poifs.crypt.Encryptor;
+import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.ss.usermodel.FormulaError;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator;
@@ -174,15 +179,48 @@ class SpreadsheetTableExtractorTest {
     }
 
     @Test
-    @DisplayName("옛 엑셀 형식(.xls)은 무엇을 해야 하는지 알려 주며 거부한다")
-    void extract_oldExcelFormat_isRejected() {
-        // OLE2 복합 문서 서명 — .xls 는 zip 이 아니라 이 형식이다
-        byte[] xls = {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
+    @DisplayName("옛 엑셀 형식(.xls)도 같은 표로 읽는다 — 담당자가 어떤 형식으로 저장하든 통과한다")
+    void extract_oldExcelFormat() throws Exception {
+        byte[] xls;
+        try (HSSFWorkbook workbook = new HSSFWorkbook(); var out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("대상지");
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue("기준점명");
+            header.createCell(1).setCellValue("X좌표");
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("1465공");
+            row.createCell(1).setCellValue(545236.77);
+            workbook.write(out);
+            xls = out.toByteArray();
+        }
+
+        Table table = extractor.extract(xls);
+
+        assertEquals(List.of("기준점명", "X좌표"), table.headers());
+        assertEquals(List.of("1465공", "545236.77"), table.rows().getFirst());
+    }
+
+    @Test
+    @DisplayName("암호가 걸린 xlsx 는 암호를 풀라고 알린다 — zip 이 아니라 OLE2 로 저장돼도 옛 형식으로 오인하지 않는다")
+    void extract_encryptedXlsx_isRejectedWithPasswordMessage() throws Exception {
+        byte[] encrypted;
+        try (POIFSFileSystem fs = new POIFSFileSystem();
+             XSSFWorkbook workbook = new XSSFWorkbook();
+             var out = new ByteArrayOutputStream()) {
+            workbook.createSheet("대상지").createRow(0).createCell(0).setCellValue("기준점명");
+            Encryptor encryptor = new EncryptionInfo(EncryptionMode.agile).getEncryptor();
+            encryptor.confirmPassword("1234");
+            try (var stream = encryptor.getDataStream(fs)) {
+                workbook.write(stream);
+            }
+            fs.writeFilesystem(out);
+            encrypted = out.toByteArray();
+        }
 
         InvalidControlPointException thrown =
-                assertThrows(InvalidControlPointException.class, () -> extractor.extract(xls));
+                assertThrows(InvalidControlPointException.class, () -> extractor.extract(encrypted));
 
-        assertTrue(thrown.getMessage().contains("xlsx"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("암호"), thrown.getMessage());
     }
 
     @Test

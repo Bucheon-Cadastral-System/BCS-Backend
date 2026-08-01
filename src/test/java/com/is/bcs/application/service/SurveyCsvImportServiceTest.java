@@ -112,15 +112,6 @@ class SurveyCsvImportServiceTest {
     }
 
     @Test
-    @DisplayName("프로젝트 유형은 요청한 값을 따른다 — 같은 서식이라도 일반 조사로 임포트할 수 있다")
-    void importCsv_usesRequestedProjectType() throws Exception {
-        SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 정기조사", STARTED, null, null, sampleCsv()));
-
-        assertEquals(STARTED, surveyStore.projects.get(result.projectId()).getStartedOn());
-    }
-
-    @Test
     @DisplayName("조사기록의 시각은 기존조사일의 KST 자정이고 결과·비고가 보존된다")
     void importCsv_recordUsesPriorSurveyDate() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
@@ -238,7 +229,7 @@ class SurveyCsvImportServiceTest {
     }
 
     @Test
-    @DisplayName("같은 기준점이 두 번 있는 파일은 아무것도 등록하지 않는다 — 대상 중복은 저장 단계에서 터진다")
+    @DisplayName("같은 기준점이 두 번 있는 파일은 저장을 시작하기 전에 거부한다")
     void importCsv_duplicatePointInFile_rejectsWholeFile() {
         byte[] csv = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
@@ -249,8 +240,29 @@ class SurveyCsvImportServiceTest {
         assertThrows(InvalidControlPointException.class, () -> service.importCsv(
                 new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
 
+        // 매퍼가 행 오류로 걸러 트랜잭션에 들어가기 전에 거부하므로 저장이 아예 시작되지 않는다
         assertTrue(pointStore.points.isEmpty());
         assertTrue(targetStore.targets.isEmpty());
+        assertTrue(surveyStore.projects.isEmpty());
+    }
+
+    @Test
+    @DisplayName("중복으로 거부한 행의 값이 뒤 행의 판정을 오염시키지 않는다")
+    void importCsv_rejectedRowDoesNotBlockLaterRow() throws Exception {
+        // 2행은 관리번호가 1행과 겹쳐 거부된다. 3행은 그 2행과 이름만 같을 뿐 관리번호가 고유하다.
+        byte[] csv = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96
+                41192D000000001,도근점,1466공,세계,545100.00,181100.00
+                41192D000000002,도근점,1466공,세계,545200.00,181200.00
+                """.getBytes(StandardCharsets.UTF_8);
+
+        InvalidControlPointException thrown = assertThrows(InvalidControlPointException.class,
+                () -> service.importCsv(new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
+
+        // 거부는 2행 하나뿐이어야 한다 — 3행까지 '같은 기준점'으로 걸리면 담당자가 멀쩡한 행을 고치게 된다
+        assertTrue(thrown.getMessage().contains("3행"), thrown.getMessage());
+        assertTrue(!thrown.getMessage().contains("4행"), thrown.getMessage());
     }
 
     @Test

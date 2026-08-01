@@ -37,7 +37,9 @@ import java.time.LocalDate;
         },
         indexes = {
                 @Index(name = "idx_control_points_type", columnList = "type"),
-                @Index(name = "idx_control_points_region_code", columnList = "region_code")
+                @Index(name = "idx_control_points_region_code", columnList = "region_code"),
+                // 임포트가 파일에 나온 이름을 한 번에 조회한다
+                @Index(name = "idx_control_points_name", columnList = "name")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

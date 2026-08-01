@@ -12,6 +12,7 @@ import com.is.bcs.domain.survey.SurveyResult;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -170,12 +171,17 @@ public final class SurveyTargetMapper {
      * 그대로 두면 뒤 행이 앞 행의 성과를 덮어쓰고, 같은 조사에 같은 대상이 두 번 등록돼 저장 단계에서 제약에 걸린다.
      */
     private static String duplicated(Row row, Set<String> pointNos, Set<String> points) {
-        boolean sameNo = !pointNos.add(row.pointNo());
-        boolean samePoint = !points.add(row.type() + "|" + row.name());
-        if (sameNo) {
+        String pointKey = row.type() + "|" + row.name();
+        // 판정을 먼저 하고 통과한 행만 등록한다 — 거부한 행의 값을 남기면 뒤 행이 그 값 때문에 잘못 걸린다
+        if (pointNos.contains(row.pointNo())) {
             return "같은 관리번호가 앞 행에 이미 있습니다: " + row.pointNo();
         }
-        return samePoint ? "같은 기준점이 앞 행에 이미 있습니다: " + row.name() : null;
+        if (points.contains(pointKey)) {
+            return "같은 기준점이 앞 행에 이미 있습니다: " + row.name();
+        }
+        pointNos.add(row.pointNo());
+        points.add(pointKey);
+        return null;
     }
 
     /** 표준 항목으로 읽히는 열 — 파일의 열 이름 → 표준 이름. 순서는 파일에 적힌 그대로 둔다. */
@@ -373,7 +379,7 @@ public final class SurveyTargetMapper {
         }
         try {
             return LocalDate.parse(value);
-        } catch (Exception e) {
+        } catch (DateTimeParseException e) {
             throw unknown(field, value);
         }
     }

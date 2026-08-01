@@ -11,7 +11,9 @@ import org.locationtech.proj4j.CoordinateReferenceSystem;
 import org.locationtech.proj4j.ProjCoordinate;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -51,6 +53,14 @@ public class Proj4jCoordinateTransformer implements CoordinateTransformer {
         target = factory.createFromParameters("WGS84", WGS84);
         DEFINITIONS.forEach((crs, definition) ->
                 sources.put(crs, factory.createFromParameters(crs.getEpsgCode(), definition)));
+
+        // 좌표계를 새로 등록하면서 정의를 빠뜨리면 그 성과를 실제로 만나기 전까지 드러나지 않는다 — 기동할 때 막는다
+        List<CoordinateSystem> undefined = Arrays.stream(CoordinateSystem.values())
+                .filter(crs -> !sources.containsKey(crs))
+                .toList();
+        if (!undefined.isEmpty()) {
+            throw new IllegalStateException("변환 정의가 없는 좌표계가 있습니다: " + undefined);
+        }
     }
 
     @Override
