@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,6 +146,14 @@ class ControlPointServiceTest {
         @Override
         public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
             return points.values().stream().filter(p -> p.getName().equals(name) && p.getType() == type).findFirst();
+        }
+
+        @Override
+        public List<ControlPoint> findAllByNameInOrPointNoIn(
+                Collection<String> names, Collection<String> pointNos) {
+            return points.values().stream()
+                    .filter(p -> names.contains(p.getName()) || pointNos.contains(p.getPointNo()))
+                    .toList();
         }
 
         @Override

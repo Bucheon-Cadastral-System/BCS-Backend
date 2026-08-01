@@ -18,6 +18,8 @@ import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
+import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
+import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import com.is.bcs.domain.survey.ExtraColumn;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
@@ -27,11 +29,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +44,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 대상지 CSV 임포트 검증 — 픽스처는 고객사 실파일(49행·기존조사 44건). */
@@ -209,6 +214,42 @@ class SurveyCsvImportServiceTest {
     }
 
     @Test
+    @DisplayName("같은 기준점이 두 번 있는 파일은 아무것도 등록하지 않는다 — 대상 중복은 저장 단계에서 터진다")
+    void importCsv_duplicatePointInFile_rejectsWholeFile() {
+        byte[] csv = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96
+                41192D000000002,도근점,1465공,세계,545000.00,181000.00
+                """.getBytes(StandardCharsets.UTF_8);
+
+        assertThrows(InvalidControlPointException.class, () -> service.importCsv(
+                new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
+
+        assertTrue(pointStore.points.isEmpty());
+        assertTrue(targetStore.targets.isEmpty());
+    }
+
+    @Test
+    @DisplayName("이미 다른 점이 쓰는 관리번호면 거부한다 — 저장 제약에 걸려 서버 오류로 새지 않게")
+    void importCsv_pointNoTakenByAnotherPoint_isRejected() {
+        pointStore.save(ControlPoint.register(
+                "41192D000000001", PointType.DOGEUN, "다른이름",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
+                new GeoCoordinate(126.79, 37.50),
+                null, null, null, null, null, null, null));
+
+        byte[] csv = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96
+                """.getBytes(StandardCharsets.UTF_8);
+
+        DuplicateControlPointException thrown = assertThrows(DuplicateControlPointException.class,
+                () -> service.importCsv(new ImportSurveyCsvCommand("충돌 조사", STARTED, null, null, csv)));
+
+        assertTrue(thrown.getMessage().contains("41192D000000001"), thrown.getMessage());
+    }
+
+    @Test
     @DisplayName("기본 양식에 없어 기준점으로 옮기지 못한 열은 조사 대상에 그대로 보관된다")
     void importCsv_keepsUnrecognizedColumnsOnTarget() throws Exception {
         service.importCsv(new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
@@ -242,6 +283,14 @@ class SurveyCsvImportServiceTest {
             return points.values().stream()
                     .filter(p -> p.getName().equals(name) && p.getType() == type)
                     .findFirst();
+        }
+
+        @Override
+        public List<ControlPoint> findAllByNameInOrPointNoIn(
+                Collection<String> names, Collection<String> pointNos) {
+            return points.values().stream()
+                    .filter(p -> names.contains(p.getName()) || pointNos.contains(p.getPointNo()))
+                    .toList();
         }
 
         @Override

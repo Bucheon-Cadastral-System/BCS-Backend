@@ -1,12 +1,15 @@
 package com.is.bcs.adapter.out.file;
 
 import com.is.bcs.application.port.out.file.Table;
+import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 파일 → 표 추출 검증.
@@ -67,5 +70,26 @@ class SpreadsheetTableExtractorTest {
 
         assertEquals(plain.headers(), titled.headers());
         assertEquals(plain.rows().size(), titled.rows().size());
+    }
+
+    @Test
+    @DisplayName("옛 엑셀 형식(.xls)은 무엇을 해야 하는지 알려 주며 거부한다")
+    void extract_oldExcelFormat_isRejected() {
+        // OLE2 복합 문서 서명 — .xls 는 zip 이 아니라 이 형식이다
+        byte[] xls = {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
+
+        InvalidControlPointException thrown =
+                assertThrows(InvalidControlPointException.class, () -> extractor.extract(xls));
+
+        assertTrue(thrown.getMessage().contains("xlsx"), thrown.getMessage());
+    }
+
+    @Test
+    @DisplayName("열리지 않는 엑셀 파일은 도메인 오류로 거부한다 — 서버 오류로 새지 않게")
+    void extract_brokenXlsx_isRejected() {
+        // zip 서명만 맞고 내용은 엑셀이 아니다 — POI 가 런타임 예외를 던지는 자리
+        byte[] broken = {0x50, 0x4B, 0x03, 0x04, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
+
+        assertThrows(InvalidControlPointException.class, () -> extractor.extract(broken));
     }
 }

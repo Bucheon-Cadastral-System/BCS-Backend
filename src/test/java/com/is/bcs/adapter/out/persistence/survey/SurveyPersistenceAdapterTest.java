@@ -143,4 +143,19 @@ class SurveyPersistenceAdapterTest {
                 new ExtraColumn("점검자", "김주무관"),
                 new ExtraColumn("field_20", null)), found.getExtras());
     }
+
+    @Test
+    @DisplayName("보관 열 값은 길이 제한 없이 들어간다 — 뜻을 모르는 열이라 길이를 예상할 수 없다")
+    void saveTarget_acceptsLongExtraValue() {
+        SurveyProject project = savedProject();
+        String longValue = "가".repeat(5000);
+
+        SurveyTarget saved = targetAdapter.save(
+                SurveyTarget.create(project.getId(), 10L, List.of(new ExtraColumn("현장 메모", longValue))));
+        targetRepository.flush();
+        entityManager.clear();
+
+        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        assertEquals(longValue, found.getExtras().getFirst().value());
+    }
 }

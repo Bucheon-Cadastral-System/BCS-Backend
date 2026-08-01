@@ -3,6 +3,7 @@ package com.is.bcs.adapter.out.file;
 import com.is.bcs.application.port.out.file.Table;
 import com.is.bcs.application.port.out.file.TableExtractor;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -33,6 +34,9 @@ public class SpreadsheetTableExtractor implements TableExtractor {
     /** 관공서 내보내기가 흔히 쓰는 인코딩. CP949 는 EUC-KR 을 포함하므로 이것 하나로 둘 다 읽힌다. */
     private static final Charset CP949 = Charset.forName("MS949");
     private static final byte[] ZIP_MAGIC = {0x50, 0x4B, 0x03, 0x04}; // xlsx 는 zip 이다
+    /** OLE2 복합 문서 서명 — 옛 엑셀(.xls)·한글 문서 등이 이 형식이다. */
+    private static final byte[] OLE2_MAGIC =
+            {(byte) 0xD0, (byte) 0xCF, 0x11, (byte) 0xE0, (byte) 0xA1, (byte) 0xB1, 0x1A, (byte) 0xE1};
     private static final String UTF8_BOM = "﻿";
     /** 제목 행은 보통 한 칸만 채워져 있어, 두 칸 이상 채워진 첫 행을 헤더로 본다. */
     private static final int HEADER_MIN_FILLED_CELLS = 2;
@@ -42,15 +46,19 @@ public class SpreadsheetTableExtractor implements TableExtractor {
         if (content == null || content.length == 0) {
             throw new InvalidControlPointException("빈 파일입니다.");
         }
-        return isZip(content) ? fromXlsx(content) : fromCsv(decode(content));
+        if (startsWith(content, OLE2_MAGIC)) {
+            // CSV 로 읽으면 깨진 글자에서 "필수 열이 없습니다"가 나와 원인을 짐작할 수 없다
+            throw new InvalidControlPointException("예전 엑셀 형식(.xls)은 읽을 수 없습니다. .xlsx 로 저장해 올려 주세요.");
+        }
+        return startsWith(content, ZIP_MAGIC) ? fromXlsx(content) : fromCsv(decode(content));
     }
 
-    private static boolean isZip(byte[] content) {
-        if (content.length < ZIP_MAGIC.length) {
+    private static boolean startsWith(byte[] content, byte[] magic) {
+        if (content.length < magic.length) {
             return false;
         }
-        for (int i = 0; i < ZIP_MAGIC.length; i++) {
-            if (content[i] != ZIP_MAGIC[i]) {
+        for (int i = 0; i < magic.length; i++) {
+            if (content[i] != magic[i]) {
                 return false;
             }
         }
@@ -86,6 +94,10 @@ public class SpreadsheetTableExtractor implements TableExtractor {
 
     private static Table fromXlsx(byte[] content) {
         try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(content))) {
+            if (workbook.getNumberOfSheets() == 0) {
+                throw new InvalidControlPointException("엑셀 파일에 시트가 없습니다.");
+            }
+            // 첫 시트만 읽는다 — 대상지는 한 장에 담기는 표라 여러 장 중 어느 것인지 묻는 단계를 두지 않는다
             Sheet sheet = workbook.getSheetAt(0);
 
             List<String> headers = null;
@@ -107,8 +119,13 @@ public class SpreadsheetTableExtractor implements TableExtractor {
                 throw new InvalidControlPointException("파일에 헤더가 없습니다.");
             }
             return new Table(headers, rows);
-        } catch (IOException e) {
-            throw new InvalidControlPointException("엑셀 파일을 읽지 못했습니다.");
+        } catch (InvalidControlPointException e) {
+            throw e;
+        } catch (EncryptedDocumentException e) {
+            throw new InvalidControlPointException("암호가 걸린 엑셀 파일은 읽을 수 없습니다. 암호를 풀고 올려 주세요.");
+        } catch (IOException | RuntimeException e) {
+            // POI 는 열지 못한 파일을 형식마다 다른 런타임 예외로 알린다 — 어느 쪽이든 잘못된 업로드이지 서버 오류가 아니다
+            throw new InvalidControlPointException("엑셀 파일을 읽지 못했습니다. 파일이 손상되지 않았는지 확인해 주세요.");
         }
     }
 

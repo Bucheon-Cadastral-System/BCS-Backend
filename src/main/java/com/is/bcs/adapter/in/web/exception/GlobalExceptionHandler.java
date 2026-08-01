@@ -16,6 +16,7 @@ import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -167,6 +168,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DuplicateControlPointException.class)
     public ProblemDetail handleDuplicateControlPoint(DuplicateControlPointException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
+    }
+
+    /**
+     * 저장 제약 위반(유니크 등) — 도메인 검증을 지나쳐 왔더라도 서버 오류로 내리지 않는다.
+     * 제약 이름·SQL 은 사용자에게 뜻이 없고 노출하면 스키마가 드러나므로 로그로만 남긴다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        log.error("저장 제약 위반", e);
+        return problem(CommonErrorCode.COMMON_CONFLICT, "이미 등록된 값이라 저장할 수 없습니다.");
     }
 
     @ExceptionHandler(SurveyProjectNotFoundException.class)

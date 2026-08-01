@@ -15,9 +15,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -143,16 +145,37 @@ public final class SurveyTargetMapper {
 
         List<Row> rows = new ArrayList<>();
         List<RowError> errors = new ArrayList<>();
+        Set<String> seenPointNos = new HashSet<>();
+        Set<String> seenPoints = new HashSet<>();
         for (int i = 0; i < table.rows().size(); i++) {
             int rowNumber = i + 2; // 헤더가 1행이므로 데이터는 2행부터
             try {
-                rows.add(mapRow(table.rows().get(i), columns, table.headers(), extraPositions));
+                Row row = mapRow(table.rows().get(i), columns, table.headers(), extraPositions);
+                String duplicated = duplicated(row, seenPointNos, seenPoints);
+                if (duplicated == null) {
+                    rows.add(row);
+                } else {
+                    errors.add(new RowError(rowNumber, duplicated));
+                }
             } catch (InvalidControlPointException e) {
                 // 한 행이 잘못됐다고 멈추면 담당자가 고치고 올리기를 반복해야 한다 — 모아서 한 번에 보여준다
                 errors.add(new RowError(rowNumber, e.getMessage()));
             }
         }
         return new MappingResult(List.copyOf(rows), mapping, List.copyOf(errors));
+    }
+
+    /**
+     * 한 파일 안에 같은 기준점이 두 번 있으면 그 사유를, 없으면 null.
+     * 그대로 두면 뒤 행이 앞 행의 성과를 덮어쓰고, 같은 조사에 같은 대상이 두 번 등록돼 저장 단계에서 제약에 걸린다.
+     */
+    private static String duplicated(Row row, Set<String> pointNos, Set<String> points) {
+        boolean sameNo = !pointNos.add(row.pointNo());
+        boolean samePoint = !points.add(row.type() + "|" + row.name());
+        if (sameNo) {
+            return "같은 관리번호가 앞 행에 이미 있습니다: " + row.pointNo();
+        }
+        return samePoint ? "같은 기준점이 앞 행에 이미 있습니다: " + row.name() : null;
     }
 
     /** 표준 항목으로 읽히는 열 — 파일의 열 이름 → 표준 이름. 순서는 파일에 적힌 그대로 둔다. */
@@ -219,9 +242,10 @@ public final class SurveyTargetMapper {
         }
 
         return new Row(
-                cell(cells, columns, POINT_NO),
+                // 열이 있어도 칸이 비어 있을 수 있다 — 등록 단계에서 터뜨리지 않고 여기서 행 오류로 만든다
+                require(cell(cells, columns, POINT_NO), POINT_NO),
                 pointType(cell(cells, columns, TYPE)),
-                cell(cells, columns, NAME),
+                require(cell(cells, columns, NAME), NAME),
                 crs(cell(cells, columns, CRS)),
                 decimal(cell(cells, columns, NORTHING), NORTHING),
                 decimal(cell(cells, columns, EASTING), EASTING),

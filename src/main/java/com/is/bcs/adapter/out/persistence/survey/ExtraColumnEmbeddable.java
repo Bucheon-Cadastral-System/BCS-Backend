@@ -16,7 +16,8 @@ public class ExtraColumnEmbeddable {
     @Column(name = "column_name", nullable = false, length = 200)
     private String columnName;
 
-    @Column(name = "column_value", length = 1000)
+    /** 뜻을 해석하지 않는 값이라 길이를 예상할 수 없다 — 자릿수를 걸면 긴 셀 하나에 임포트 전체가 막힌다. */
+    @Column(name = "column_value", columnDefinition = "text")
     private String columnValue;
 
     private ExtraColumnEmbeddable(String columnName, String columnValue) {

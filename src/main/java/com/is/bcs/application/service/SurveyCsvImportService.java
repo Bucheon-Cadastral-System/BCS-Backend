@@ -13,7 +13,9 @@ import com.is.bcs.application.port.out.survey.SaveSurveyTargetPort;
 import com.is.bcs.application.service.SurveyTargetMapper.Row;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
+import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
+import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
@@ -24,9 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * 대상지 파일(CSV·XLSX) 임포트 — 한 파일로 조사 프로젝트 생성, 기준점 마스터 등록, 조사 대상 등록, 기존조사 이력 기록을 수행한다.
@@ -58,44 +63,90 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
                 command.name(), command.startedOn(), command.endedOn(), command.note()));
 
-        int newPoints = 0;
-        int existingPoints = 0;
-        int updatedPoints = 0;
-        int createdRecords = 0;
+        // 행마다 찾으면 질의가 행 수만큼 늘어난다 — 파일에 나온 이름·관리번호를 한 번에 읽어 맞춘다
+        List<ControlPoint> candidates = loadControlPointPort.findAllByNameInOrPointNoIn(
+                rows.stream().map(Row::name).collect(Collectors.toSet()),
+                rows.stream().map(Row::pointNo).collect(Collectors.toSet()));
+        Map<String, ControlPoint> existing = candidates.stream()
+                .collect(Collectors.toMap(p -> pointKey(p.getName(), p.getType()), p -> p, (first, second) -> first));
+        Map<String, ControlPoint> byPointNo = candidates.stream()
+                .collect(Collectors.toMap(ControlPoint::getPointNo, p -> p, (first, second) -> first));
 
-        for (Row row : rows) {
+        ControlPoint[] pointOfRow = new ControlPoint[rows.size()];
+        List<Integer> newAt = new ArrayList<>();
+        List<ControlPoint> toRegister = new ArrayList<>();
+        List<Integer> revisedAt = new ArrayList<>();
+        List<ControlPoint> toRevise = new ArrayList<>();
+
+        for (int i = 0; i < rows.size(); i++) {
+            Row row = rows.get(i);
             TmCoordinate tm = new TmCoordinate(row.crs(), row.northing(), row.easting());
             // 경위도는 파일에 열이 있든 없든 성과에서 파생한다 — 권위값은 TM 이고, 파일의 경위도는 출처가 보증되지 않는다.
             // 덕분에 기본 양식과 경위도가 덧붙은 파일이 같은 결과를 낸다.
             GeoCoordinate geo = coordinateTransformer.toWgs84(tm);
 
-            ControlPoint existing = loadControlPointPort.findByNameAndType(row.name(), row.type()).orElse(null);
-            ControlPoint point;
-            if (existing == null) {
-                point = saveControlPointPort.save(register(row, tm, geo));
-                newPoints++;
-            } else if (unchanged(existing, row, tm, geo)) {
-                point = existing; // 성과·속성이 CSV와 동일 — 재사용
-                existingPoints++;
+            ControlPoint found = existing.get(pointKey(row.name(), row.type()));
+            rejectIfPointNoTaken(row, found, byPointNo.get(row.pointNo()));
+            if (found == null) {
+                newAt.add(i);
+                toRegister.add(register(row, tm, geo));
+            } else if (unchanged(found, row, tm, geo)) {
+                pointOfRow[i] = found; // 성과·속성이 CSV와 동일 — 재사용
             } else {
                 // 기존 점의 성과·속성이 CSV와 다르면(관리번호가 같아도) CSV의 확정값으로 갱신하고 id는 보존
-                point = saveControlPointPort.save(revise(existing.getId(), row, tm, geo));
-                updatedPoints++;
-            }
-
-            // 모든 행은 이 프로젝트의 조사 대상이다 — 진행률의 분모(전체 대상)가 된다.
-            // 기본 양식에 없어 기준점 마스터로 옮기지 못한 열은 이 대상에 그대로 보관한다.
-            saveSurveyTargetPort.save(SurveyTarget.create(project.getId(), point.getId(), row.extras()));
-
-            if (row.priorResult() != null) {
-                saveSurveyRecordPort.save(SurveyRecord.create(
-                        project.getId(), point.getId(), row.priorResult(), surveyedAt(row), row.note()));
-                createdRecords++;
+                revisedAt.add(i);
+                toRevise.add(revise(found.getId(), row, tm, geo));
             }
         }
 
+        place(pointOfRow, newAt, saveControlPointPort.saveAll(toRegister));
+        place(pointOfRow, revisedAt, saveControlPointPort.saveAll(toRevise));
+
+        // 모든 행은 이 프로젝트의 조사 대상이다 — 진행률의 분모(전체 대상)가 된다.
+        // 기본 양식에 없어 기준점 마스터로 옮기지 못한 열은 이 대상에 그대로 보관한다.
+        saveSurveyTargetPort.saveAll(indices(rows)
+                .mapToObj(i -> SurveyTarget.create(project.getId(), pointOfRow[i].getId(), rows.get(i).extras()))
+                .toList());
+
+        List<SurveyRecord> records = indices(rows)
+                .filter(i -> rows.get(i).priorResult() != null)
+                .mapToObj(i -> SurveyRecord.create(
+                        project.getId(), pointOfRow[i].getId(),
+                        rows.get(i).priorResult(), surveyedAt(rows.get(i)), rows.get(i).note()))
+                .toList();
+        saveSurveyRecordPort.saveAll(records);
+
         return new SurveyCsvImportResult(
-                project.getId(), rows.size(), newPoints, existingPoints, updatedPoints, createdRecords);
+                project.getId(), rows.size(),
+                newAt.size(), rows.size() - newAt.size() - revisedAt.size(), revisedAt.size(), records.size());
+    }
+
+    private static IntStream indices(List<Row> rows) {
+        return IntStream.range(0, rows.size());
+    }
+
+    /** 저장 결과를 원래 행 자리에 되돌려 놓는다 — saveAll 은 넣은 순서대로 돌려준다. */
+    private static void place(ControlPoint[] pointOfRow, List<Integer> at, List<ControlPoint> saved) {
+        for (int i = 0; i < at.size(); i++) {
+            pointOfRow[at.get(i)] = saved.get(i);
+        }
+    }
+
+    /** 같은 물리적 점을 가리키는 키 — 관리번호는 출처마다 값이 달라 이름·종류로 맞춘다(부천 도근점은 이름 유일). */
+    private static String pointKey(String name, PointType type) {
+        return type + "|" + name;
+    }
+
+    /**
+     * 파일의 관리번호를 이미 다른 점이 쓰고 있으면 멈춘다 — 관리번호는 유일해야 한다.
+     * 그대로 두면 저장 제약에 걸려 원인을 알 수 없는 서버 오류가 되고, 어느 쪽 값이 맞는지는 사람이 판단할 일이다.
+     */
+    private static void rejectIfPointNoTaken(Row row, ControlPoint matched, ControlPoint owner) {
+        if (owner == null || (matched != null && owner.getId().equals(matched.getId()))) {
+            return;
+        }
+        throw new DuplicateControlPointException(
+                "관리번호 " + row.pointNo() + "는 이미 다른 기준점(" + owner.getName() + ")이 쓰고 있습니다.");
     }
 
     /**

@@ -225,6 +225,57 @@ class SurveyTargetMapperTest {
     }
 
     @Test
+    @DisplayName("필수 열의 칸이 비어 있으면 행 오류로 알린다 — 등록 단계까지 미루지 않고 미리보기에서 보이게")
+    void map_requiredCellEmpty_isRowError() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("", "도근점", "1465공", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000002", "도근점", "", "세계", "545000.00", "181000.00")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(0, result.rows().size());
+        assertEquals(2, result.errors().size());
+        assertTrue(result.errors().getFirst().message().contains("기준점번호"), result.errors().getFirst().message());
+        assertTrue(result.errors().getLast().message().contains("기준점명"), result.errors().getLast().message());
+    }
+
+    @Test
+    @DisplayName("같은 기준점이 두 번 나오면 뒤 행을 오류로 알린다 — 뒤 행이 앞 행의 성과를 덮어쓰지 않게")
+    void map_duplicatePointInSameFile_isRowError() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "1465공", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000002", "도근점", "1465공", "세계", "545000.00", "181000.00")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(1, result.rows().size());
+        assertEquals(1, result.errors().size());
+        assertEquals(3, result.errors().getFirst().row());
+        assertTrue(result.errors().getFirst().message().contains("1465공"), result.errors().getFirst().message());
+    }
+
+    @Test
+    @DisplayName("같은 관리번호가 두 번 나오면 뒤 행을 오류로 알린다 — 기준점 관리번호는 유일하다")
+    void map_duplicatePointNoInSameFile_isRowError() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "1465공", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000001", "도근점", "1466공", "세계", "545000.00", "181000.00")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(1, result.rows().size());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().getFirst().message().contains("41192D000000001"),
+                result.errors().getFirst().message());
+    }
+
+    @Test
     @DisplayName("필수 열이 없으면 표준 이름으로 무엇이 빠졌는지 알린다")
     void map_missingRequiredColumns_throws() {
         Table table = new Table(List.of("종류", "기준점명"), List.of());

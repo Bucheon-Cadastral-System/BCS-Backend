@@ -7,6 +7,7 @@ import com.is.bcs.domain.controlpoint.PointType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +33,16 @@ public class ControlPointPersistenceAdapter
     @Override
     public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
         return repository.findFirstByNameAndType(name, type).map(ControlPointJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<ControlPoint> findAllByNameInOrPointNoIn(Collection<String> names, Collection<String> pointNos) {
+        if (names.isEmpty() && pointNos.isEmpty()) {
+            return List.of();
+        }
+        return repository.findAllByNameInOrPointNoIn(names, pointNos).stream()
+                .map(ControlPointJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

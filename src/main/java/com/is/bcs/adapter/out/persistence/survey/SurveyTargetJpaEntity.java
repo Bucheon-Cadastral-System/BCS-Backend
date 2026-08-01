@@ -13,6 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -37,7 +38,9 @@ import java.util.List;
 public class SurveyTargetJpaEntity extends BaseTime {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // IDENTITY 는 넣자마자 생성된 id 를 받아야 해서 INSERT 를 묶지 못한다 — 임포트가 수천 행을 한 번에 넣으므로 시퀀스로 미리 받는다
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "survey_targets_seq")
+    @SequenceGenerator(name = "survey_targets_seq", sequenceName = "survey_targets_seq", schema = "bcs", allocationSize = 50)
     private Long id;
 
     @Column(name = "project_id", nullable = false)

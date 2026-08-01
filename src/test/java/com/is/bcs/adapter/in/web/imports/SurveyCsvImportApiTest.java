@@ -140,6 +140,20 @@ class SurveyCsvImportApiTest {
     }
 
     @Test
+    @DisplayName("엑셀이 아닌 파일을 올리면 400으로 알린다 — 서버 오류로 새지 않게")
+    void import_brokenFile_400() throws Exception {
+        // zip 서명만 맞고 내용은 엑셀이 아니다
+        MockMultipartFile broken = new MockMultipartFile(
+                "file", "대상지.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                new byte[]{0x50, 0x4B, 0x03, 0x04, 0x00, 0x01, 0x02, 0x03});
+
+        mockMvc.perform(multipart("/api/imports/survey-csv")
+                        .file(broken).param("name", "깨진 파일").param("startedOn", "2026-07-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("조사명·시작일 없이 업로드하면 400")
     void import_withoutRequiredParams_400() throws Exception {
         mockMvc.perform(multipart("/api/imports/survey-csv").file(sampleFile()))

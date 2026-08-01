@@ -50,6 +50,28 @@ class ControlPointPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("이름이나 관리번호가 겹치는 점을 한 번에 조회한다 — 임포트가 행마다 찾지 않도록")
+    void findAllByNameInOrPointNoIn_returnsMatchingPoints() {
+        adapter.save(csvRow1());
+        adapter.save(ControlPoint.register(
+                "41192D000001267", PointType.DOGEUN, "1466공",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545201.74"), new BigDecimal("181833.69")),
+                new GeoCoordinate(126.794541, 37.506107),
+                "10300", "춘의동", "경기도 부천시 춘의동 102-16",
+                MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21), null));
+
+        // 이름으로 하나, 관리번호로 다른 하나 — 둘 다 걸린다
+        List<ControlPoint> found =
+                adapter.findAllByNameInOrPointNoIn(List.of("1465공", "없는점"), List.of("41192D000001267"));
+
+        assertEquals(2, found.size());
+        assertTrue(found.stream().anyMatch(p -> "1465공".equals(p.getName())));
+        assertTrue(found.stream().anyMatch(p -> "1466공".equals(p.getName())));
+        assertTrue(adapter.findAllByNameInOrPointNoIn(List.of(), List.of()).isEmpty()); // 빈 목록은 질의하지 않는다
+    }
+
+    @Test
     @DisplayName("저장 후 관리번호로 조회하면 성과·속성이 보존된다 (BigDecimal은 값 기준 비교)")
     void saveAndFindByPointNo_preservesAttributes() {
         adapter.save(csvRow1());
