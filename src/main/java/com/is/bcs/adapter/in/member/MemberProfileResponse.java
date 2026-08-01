@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.member;
 
+import com.is.bcs.application.port.in.admin.GetMemberAdminUseCase;
 import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
 import com.is.bcs.domain.member.District;
 import com.is.bcs.domain.member.MemberRole;
@@ -34,4 +35,21 @@ public record MemberProfileResponse(
                 result.status()
         );
     }
+
+    public static MemberProfileResponse from(GetMemberAdminUseCase.Result result) {
+        return new MemberProfileResponse(
+                result.id(),
+                result.name(),
+                result.phone(),
+                result.email(),
+                result.district(),
+                result.department(),
+                result.team(),
+                result.position(),
+                result.role(),
+                result.status()
+        );
+    }
+
+
 }
