@@ -140,10 +140,6 @@ public class MemberAdminController {
     }
 
 
-    // TODO : 관리자 활동 조회 API (로그)
-
-
-
     private void validatePageRequest(int page, int size) {
         if (page < 0) {
             throw new IllegalArgumentException("page는 0 이상이어야 합니다.");
