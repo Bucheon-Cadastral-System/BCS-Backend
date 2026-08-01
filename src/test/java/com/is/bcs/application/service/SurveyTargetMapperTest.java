@@ -276,6 +276,77 @@ class SurveyTargetMapperTest {
     }
 
     @Test
+    @DisplayName("모르는 어휘·형식은 어느 항목이 문제인지와 함께 행 오류로 모인다")
+    void map_unknownVocabularyAndFormats_areRowErrors() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표",
+                        "표지재질", "설치구분", "교차구분", "기존조사내용", "설치일자", "경도(X)"),
+                List.of(
+                        row("1", "도근점", "재질", "세계", "목재", "설치", "도근점", "완전", "2018-02-21", "126.79"),
+                        row("2", "도근점", "설치", "세계", "표석", "이설", "도근점", "완전", "2018-02-21", "126.79"),
+                        row("3", "도근점", "교차", "세계", "표석", "설치", "삼각점", "완전", "2018-02-21", "126.79"),
+                        row("4", "도근점", "결과", "세계", "표석", "설치", "도근점", "반파", "2018-02-21", "126.79"),
+                        row("5", "도근점", "날짜", "세계", "표석", "설치", "도근점", "완전", "2018년 2월", "126.79"),
+                        row("6", "도근점", "경도", "세계", "표석", "설치", "도근점", "완전", "2018-02-21", "동경"),
+                        row("7", "도근점", "좌표계", "지역", "표석", "설치", "도근점", "완전", "2018-02-21", "126.79")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(0, result.rows().size());
+        assertEquals(7, result.errors().size());
+        List<String> messages = result.errors().stream().map(SurveyTargetMapper.RowError::message).toList();
+        assertTrue(messages.get(0).contains("표지재질"), messages.get(0));
+        assertTrue(messages.get(1).contains("설치구분"), messages.get(1));
+        assertTrue(messages.get(2).contains("교차구분"), messages.get(2));
+        assertTrue(messages.get(3).contains("기존조사내용"), messages.get(3));
+        assertTrue(messages.get(4).contains("설치일자"), messages.get(4));
+        assertTrue(messages.get(5).contains("경도"), messages.get(5));
+        assertTrue(messages.get(6).contains("좌표계구분"), messages.get(6));
+    }
+
+    /** 위 표의 한 행 — 좌표는 어느 행에서도 문제 삼지 않으므로 같은 값을 쓴다. */
+    private static List<String> row(String no, String type, String name, String crs,
+                                    String material, String install, String intersection,
+                                    String priorResult, String installedDate, String longitude) {
+        return List.of("41192D00000000" + no, type, name, crs, "545236.77", "181840.96",
+                material, install, intersection, priorResult, installedDate, longitude);
+    }
+
+    @Test
+    @DisplayName("삼각점·삼각보조점 어휘도 읽고, 재설치는 '재설'·'재설치' 둘 다 받는다")
+    void map_remainingVocabulary() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "설치구분"),
+                List.of(
+                        List.of("41192D000000001", "지적삼각점", "삼각1", "세계", "545236.77", "181840.96", "재설"),
+                        List.of("41192D000000002", "삼각보조점", "보조1", "세계", "545236.77", "181840.96", "재설치")));
+
+        List<Row> rows = SurveyTargetMapper.map(table).rows();
+
+        assertEquals(PointType.TRIANGULATION, rows.getFirst().type());
+        assertEquals(InstallType.REINSTALLED, rows.getFirst().installType());
+        assertEquals(PointType.TRIANGULATION_AUX, rows.getLast().type());
+        assertEquals(InstallType.REINSTALLED, rows.getLast().installType());
+    }
+
+    @Test
+    @DisplayName("이름 없는 열은 건너뛰고, 헤더보다 짧은 행은 뒤쪽 열이 빈 것으로 읽는다")
+    void map_blankHeaderAndShortRow() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "", "상세주소"),
+                List.of(
+                        List.of("41192D000000001", "도근점", "짧은행", "세계", "545236.77", "181840.96"),
+                        List.of("41192D000000002", "도근점", "온전한행", "세계", "545236.77", "181840.96", "", "춘의동 1-1")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertEquals(2, result.rows().size());
+        assertNull(result.rows().getFirst().address()); // 행이 짧아 상세주소 칸이 아예 없다
+        assertEquals("춘의동 1-1", result.rows().getLast().address());
+        assertTrue(result.columns().extra().isEmpty()); // 이름 없는 열은 되살릴 근거가 없어 보관하지 않는다
+    }
+
+    @Test
     @DisplayName("필수 열이 없으면 표준 이름으로 무엇이 빠졌는지 알린다")
     void map_missingRequiredColumns_throws() {
         Table table = new Table(List.of("종류", "기준점명"), List.of());

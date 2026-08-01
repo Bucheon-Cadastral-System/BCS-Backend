@@ -2,9 +2,15 @@ package com.is.bcs.adapter.out.file;
 
 import com.is.bcs.application.port.out.file.Table;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import org.apache.poi.ss.usermodel.FormulaError;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -70,6 +76,101 @@ class SpreadsheetTableExtractorTest {
 
         assertEquals(plain.headers(), titled.headers());
         assertEquals(plain.rows().size(), titled.rows().size());
+    }
+
+    @Test
+    @DisplayName("빈 파일과 헤더 없는 파일은 각각의 사유로 거부한다")
+    void extract_emptyAndHeaderless() {
+        assertThrows(InvalidControlPointException.class, () -> extractor.extract(new byte[0]));
+        assertThrows(InvalidControlPointException.class, () -> extractor.extract(null));
+
+        // 줄바꿈뿐이라 채워진 칸이 하나도 없다 — 헤더로 삼을 행이 없다
+        InvalidControlPointException thrown = assertThrows(InvalidControlPointException.class,
+                () -> extractor.extract("\n\n".getBytes(StandardCharsets.UTF_8)));
+        assertTrue(thrown.getMessage().contains("헤더"), thrown.getMessage());
+    }
+
+    @Test
+    @DisplayName("따옴표 안의 콤마·줄바꿈·겹따옴표를 값으로 보존한다")
+    void extract_csvQuoting() {
+        String csv = "이름,주소,비고\n"
+                + "\"가,나\",\"춘의동\n102-16\",\"큰 \"\"돌\"\" 옆\"\n";
+
+        Table table = extractor.extract(csv.getBytes(StandardCharsets.UTF_8));
+
+        assertEquals(List.of("이름", "주소", "비고"), table.headers());
+        assertEquals(1, table.rows().size());
+        assertEquals(List.of("가,나", "춘의동\n102-16", "큰 \"돌\" 옆"), table.rows().getFirst());
+    }
+
+    @Test
+    @DisplayName("헤더 뒤쪽의 빈 칸은 열로 세지 않는다 — 엑셀이 남긴 빈 셀")
+    void extract_trailingEmptyHeaders() {
+        Table table = extractor.extract("이름,주소,,\n가,나,,\n".getBytes(StandardCharsets.UTF_8));
+
+        assertEquals(List.of("이름", "주소"), table.headers());
+        assertEquals(List.of("가", "나"), table.rows().getFirst());
+    }
+
+    @Test
+    @DisplayName("XLSX 의 참·거짓 셀·수식 셀·오류 셀도 문자열로 읽는다")
+    void extract_xlsxCellTypes() throws Exception {
+        byte[] xlsx = workbookBytes(sheet -> {
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue("이름");
+            header.createCell(1).setCellValue("대상");
+            header.createCell(2).setCellValue("합");
+            header.createCell(3).setCellValue("오류");
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("1465공");
+            row.createCell(1).setCellValue(true);
+            row.createCell(2).setCellFormula("1+2");
+            row.createCell(3).setCellErrorValue(FormulaError.DIV0.getCode());
+        });
+
+        Table table = extractor.extract(xlsx);
+
+        // 수식은 계산된 결과를, 읽을 수 없는 셀(오류)은 빈 값을 준다 — 뒤 단계는 언제나 문자열만 본다
+        assertEquals(List.of("1465공", "true", "3", ""), table.rows().getFirst());
+    }
+
+    @Test
+    @DisplayName("헤더로 삼을 행이 없는 XLSX 는 거부한다 — 한 칸짜리 제목만 있는 파일")
+    void extract_xlsxWithoutHeaderRow() throws Exception {
+        byte[] xlsx = workbookBytes(sheet -> sheet.createRow(0).createCell(0).setCellValue("부천시 지적기준점"));
+
+        InvalidControlPointException thrown =
+                assertThrows(InvalidControlPointException.class, () -> extractor.extract(xlsx));
+
+        assertTrue(thrown.getMessage().contains("헤더"), thrown.getMessage());
+    }
+
+    @Test
+    @DisplayName("시트가 하나도 없는 XLSX 는 그 사유로 거부한다")
+    void extract_xlsxWithoutSheet() throws Exception {
+        byte[] xlsx;
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
+            workbook.write(out);
+            xlsx = out.toByteArray();
+        }
+
+        InvalidControlPointException thrown =
+                assertThrows(InvalidControlPointException.class, () -> extractor.extract(xlsx));
+
+        assertTrue(thrown.getMessage().contains("시트"), thrown.getMessage());
+    }
+
+    /**
+     * 테스트용 xlsx 를 메모리에서 만든다 — 픽스처 파일을 늘리지 않고 셀 종류만 확인하려는 목적.
+     * 수식은 미리 계산해 결과를 캐시에 넣는다(엑셀이 저장할 때 하는 일과 같다).
+     */
+    private byte[] workbookBytes(java.util.function.Consumer<Sheet> fill) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
+            fill.accept(workbook.createSheet("대상지"));
+            XSSFFormulaEvaluator.evaluateAllFormulaCells(workbook);
+            workbook.write(out);
+            return out.toByteArray();
+        }
     }
 
     @Test
