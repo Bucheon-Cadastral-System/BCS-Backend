@@ -177,6 +177,30 @@ public class MemberJpaEntity extends BaseTime {
         }
     }
 
+    public void updateProfileByAdmin(
+            String name,
+            String phone,
+            String email,
+            District district,
+            String department,
+            Team team,
+            Position position
+    ) {
+        if (name != null) {this.name = name.trim();}
+
+        if (phone != null) {this.phone = phone.trim();}
+
+        if (email != null) {this.email = email.trim().toLowerCase();}
+
+        if (district != null) {this.district = district;}
+
+        if (department != null) {this.department = department.trim();}
+
+        if (team != null) {this.team = team;}
+
+        if (position != null) {this.position = position;}
+    }
+
     public static MemberJpaEntity fromDomain(Member member) {
         return new MemberJpaEntity(
                 member.getId(),

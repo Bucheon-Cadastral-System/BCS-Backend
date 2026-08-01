@@ -3,6 +3,7 @@ package com.is.bcs.adapter.in.web.exception;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.member.exception.DuplicateMemberEmailException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
@@ -16,10 +17,7 @@ import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ProblemDetail;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -202,6 +200,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidOAuthExchangeCodeException.class)
     public ProblemDetail handleInvalidOAuthExchangeCode(InvalidOAuthExchangeCodeException e) {
         return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_INVALID, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidMemberProfileException.class)
+    public ProblemDetail handleInvalidMemberProfileException(InvalidMemberProfileException e) {
+        return problem(MemberErrorCode.MEMBER_PROFILE_INVALID, e.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateMemberEmailException.class)
+    public ProblemDetail handleDuplicateMemberEmailException(DuplicateMemberEmailException e) {
+        return problem(MemberErrorCode.MEMBER_EMAIL_DUPLICATE, e.getMessage());
     }
 
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */

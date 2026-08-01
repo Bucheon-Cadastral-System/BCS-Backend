@@ -5,6 +5,7 @@ import com.is.bcs.domain.member.*;
 import com.is.bcs.domain.page.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,6 +27,7 @@ public class MemberAdminController {
     private final RejectMemberAdminUseCase rejectMemberAdminUseCase;
     private final DeactivateMemberAdminUseCase deactivateMemberAdminUseCase;
     private final ActivateMemberAdminUseCase activateMemberAdminUseCase;
+    private final UpdateMemberProfileAdminUseCase updateMemberProfileAdminUseCase;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -99,7 +101,14 @@ public class MemberAdminController {
     }
 
 
-    // TODO : 유저 개인정보 강제 변경 API
+    @Operation(summary = "회원 개인정보 강제 변경")
+    @PatchMapping("/{memberId}/profile")
+    public ResponseEntity<Void> updateMemberProfile(@PathVariable Long memberId,
+                                        @Valid @RequestBody UpdateMemberProfileAdminRequest request) {
+        updateMemberProfileAdminUseCase.updateProfile(memberId, request.toCommand());
+
+        return ResponseEntity.noContent().build();
+    }
 
 
     // TODO : 사용자 권한 USER -> ADMIN 변경 API
