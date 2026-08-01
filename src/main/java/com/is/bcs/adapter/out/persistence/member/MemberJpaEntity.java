@@ -2,6 +2,7 @@ package com.is.bcs.adapter.out.persistence.member;
 
 import com.is.bcs.adapter.out.persistence.common.BaseTime;
 import com.is.bcs.domain.member.*;
+import com.is.bcs.domain.member.exception.InvalidMemberRoleException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -199,6 +200,18 @@ public class MemberJpaEntity extends BaseTime {
         if (team != null) {this.team = team;}
 
         if (position != null) {this.position = position;}
+    }
+
+    public void promoteToAdmin() {
+        if (this.role != MemberRole.USER) {
+            throw new InvalidMemberRoleException("USER 권한의 회원만 ADMIN으로 변경할 수 있습니다. 현재 권한=" + this.role);
+        }
+
+        if (this.status != MemberStatus.ACTIVE) {
+            throw new InvalidMemberStateException("ACTIVE 상태의 회원만 ADMIN 권한을 부여할 수 있습니다. 현재 상태=" + this.status);
+        }
+
+        this.role = MemberRole.ADMIN;
     }
 
     public static MemberJpaEntity fromDomain(Member member) {

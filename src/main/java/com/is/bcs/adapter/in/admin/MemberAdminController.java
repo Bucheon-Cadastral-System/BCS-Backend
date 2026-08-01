@@ -28,6 +28,7 @@ public class MemberAdminController {
     private final DeactivateMemberAdminUseCase deactivateMemberAdminUseCase;
     private final ActivateMemberAdminUseCase activateMemberAdminUseCase;
     private final UpdateMemberProfileAdminUseCase updateMemberProfileAdminUseCase;
+    private final PromoteMemberAdminUseCase promoteMemberAdminUseCase;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -110,8 +111,13 @@ public class MemberAdminController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "회원 관리자 권한 부여")
+    @PatchMapping("/{memberId}/role/admin")
+    public ResponseEntity<Void> promoteMember(@PathVariable Long memberId) {
+        promoteMemberAdminUseCase.promote(memberId);
 
-    // TODO : 사용자 권한 USER -> ADMIN 변경 API
+        return ResponseEntity.noContent().build();
+    }
 
 
     // TODO : 사용자 권한 ADMIN -> USER 변경 API

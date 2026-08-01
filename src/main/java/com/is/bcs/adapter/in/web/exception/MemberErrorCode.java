@@ -15,7 +15,10 @@ public enum MemberErrorCode implements ErrorCode {
     MEMBER_PROFILE_INVALID(HttpStatus.BAD_REQUEST),
 
     /** 이메일 중복 */
-    MEMBER_EMAIL_DUPLICATE(HttpStatus.CONFLICT);
+    MEMBER_EMAIL_DUPLICATE(HttpStatus.CONFLICT),
+
+    /** 회원 권한 전이 규칙 위반 */
+    MEMBER_INVALID_ROLE(HttpStatus.UNPROCESSABLE_CONTENT);
 
     private final HttpStatus status;
 
