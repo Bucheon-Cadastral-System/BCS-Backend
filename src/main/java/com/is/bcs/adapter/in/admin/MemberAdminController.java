@@ -2,6 +2,7 @@ package com.is.bcs.adapter.in.admin;
 
 import com.is.bcs.application.port.in.admin.ApproveMemberAdminUseCase;
 import com.is.bcs.application.port.in.admin.GetMemberAdminUseCase;
+import com.is.bcs.application.port.in.admin.RejectMemberAdminUseCase;
 import com.is.bcs.domain.member.*;
 import com.is.bcs.domain.page.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +25,7 @@ public class MemberAdminController {
 
     private final GetMemberAdminUseCase getMemberAdminUseCase;
     private final ApproveMemberAdminUseCase approveMemberAdminUseCase;
+    private final RejectMemberAdminUseCase rejectMemberAdminUseCase;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -72,6 +74,12 @@ public class MemberAdminController {
 
 
     // TODO : 유저 PENDING -> INACTIVE 가입 거절 API
+    @Operation(summary = "회원 가입 거절")
+    @PatchMapping("/{memberId}/reject")
+    public ResponseEntity<Void> rejectMember(@PathVariable Long memberId) {
+        rejectMemberAdminUseCase.reject(memberId);
+        return ResponseEntity.noContent().build();
+    }
 
 
     // TODO : 유저 ACTIVE -> INACTIVE 비활성화 API

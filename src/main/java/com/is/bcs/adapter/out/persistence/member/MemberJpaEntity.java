@@ -144,6 +144,16 @@ public class MemberJpaEntity extends BaseTime {
         this.deactivatedAt = null;
     }
 
+    public void reject() {
+        if (this.status != MemberStatus.PENDING) {
+            throw new InvalidMemberStateException("PENDING 상태의 회원만 가입을 거절할 수 있습니다. " + "현재 상태=" + this.status);
+        }
+
+        this.status = MemberStatus.INACTIVE;
+        this.deactivatedAt = OffsetDateTime.now();
+        this.approvedAt = null;
+    }
+
     public static MemberJpaEntity fromDomain(Member member) {
         return new MemberJpaEntity(
                 member.getId(),
