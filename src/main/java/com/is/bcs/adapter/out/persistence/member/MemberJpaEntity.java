@@ -2,6 +2,7 @@ package com.is.bcs.adapter.out.persistence.member;
 
 import com.is.bcs.adapter.out.persistence.common.BaseTime;
 import com.is.bcs.domain.member.*;
+import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -131,6 +132,16 @@ public class MemberJpaEntity extends BaseTime {
         this.requestedAt = requestedAt;
         this.approvedAt = approvedAt;
         this.deactivatedAt = deactivatedAt;
+    }
+
+    public void approve() {
+        if (this.status != MemberStatus.PENDING) {
+            throw new InvalidMemberStateException("PENDING 상태의 회원만 승인할 수 있습니다. 현재 상태: " + this.status);
+        }
+
+        this.status = MemberStatus.ACTIVE;
+        this.approvedAt = OffsetDateTime.now();
+        this.deactivatedAt = null;
     }
 
     public static MemberJpaEntity fromDomain(Member member) {

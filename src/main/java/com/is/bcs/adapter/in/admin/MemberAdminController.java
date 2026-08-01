@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.admin;
 
+import com.is.bcs.application.port.in.admin.ApproveMemberAdminUseCase;
 import com.is.bcs.application.port.in.admin.GetMemberAdminUseCase;
 import com.is.bcs.domain.member.*;
 import com.is.bcs.domain.page.PageResponse;
@@ -12,10 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @Tag(name = "3. MemberAdminController", description = "어드민 전용 멤버 관리")
@@ -25,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MemberAdminController {
 
     private final GetMemberAdminUseCase getMemberAdminUseCase;
+    private final ApproveMemberAdminUseCase approveMemberAdminUseCase;
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
@@ -63,6 +62,37 @@ public class MemberAdminController {
         return ResponseEntity.ok(PageResponse.from(response));
     }
 
+
+    @Operation(summary = "회원 가입 승인")
+    @PatchMapping("/{memberId}/approve")
+    public ResponseEntity<Void> approveMember(@PathVariable Long memberId) {
+        approveMemberAdminUseCase.approve(memberId);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    // TODO : 유저 PENDING -> INACTIVE 가입 거절 API
+
+
+    // TODO : 유저 ACTIVE -> INACTIVE 비활성화 API
+
+
+    // TODO : 유저 INACTIVE -> ACTIVE 활성화 API
+
+
+    // TODO : 유저 개인정보 강제 변경 API
+
+
+    // TODO : 사용자 권한 USER -> ADMIN 변경 API
+
+
+    // TODO : 사용자 권한 ADMIN -> USER 변경 API
+
+
+    // TODO : 관리자 활동 조회 API (로그)
+
+
+
     private void validatePageRequest(int page, int size) {
         if (page < 0) {
             throw new IllegalArgumentException("page는 0 이상이어야 합니다.");
@@ -89,31 +119,6 @@ public class MemberAdminController {
             );
         };
     }
-
-
-
-    // TODO : 유저 PENDING -> ACTIVE 가입 승인 API
-
-
-    // TODO : 유저 PENDING -> INACTIVE 가입 거절 API
-
-
-    // TODO : 유저 ACTIVE -> INACTIVE 비활성화 API
-
-
-    // TODO : 유저 INACTIVE -> ACTIVE 활성화 API
-
-
-    // TODO : 유저 개인정보 강제 변경 API
-
-
-    // TODO : 사용자 권한 USER -> ADMIN 변경 API
-
-
-    // TODO : 사용자 권한 ADMIN -> USER 변경 API
-
-
-    // TODO : 관리자 활동 조회 API (로그)
 
 
 
