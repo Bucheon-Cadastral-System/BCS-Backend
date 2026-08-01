@@ -3,6 +3,7 @@ package com.is.bcs.application.service.member;
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
 import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
+import com.is.bcs.application.port.in.member.UpdateMemberProfileUseCase;
 import com.is.bcs.application.port.out.member.LoadMemberPort;
 import com.is.bcs.application.port.out.member.SaveMemberPort;
 import com.is.bcs.domain.member.Member;
@@ -13,8 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class MemberService
-        implements CompleteMemberProfileUseCase, GetMemberStateUseCase, GetMyProfileUseCase {
+public class MemberService implements CompleteMemberProfileUseCase, GetMemberStateUseCase, GetMyProfileUseCase, UpdateMemberProfileUseCase {
 
     private static final String DEPARTMENT = "민원지적과";
 
@@ -23,7 +23,7 @@ public class MemberService
 
     @Override
     @Transactional
-    public void complete(Long memberId, Command command) {
+    public void complete(Long memberId, CompleteMemberProfileUseCase.Command command) {
         Member member = getMember(memberId);
 
         member.completeProfile(
@@ -36,6 +36,18 @@ public class MemberService
                 command.position()
         );
 
+        saveMemberPort.save(member);
+    }
+
+    @Override
+    public void update(Long memberId, UpdateMemberProfileUseCase.Command command) {
+        Member member = getMember(memberId);
+        member.updateProfile(
+                command.phone(),
+                command.district(),
+                command.team(),
+                command.position()
+        );
         saveMemberPort.save(member);
     }
 

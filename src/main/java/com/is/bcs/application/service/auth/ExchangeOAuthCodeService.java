@@ -44,11 +44,13 @@ public class ExchangeOAuthCodeService implements ExchangeOAuthCodeUseCase {
 
         String actualChallenge = createCodeChallenge(codeVerifier);
 
+        log.error("저장소에서 꺼낸 값: [{}], 베리피어로 만든 값: [{}]", exchangeToken.codeChallenge(), actualChallenge);
+
         if (!exchangeToken.codeChallenge().equals(actualChallenge)) {
             throw new InvalidOAuthExchangeCodeException("코드 verifier가 올바르지 않습니다.");
         }
 
-        log.info("codeVerifier와 세션에서 꺼낸 codeChallenge가 같습니다.");
+        log.info("Verifier의 해싱값과 캐시에서 꺼낸 Challenge가 같습니다.");
 
 
         return new ExchangeOAuthCodeResult(

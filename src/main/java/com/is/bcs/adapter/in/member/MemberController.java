@@ -3,8 +3,8 @@ package com.is.bcs.adapter.in.member;
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
 import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
+import com.is.bcs.application.port.in.member.UpdateMemberProfileUseCase;
 import com.is.bcs.application.port.out.token.AccessTokenClaims;
-import com.is.bcs.config.SwaggerConfig;
 import com.is.bcs.domain.member.District;
 import com.is.bcs.domain.member.MemberStatus;
 import com.is.bcs.domain.member.Position;
@@ -35,6 +35,7 @@ public class MemberController {
     private final CompleteMemberProfileUseCase completeMemberProfileUseCase;
     private final GetMemberStateUseCase getMemberStateUseCase;
     private final GetMyProfileUseCase getMyProfileUseCase;
+    private final UpdateMemberProfileUseCase updateMemberProfileUseCase;
 
     @Operation(summary = "내 정보 조회", security = @SecurityRequirement(name = "Bearer Authentication"))
     @GetMapping("/me")
@@ -47,11 +48,12 @@ public class MemberController {
         return ResponseEntity.ok(MemberProfileResponse.from(result));
     }
 
-    @Operation(summary = "가입 정보 입력", security = @SecurityRequirement(name = CSRF_SECURITY_SCHEME))
+    @Operation(summary = "가입 정보 입력, CSRF 토큰을 꼭 넣으셔야합니다. (세션 사용하기 때문)", security = @SecurityRequirement(name = CSRF_SECURITY_SCHEME))
     @PutMapping("/me/registration")
     public ResponseEntity<Void> completeRegistration(Authentication authentication, @Valid @RequestBody CompleteRegistrationRequest request
     ) {
-        Long memberId = Long.valueOf(authentication.getName());
+        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
+        Long memberId = principal.memberId();
 
         completeMemberProfileUseCase.complete(
                 memberId,
@@ -61,6 +63,21 @@ public class MemberController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "내 정보 변경 (ACTIVE 유저만)", security = @SecurityRequirement(name = "Bearer Authentication"))
+    @PatchMapping("/me/update")
+    public ResponseEntity<Void> updateMyProfile(Authentication authentication, @Valid @RequestBody UpdateProfileRequest request) {
+        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
+        Long memberId = principal.memberId();
+
+        updateMemberProfileUseCase.update(
+                memberId,
+                request.toCommand()
+        );
+        return ResponseEntity.noContent().build();
+
+    }
+
+    @Operation(summary = "세션을 사용하는 경우 CSRF 토큰 필요, 해당 API : /me/registration (가입 정보 입력) ")
     @GetMapping("/api/csrf")
     public CsrfToken csrf(CsrfToken csrfToken) {
         return csrfToken;
@@ -69,7 +86,8 @@ public class MemberController {
     @Operation(summary = "내 가입 상태 조회")
     @GetMapping("/me/state")
     public ResponseEntity<MemberStateResponse> getMyState(Authentication authentication) {
-        Long memberId = Long.valueOf(authentication.getName());
+        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
+        Long memberId = principal.memberId();
 
         GetMemberStateUseCase.Result result = getMemberStateUseCase.getState(memberId);
 
@@ -107,6 +125,30 @@ public class MemberController {
                     name,
                     phone,
                     email,
+                    district,
+                    team,
+                    position
+            );
+        }
+    }
+
+    public record UpdateProfileRequest(
+            @NotBlank
+            @Pattern(regexp = "^01[016789]\\d{7,8}$")
+            String phone,
+
+            @NotNull
+            District district,
+
+            @NotNull
+            Team team,
+
+            @NotNull
+            Position position
+    ) {
+        UpdateMemberProfileUseCase.Command toCommand() {
+            return new UpdateMemberProfileUseCase.Command(
+                    phone,
                     district,
                     team,
                     position

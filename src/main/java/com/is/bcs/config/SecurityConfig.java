@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -40,11 +41,10 @@ public class SecurityConfig {
                         .csrfTokenRepository(
                                 CookieCsrfTokenRepository.withHttpOnlyFalse()
                         )
-                        .ignoringRequestMatchers(
-                                "/api/auth/token/exchange",
-                                "/api/auth/token/refresh",
-                                "/api/auth/logout"
+                        .requireCsrfProtectionMatcher(
+                                new RegexRequestMatcher("^/api/members/me/registration$", "PUT")
                         )
+
                 )
 
                 .authorizeHttpRequests(auth -> auth
