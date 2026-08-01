@@ -1,9 +1,11 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
+import com.is.bcs.domain.survey.ExtraColumn;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
+import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,6 +40,12 @@ class SurveyPersistenceAdapterTest {
 
     @Autowired
     private SurveyTargetPersistenceAdapter targetAdapter;
+
+    @Autowired
+    private SurveyTargetJpaRepository targetRepository;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private SurveyProject savedProject() {
         return adapter.save(SurveyProject.create("2026 일제조사", STARTED, null, "정기 조사"));
@@ -114,5 +123,24 @@ class SurveyPersistenceAdapterTest {
         assertEquals(2, counts.get(SurveyResult.INTACT)); // 13번은 비대상이라 제외
         assertEquals(1, counts.get(SurveyResult.LOST));
         assertEquals(2, counts.size()); // 기록 없는 결과(기타)는 키가 없다 — 0 채움은 서비스 몫
+    }
+
+    @Test
+    @DisplayName("조사 대상에 보관한 열은 이름·값·순서가 그대로 돌아온다")
+    void saveAndFindTarget_preservesExtraColumns() {
+        SurveyProject project = savedProject();
+        SurveyTarget saved = targetAdapter.save(SurveyTarget.create(project.getId(), 10L, List.of(
+                new ExtraColumn("순번", "131"),
+                new ExtraColumn("점검자", "김주무관"),
+                new ExtraColumn("field_20", null))));
+
+        targetRepository.flush();
+        entityManager.clear(); // 1차 캐시가 아니라 DB에서 다시 읽는다
+
+        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        assertEquals(List.of(
+                new ExtraColumn("순번", "131"),
+                new ExtraColumn("점검자", "김주무관"),
+                new ExtraColumn("field_20", null)), found.getExtras());
     }
 }

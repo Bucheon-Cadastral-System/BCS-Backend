@@ -11,6 +11,7 @@ import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.survey.ExtraColumn;
 import com.is.bcs.domain.survey.SurveyResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -145,47 +145,38 @@ class SurveyTargetMapperTest {
     }
 
     @Test
-    @DisplayName("담당자가 지정한 매핑대로 읽는다 — 사전이 몰라 무시하던 열도 항목에 이어 붙는다")
-    void map_appliesColumnOverrides() {
-        Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "설치년월일"),
-                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "2018-02-21")));
-
-        MappingResult plain = SurveyTargetMapper.map(table);
-        assertNull(plain.rows().getFirst().installedDate()); // 지정 전에는 조용히 빠진다
-        assertTrue(plain.columns().ignored().contains("설치년월일"));
-
-        MappingResult mapped = SurveyTargetMapper.map(table, Map.of("설치년월일", "설치일자"));
-
-        assertEquals(LocalDate.of(2018, 2, 21), mapped.rows().getFirst().installedDate());
-        assertEquals("설치일자", mapped.columns().recognized().get("설치년월일"));
-        assertTrue(mapped.columns().ignored().isEmpty());
-    }
-
-    @Test
-    @DisplayName("지정한 매핑이 별칭 사전보다 우선한다 — 사람이 정한 것이 규칙보다 앞선다")
-    void map_overrideBeatsAlias() {
-        Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "경도"),
-                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "37.506423")));
-
-        // '경도'는 사전상 경도(X)지만, 담당자가 위도라고 지정하면 그대로 따른다
-        MappingResult mapped = SurveyTargetMapper.map(table, Map.of("경도", "위도(Y)"));
-
-        assertNull(mapped.rows().getFirst().longitude());
-        assertEquals(37.506423, mapped.rows().getFirst().latitude());
-    }
-
-    @Test
-    @DisplayName("파일의 열이 어떤 항목으로 읽혔는지와 무시된 열을 함께 알린다")
+    @DisplayName("파일의 열이 어떤 항목으로 읽혔는지와 값만 보관하는 열을 함께 알린다")
     void map_reportsColumnMapping() throws Exception {
         ColumnMapping columns = SurveyTargetMapper.map(sampleTable()).columns();
 
         assertEquals("기준점번호", columns.recognized().get("기준점번호"));
         assertEquals("기존조사내용", columns.recognized().get("기존조사내")); // 잘린 이름 → 표준 항목
         assertEquals("조사대상여부", columns.recognized().get("조사대상여"));
-        assertTrue(columns.ignored().contains("순번"), columns.ignored().toString());
-        assertTrue(columns.ignored().contains("field_20"), columns.ignored().toString());
+        assertEquals(List.of("순번", "field_20"), columns.extra()); // 파일에 적힌 순서 그대로
+    }
+
+    @Test
+    @DisplayName("기본 양식에 없는 열도 이름·값 그대로 남는다 — 빈 칸이어도 열은 사라지지 않는다")
+    void map_keepsUnrecognizedColumnValues() throws Exception {
+        Row first = SurveyTargetMapper.map(sampleTable()).rows().getFirst();
+
+        assertEquals(List.of(new ExtraColumn("순번", "131"), new ExtraColumn("field_20", null)), first.extras());
+    }
+
+    @Test
+    @DisplayName("고객사가 열을 더해도 코드를 고치지 않고 그 값까지 보관한다")
+    void map_columnsAddedByCustomer_areKept() {
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "점검자", "재조사 사유"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "김주무관", "표지 훼손")));
+
+        MappingResult result = SurveyTargetMapper.map(table);
+
+        assertTrue(result.errors().isEmpty());
+        assertEquals(List.of("점검자", "재조사 사유"), result.columns().extra());
+        assertEquals(
+                List.of(new ExtraColumn("점검자", "김주무관"), new ExtraColumn("재조사 사유", "표지 훼손")),
+                result.rows().getFirst().extras());
     }
 
     @Test
@@ -218,8 +209,8 @@ class SurveyTargetMapperTest {
     }
 
     @Test
-    @DisplayName("열 순서가 달라도 되고 모르는 열은 무시한다")
-    void map_ignoresOrderAndUnknownColumns() {
+    @DisplayName("열 순서가 달라도 읽히고, 모르는 열은 제자리 순서대로 보관된다")
+    void map_columnOrderDoesNotMatter() {
         Table table = new Table(
                 List.of("메모", "Y좌표", "종류", "field_20", "기준점명", "X좌표", "좌표계구분", "기준점번호"),
                 List.of(List.of("아무거나", "181840.96", "도근점", "", "1465공", "545236.77", "세계", "41192D000001265")));
@@ -230,6 +221,7 @@ class SurveyTargetMapperTest {
         assertEquals("1465공", row.name());
         assertEquals(0, new BigDecimal("181840.96").compareTo(row.easting()));
         assertNull(row.address()); // 없는 열은 비어 있을 뿐 거부하지 않는다
+        assertEquals(List.of(new ExtraColumn("메모", "아무거나"), new ExtraColumn("field_20", null)), row.extras());
     }
 
     @Test

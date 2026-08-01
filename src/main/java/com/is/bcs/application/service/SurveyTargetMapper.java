@@ -7,6 +7,7 @@ import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.survey.ExtraColumn;
 import com.is.bcs.domain.survey.SurveyResult;
 
 import java.math.BigDecimal;
@@ -23,12 +24,15 @@ import java.util.stream.Collectors;
  * 대상지 표의 각 행을 도메인 값으로 읽는다.
  * 열은 위치가 아니라 이름으로 찾는다 — 고객사가 기본 양식에 열을 더하거나 빼도 그대로 읽히게.
  *
+ * 기본 양식의 열만 도메인 필드로 해석하고, 그 밖의 열은 뜻을 묻지 않고 이름·값 그대로 넘긴다(extras).
+ * 고객사가 "필요에 따라 열을 추가해서 관리한다"고 밝힌 서식이라, 아는 열만 남기고 버리면 올린 파일이 손실된다.
+ *
  * 별칭은 한글 서식에서 실제로 확인한 표기만 등록한다.
  * 특히 5174 정의서의 영문 컬럼(POINT_X 등)은 X가 동방향이라 이 서식의 X좌표(북방향)와 축이 반대이므로 섞지 않는다.
  */
 public final class SurveyTargetMapper {
 
-    /** 표 한 행 — 기준점 마스터 필드 + 기존조사 이력. */
+    /** 표 한 행 — 기준점 마스터 필드 + 기존조사 이력 + 해석하지 않고 보관하는 열. */
     public record Row(
             String pointNo,
             PointType type,
@@ -47,7 +51,8 @@ public final class SurveyTargetMapper {
             TraverseInfo traverse,
             SurveyResult priorResult,
             LocalDate priorSurveyDate,
-            String note
+            String note,
+            List<ExtraColumn> extras
     ) {
     }
 
@@ -108,8 +113,11 @@ public final class SurveyTargetMapper {
         }
     }
 
-    /** 파일의 열 이름이 어떤 항목으로 읽혔는지. 사전에 없는 이름은 조용히 버리지 않고 무시 목록으로 알린다. */
-    public record ColumnMapping(Map<String, String> recognized, List<String> ignored) {
+    /**
+     * 파일의 열 이름이 어떤 항목으로 읽혔는지, 그리고 해석하지 않고 값만 보관한 열이 무엇인지.
+     * 순서는 파일에 적힌 그대로 둔다.
+     */
+    public record ColumnMapping(Map<String, String> recognized, List<String> extra) {
     }
 
     public record RowError(int row, String message) {
@@ -118,22 +126,8 @@ public final class SurveyTargetMapper {
     private SurveyTargetMapper() {
     }
 
-    /** 이 매퍼가 읽을 줄 아는 항목 — 화면이 "이 열을 무엇으로 읽을지" 고르는 목록으로 쓴다. */
-    public static List<String> assignableColumns() {
-        return KNOWN_COLUMNS;
-    }
-
     public static MappingResult map(Table table) {
-        return map(table, Map.of());
-    }
-
-    /**
-     * @param overrides 파일의 열 이름 → 읽어 들일 항목. 사전이 알아보지 못한 열을 담당자가 직접 이어 붙일 때 쓴다.
-     *                  별칭 사전보다 우선한다 — 사람이 정한 것이 규칙보다 앞선다.
-     */
-    public static MappingResult map(Table table, Map<String, String> overrides) {
-        Map<String, String> resolved = resolveOverrides(overrides);
-        Map<String, Integer> columns = columnIndex(table.headers(), resolved);
+        Map<String, Integer> columns = columnIndex(table.headers());
 
         List<String> missing = REQUIRED_COLUMNS.stream().filter(c -> !columns.containsKey(normalize(c))).toList();
         if (!missing.isEmpty()) {
@@ -141,72 +135,71 @@ public final class SurveyTargetMapper {
             throw new InvalidControlPointException("필수 열이 없습니다: " + String.join(", ", missing));
         }
 
+        // 보관할 열은 위치로 붙잡아 둔다 — 알리는 열 이름과 행별 값이 같은 판단에서 나오게
+        List<Integer> extraPositions = extraPositions(table.headers());
+        ColumnMapping mapping = new ColumnMapping(
+                recognizedColumns(table.headers()),
+                extraPositions.stream().map(table.headers()::get).toList());
+
         List<Row> rows = new ArrayList<>();
         List<RowError> errors = new ArrayList<>();
         for (int i = 0; i < table.rows().size(); i++) {
             int rowNumber = i + 2; // 헤더가 1행이므로 데이터는 2행부터
             try {
-                rows.add(mapRow(table.rows().get(i), columns));
+                rows.add(mapRow(table.rows().get(i), columns, table.headers(), extraPositions));
             } catch (InvalidControlPointException e) {
                 // 한 행이 잘못됐다고 멈추면 담당자가 고치고 올리기를 반복해야 한다 — 모아서 한 번에 보여준다
                 errors.add(new RowError(rowNumber, e.getMessage()));
             }
         }
-        return new MappingResult(List.copyOf(rows), columnMapping(table.headers(), resolved), List.copyOf(errors));
+        return new MappingResult(List.copyOf(rows), mapping, List.copyOf(errors));
     }
 
-    /**
-     * 담당자가 지정한 매핑을 조회용 형태(정규화한 파일 열 이름 → 정규화한 표준 항목)로 바꾼다.
-     * 모르는 항목을 가리키면 무엇이 잘못됐는지 알리고 멈춘다 — 조용히 무시하면 지정한 줄 알고 넘어간다.
-     */
-    private static Map<String, String> resolveOverrides(Map<String, String> overrides) {
-        Map<String, String> resolved = new HashMap<>();
-        overrides.forEach((header, column) -> {
-            String standard = STANDARD_BY_NORMALIZED.get(normalize(column));
-            if (standard == null) {
-                throw new InvalidControlPointException("읽을 수 없는 항목입니다: " + column);
-            }
-            resolved.put(normalize(header), normalize(standard));
-        });
-        return resolved;
-    }
-
-    /** 파일 헤더를 표준 항목과 대조해 인식·무시로 가른다. 순서는 파일에 적힌 그대로 둔다. */
-    private static ColumnMapping columnMapping(List<String> headers, Map<String, String> overrides) {
+    /** 표준 항목으로 읽히는 열 — 파일의 열 이름 → 표준 이름. 순서는 파일에 적힌 그대로 둔다. */
+    private static Map<String, String> recognizedColumns(List<String> headers) {
         Map<String, String> recognized = new LinkedHashMap<>();
-        List<String> ignored = new ArrayList<>();
         for (String header : headers) {
-            String key = normalize(header);
-            if (key.isEmpty()) {
-                continue;
-            }
-            String standard = STANDARD_BY_NORMALIZED.get(resolve(key, overrides));
-            if (standard == null) {
-                ignored.add(header);
-            } else {
+            String standard = standardOf(header);
+            if (standard != null) {
                 recognized.putIfAbsent(header, standard);
             }
         }
-        return new ColumnMapping(Collections.unmodifiableMap(recognized), List.copyOf(ignored));
+        return Collections.unmodifiableMap(recognized);
     }
 
-    /** 정규화한 열 이름 → 위치. 지정 매핑·별칭을 표준 이름으로 접어 넣는다. */
-    private static Map<String, Integer> columnIndex(List<String> headers, Map<String, String> overrides) {
+    /** 값만 보관할 열의 위치 — 행마다 헤더를 다시 훑지 않도록 한 번만 구한다. */
+    private static List<Integer> extraPositions(List<String> headers) {
+        List<Integer> positions = new ArrayList<>();
+        for (int i = 0; i < headers.size(); i++) {
+            // 이름이 없는 열은 무엇으로 되살릴지 알 수 없어 보관 대상에서 뺀다
+            if (standardOf(headers.get(i)) == null && !normalize(headers.get(i)).isEmpty()) {
+                positions.add(i);
+            }
+        }
+        return List.copyOf(positions);
+    }
+
+    /** 이 열이 읽어 들일 표준 항목 — 이름이 비었거나 사전에 없으면 null. */
+    private static String standardOf(String header) {
+        String key = normalize(header);
+        return key.isEmpty() ? null : STANDARD_BY_NORMALIZED.get(resolve(key));
+    }
+
+    /** 정규화한 열 이름 → 위치. 별칭을 표준 이름으로 접어 넣는다. */
+    private static Map<String, Integer> columnIndex(List<String> headers) {
         Map<String, Integer> index = new HashMap<>();
         for (int i = 0; i < headers.size(); i++) {
             String key = normalize(headers.get(i));
             if (key.isEmpty()) {
                 continue;
             }
-            index.putIfAbsent(resolve(key, overrides), i);
+            index.putIfAbsent(resolve(key), i);
         }
         return index;
     }
 
-    /** 지정 매핑이 별칭 사전보다 앞선다 — 사전은 추측이고 지정은 그 파일에 대한 사실이다. */
-    private static String resolve(String normalizedHeader, Map<String, String> overrides) {
-        String assigned = overrides.get(normalizedHeader);
-        return assigned != null ? assigned : ALIASES.getOrDefault(normalizedHeader, normalizedHeader);
+    private static String resolve(String normalizedHeader) {
+        return ALIASES.getOrDefault(normalizedHeader, normalizedHeader);
     }
 
     /** 띄어쓰기·괄호·기호는 표기 흔들림일 뿐이므로 지우고 비교한다. */
@@ -214,7 +207,8 @@ public final class SurveyTargetMapper {
         return header.replaceAll("[\\s()\\[\\]_.\\-/]", "").toLowerCase();
     }
 
-    private static Row mapRow(List<String> cells, Map<String, Integer> columns) {
+    private static Row mapRow(
+            List<String> cells, Map<String, Integer> columns, List<String> headers, List<Integer> extraPositions) {
         String regionRaw = cell(cells, columns, REGION);
         String regionCode = null;
         String regionName = regionRaw;
@@ -242,8 +236,18 @@ public final class SurveyTargetMapper {
                 traverse(cells, columns),
                 priorResult(cell(cells, columns, PRIOR_RESULT)),
                 date(cell(cells, columns, PRIOR_SURVEY_DATE), PRIOR_SURVEY_DATE),
-                cell(cells, columns, TARGET_NOTE)
+                cell(cells, columns, TARGET_NOTE),
+                extras(cells, headers, extraPositions)
         );
+    }
+
+    /** 해석하지 않는 열은 이름과 값을 적힌 그대로 옮긴다 — 뜻을 모르므로 형식 검사도 하지 않는다. */
+    private static List<ExtraColumn> extras(List<String> cells, List<String> headers, List<Integer> positions) {
+        List<ExtraColumn> extras = new ArrayList<>(positions.size());
+        for (int position : positions) {
+            extras.add(new ExtraColumn(headers.get(position), valueAt(cells, position)));
+        }
+        return List.copyOf(extras);
     }
 
     private static TraverseInfo traverse(List<String> cells, Map<String, Integer> columns) {
@@ -353,10 +357,15 @@ public final class SurveyTargetMapper {
     /** 필수 열은 map 에서 이미 검증했으므로, 여기서 없는 열은 선택 항목이다 — 거부하지 않고 비운다. */
     private static String cell(List<String> cells, Map<String, Integer> columns, String column) {
         Integer at = columns.get(normalize(column));
-        if (at == null || at >= cells.size()) {
+        return at == null ? null : valueAt(cells, at);
+    }
+
+    /** 헤더보다 짧은 행이면 뒤쪽 열은 비어 있는 것으로 본다. */
+    private static String valueAt(List<String> cells, int position) {
+        if (position >= cells.size()) {
             return null;
         }
-        String value = cells.get(at).trim();
+        String value = cells.get(position).trim();
         return value.isEmpty() ? null : value;
     }
 

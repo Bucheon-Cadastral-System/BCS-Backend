@@ -51,7 +51,7 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
 
     @Override
     public SurveyCsvImportResult importCsv(ImportSurveyCsvCommand command) {
-        SurveyTargetMapper.MappingResult mapped = SurveyTargetMapper.map(tableExtractor.extract(command.content()), command.columnOverrides());
+        SurveyTargetMapper.MappingResult mapped = SurveyTargetMapper.map(tableExtractor.extract(command.content()));
         rejectIfAnyRowFailed(mapped.errors());
         List<Row> rows = mapped.rows();
 
@@ -83,8 +83,9 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
                 updatedPoints++;
             }
 
-            // 모든 행은 이 프로젝트의 조사 대상이다 — 진행률의 분모(전체 대상)가 된다
-            saveSurveyTargetPort.save(SurveyTarget.create(project.getId(), point.getId()));
+            // 모든 행은 이 프로젝트의 조사 대상이다 — 진행률의 분모(전체 대상)가 된다.
+            // 기본 양식에 없어 기준점 마스터로 옮기지 못한 열은 이 대상에 그대로 보관한다.
+            saveSurveyTargetPort.save(SurveyTarget.create(project.getId(), point.getId(), row.extras()));
 
             if (row.priorResult() != null) {
                 saveSurveyRecordPort.save(SurveyRecord.create(

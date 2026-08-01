@@ -7,7 +7,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,18 +25,15 @@ class SurveyCsvPreviewServiceTest {
     }
 
     @Test
-    @DisplayName("실파일 — 49행, 인식한 열과 무시한 열을 알리고 오류는 없다")
+    @DisplayName("실파일 — 49행, 인식한 열과 값만 보관하는 열을 알리고 오류는 없다")
     void preview_realFile() throws Exception {
-        SurveyCsvPreviewResult result = service.preview(sampleCsv(), Map.of());
+        SurveyCsvPreviewResult result = service.preview(sampleCsv());
 
         assertEquals(49, result.totalRows());
         assertTrue(result.errors().isEmpty());
         assertEquals("기존조사내용", result.recognizedColumns().get("기존조사내"));
         assertEquals("조사대상여부", result.recognizedColumns().get("조사대상여"));
-        assertTrue(result.ignoredColumns().contains("순번"));
-        assertTrue(result.ignoredColumns().contains("field_20"));
-        // 담당자가 무시된 열을 이어 붙일 수 있도록 고를 수 있는 항목을 함께 준다
-        assertTrue(result.assignableColumns().contains("설치일자"), result.assignableColumns().toString());
+        assertEquals(List.of("순번", "field_20"), result.extraColumns());
     }
 
     @Test
@@ -49,7 +46,7 @@ class SurveyCsvPreviewServiceTest {
                 41192D000000003,도근점,이상2,세계,좌표아님,181000
                 """;
 
-        SurveyCsvPreviewResult result = service.preview(csv.getBytes(StandardCharsets.UTF_8), Map.of());
+        SurveyCsvPreviewResult result = service.preview(csv.getBytes(StandardCharsets.UTF_8));
 
         assertEquals(3, result.totalRows());
         assertEquals(2, result.errors().size());
@@ -63,7 +60,7 @@ class SurveyCsvPreviewServiceTest {
         byte[] csv = "종류,기준점명\n도근점,이름\n".getBytes(StandardCharsets.UTF_8);
 
         InvalidControlPointException thrown =
-                assertThrows(InvalidControlPointException.class, () -> service.preview(csv, Map.of()));
+                assertThrows(InvalidControlPointException.class, () -> service.preview(csv));
 
         assertTrue(thrown.getMessage().contains("기준점번호"), thrown.getMessage());
     }

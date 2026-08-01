@@ -9,14 +9,12 @@ import java.util.Map;
  *
  * @param totalRows        표의 데이터 행 수 (읽힌 행 + 오류 행)
  * @param recognizedColumns 파일의 열 이름 → 읽어 들인 항목. 파일에 적힌 순서를 유지한다.
- * @param ignoredColumns   알아보지 못해 버린 열 — 조용히 빠지지 않도록 함께 알린다.
- * @param assignableColumns 담당자가 열을 이어 붙일 수 있는 항목 전부.
+ * @param extraColumns     해석하지 않고 값만 보관하는 열 — 버리는 것이 아니라 그대로 저장된다.
  */
 public record SurveyCsvPreviewResult(
         int totalRows,
         Map<String, String> recognizedColumns,
-        List<String> ignoredColumns,
-        List<String> assignableColumns,
+        List<String> extraColumns,
         List<RowError> errors
 ) {
 
