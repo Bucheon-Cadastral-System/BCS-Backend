@@ -14,6 +14,8 @@ public class SwaggerConfig {
 
     private static final String SECURITY_SCHEME_NAME = "Bearer Authentication";
 
+    public static final String CSRF_SECURITY_SCHEME = "CSRF Token";
+
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
@@ -31,10 +33,18 @@ public class SwaggerConfig {
                                         .name("Authorization")
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")))
+                                        .bearerFormat("JWT"))
 
-                .addSecurityItem(new SecurityRequirement()
-                        .addList(SECURITY_SCHEME_NAME));
+                        .addSecuritySchemes(CSRF_SECURITY_SCHEME,
+                                new SecurityScheme()
+                                        .name("X-XSRF-TOKEN")
+                                        .type(SecurityScheme.Type.APIKEY)
+                                        .in(SecurityScheme.In.HEADER)
+                                        .description("GET /api/csrf에서 발급받은 CSRF 토큰")
+                        )
+                )
+
+                .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME));
 
     }
 }

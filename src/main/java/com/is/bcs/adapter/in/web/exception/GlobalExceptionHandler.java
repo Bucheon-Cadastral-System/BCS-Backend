@@ -3,9 +3,7 @@ package com.is.bcs.adapter.in.web.exception;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
-import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
-import com.is.bcs.domain.member.exception.InvalidMemberStateException;
-import com.is.bcs.domain.member.exception.MemberNotFoundException;
+import com.is.bcs.domain.member.exception.*;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
@@ -16,6 +14,8 @@ import com.is.bcs.domain.token.exception.InvalidTokenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.*;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
@@ -261,6 +261,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidOAuthExchangeCodeException.class)
     public ProblemDetail handleInvalidOAuthExchangeCode(InvalidOAuthExchangeCodeException e) {
         return problem(SecurityErrorCode.OAUTH_EXCHANGE_CODE_INVALID, e.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateMemberEmailException.class)
+    public ProblemDetail handleDuplicateMemberEmailException(DuplicateMemberEmailException e) {
+        return problem(MemberErrorCode.MEMBER_EMAIL_DUPLICATE, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidMemberRoleException.class)
+    public ProblemDetail handleInvalidMemberRoleException(InvalidMemberRoleException e) {
+        return problem(MemberErrorCode.MEMBER_INVALID_ROLE, e.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    public ProblemDetail handleAuthenticationCredentialsNotFoundException(AuthenticationCredentialsNotFoundException e) {
+        return problem(SecurityErrorCode.AUTHENTICATION_REQUIRED, e.getMessage());
     }
 
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */

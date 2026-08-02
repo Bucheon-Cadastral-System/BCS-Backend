@@ -1,13 +1,18 @@
 package com.is.bcs.adapter.in.auth;
 
+import com.is.bcs.adapter.in.security.oauth2.OAuth2SessionAttributes;
 import com.is.bcs.application.port.in.auth.ExchangeOAuthCodeUseCase;
 import com.is.bcs.application.port.in.auth.LogoutUseCase;
 import com.is.bcs.application.port.in.auth.RefreshAccessTokenUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -15,16 +20,19 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 
 
+@Slf4j
 @Tag(name = "1. AuthController", description = "로그인, 로그아웃, 토큰 갱신")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final boolean refreshCookieSecure;
+    private final String backendBaseUrl;
     private final LogoutUseCase logoutUseCase;
     private final ExchangeOAuthCodeUseCase exchangeOAuthCodeUseCase;
     private final RefreshAccessTokenUseCase refreshAccessTokenUseCase;
@@ -34,19 +42,46 @@ public class AuthController {
             boolean refreshCookieSecure,
             LogoutUseCase logoutUseCase,
             ExchangeOAuthCodeUseCase exchangeOAuthCodeUseCase,
-            RefreshAccessTokenUseCase refreshAccessTokenUseCase) {
+            RefreshAccessTokenUseCase refreshAccessTokenUseCase,
+            @Value("${app.backend-base-url}")
+            String backendBaseUrl) {
         this.refreshCookieSecure = refreshCookieSecure;
         this.logoutUseCase = logoutUseCase;
         this.exchangeOAuthCodeUseCase = exchangeOAuthCodeUseCase;
         this.refreshAccessTokenUseCase = refreshAccessTokenUseCase;
+        this.backendBaseUrl = backendBaseUrl;
     }
 
-    @Operation(summary = "일회용 임시 코드로 액세스 토큰 & 리프레시 토큰 교환")
-    @PostMapping("/token/exchange")
-    public ResponseEntity<OAuthCodeExchangeResponse> exchange(@Valid @RequestBody OAuthCodeExchangeRequest request) {
-        ExchangeOAuthCodeUseCase.ExchangeOAuthCodeResult result = exchangeOAuthCodeUseCase.exchange(request.code());
+    @GetMapping("/oauth2/kakao")
+    public void startKakaoLogin(@RequestParam("code_challenge")
+                                @Pattern(
+                                        regexp = "^[A-Za-z0-9_-]{43}$",
+                                        message = "code_challenge 형식이 올바르지 않습니다."
+                                )
+                                String codeChallenge,
+                                HttpServletRequest request, HttpServletResponse response) throws IOException {
+        HttpSession session = request.getSession(true);
 
-        OAuthCodeExchangeResponse response =
+        session.setAttribute(OAuth2SessionAttributes.CODE_CHALLENGE, codeChallenge);
+
+        log.debug("세션에 codeChallenge 저장 완료");
+
+        response.sendRedirect(backendBaseUrl+"/oauth2/authorization/kakao");
+    }
+
+    @Operation(summary = "일회용 임시 코드로 액세스 토큰(바디) & 리프레시 토큰 교환(쿠키)")
+    @PostMapping("/token/exchange")
+    public ResponseEntity<OAuthCodeExchangeResponse> exchange(@Valid @RequestBody OAuthCodeExchangeRequest request, HttpServletResponse response) {
+
+        ExchangeOAuthCodeUseCase.ExchangeOAuthCodeResult result = exchangeOAuthCodeUseCase.exchange(request.code(), request.codeVerifier());
+
+        addRefreshTokenCookie(
+                response,
+                result.refreshToken(),
+                result.refreshTokenExpiresAt()
+        );
+
+        OAuthCodeExchangeResponse responseBody =
                 new OAuthCodeExchangeResponse(
                         result.accessToken(),
                         "Bearer",
@@ -55,7 +90,7 @@ public class AuthController {
 
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(response);
+                .body(responseBody);
     }
 
     @Operation(summary = "리프레시 토큰으로 로그아웃")
@@ -112,8 +147,16 @@ public class AuthController {
         );
     }
 
-    public record OAuthCodeExchangeRequest(@NotBlank String code) {
+    public record OAuthCodeExchangeRequest(
+            @NotBlank String code,
 
+            @NotBlank
+            @Pattern(
+                    regexp = "^[A-Za-z0-9._~-]{43,128}$",
+                    message = "code_verifier 형식이 올바르지 않습니다."
+            )
+            String codeVerifier
+    ) {
     }
 
     public record OAuthCodeExchangeResponse(

@@ -24,6 +24,7 @@ public class LogoutService implements LogoutUseCase {
     public void logout(String rawRefreshToken) {
 
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            log.info("토큰이 비어있습니다.");
             return;
         }
 
@@ -35,6 +36,7 @@ public class LogoutService implements LogoutUseCase {
                         .orElse(null);
 
         if (storedToken == null) {
+            log.info("이미 로그아웃 처리된 RefreshToken입니다.");
             return;
         }
 

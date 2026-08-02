@@ -26,7 +26,13 @@ public enum CommonErrorCode implements ErrorCode {
     AUTH_UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
 
     /** 권한 부족 — 보안 예외 핸들러에서 사용 */
-    AUTH_FORBIDDEN(HttpStatus.FORBIDDEN);
+    AUTH_FORBIDDEN(HttpStatus.FORBIDDEN),
+
+    /** 오프셋 페이징 오류 */
+    PAGE_REQUEST_INVALID(HttpStatus.BAD_REQUEST),
+
+    /** 커서 페이징 오류 */
+    CURSOR_INVALID(HttpStatus.BAD_REQUEST);
 
     private final HttpStatus status;
 

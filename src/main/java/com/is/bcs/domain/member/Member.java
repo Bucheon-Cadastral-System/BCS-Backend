@@ -160,6 +160,26 @@ public class Member {
         this.position = validPosition;
     }
 
+    public void updateProfile(
+            String phone,
+            District district,
+            Team team,
+            Position position
+    ){
+        validateActiveStatus();
+
+        String validPhone = requireText(phone, "전화번호");
+        District validDistrict = requireField(district, "지역");
+        Team validTeam = requireField(team, "팀");
+        Position validPosition = requireField(position, "직급");
+
+        this.phone = validPhone;
+        this.district = validDistrict;
+        this.team = validTeam;
+        this.position = validPosition;
+    }
+
+
     public void approve(OffsetDateTime approvedAt) {
         validatePendingStatus();
         if (!isProfileCompleted()) {
@@ -193,6 +213,12 @@ public class Member {
     private void validatePendingStatus() {
         if (status != MemberStatus.PENDING) {
             throw new InvalidMemberStateException("승인 대기 상태에서만 처리할 수 있습니다.");
+        }
+    }
+
+    private void validateActiveStatus() {
+        if (status != MemberStatus.ACTIVE) {
+            throw new InvalidMemberStateException("활성화된 상태에서만 처리할 수 있습니다.");
         }
     }
 

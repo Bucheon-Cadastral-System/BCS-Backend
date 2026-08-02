@@ -1,6 +1,14 @@
 server:
   forward-headers-strategy: framework
 
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        secure: true
+        same-site: lax
+
 spring:
   application:
     name: bcs
@@ -79,7 +87,7 @@ spring:
     oauth2:
       client:
         registration:
-          kakao:
+          kakao: # registrationId
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET}
             client-authentication-method: client_secret_post
@@ -110,6 +118,7 @@ logging:
 
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:https://bcs.inwoohub.com}
+  backend-base-url: ${BACKEND_BASE_URL:https://bcs.inwoohub.com}
 
   jwt:
     secret: ${JWT_SECRET}
@@ -121,3 +130,4 @@ app:
       secure: ${REFRESH_COOKIE_SECURE:true}
       same-site: Lax
       path: /api/auth
+

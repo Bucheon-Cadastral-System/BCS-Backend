@@ -2,12 +2,16 @@ package com.is.bcs.adapter.out.persistence.member;
 
 import com.is.bcs.adapter.out.persistence.common.BaseTime;
 import com.is.bcs.domain.member.*;
+import com.is.bcs.domain.member.exception.InvalidMemberRoleException;
+import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 
 @Getter
 @Entity
@@ -15,7 +19,8 @@ import java.time.OffsetDateTime;
         name = "members",
         schema = "bcs",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_members_oauth", columnNames = {"oauth_provider", "provider_user_id"})
+                @UniqueConstraint(name = "uk_members_oauth", columnNames = {"oauth_provider", "provider_user_id"}),
+                @UniqueConstraint(name = "uk_members_email", columnNames = "email")
         },
         indexes = {
                 @Index(name = "idx_members_status", columnList = "status"),
@@ -131,6 +136,92 @@ public class MemberJpaEntity extends BaseTime {
         this.requestedAt = requestedAt;
         this.approvedAt = approvedAt;
         this.deactivatedAt = deactivatedAt;
+    }
+
+    public void approve() {
+        if (this.status != MemberStatus.PENDING) {
+            throw new InvalidMemberStateException("PENDING 상태의 회원만 승인할 수 있습니다. 현재 상태: " + this.status);
+        }
+
+        this.status = MemberStatus.ACTIVE;
+        this.approvedAt = OffsetDateTime.now();
+        this.deactivatedAt = null;
+    }
+
+    public void reject() {
+        if (this.status != MemberStatus.PENDING) {
+            throw new InvalidMemberStateException("PENDING 상태의 회원만 가입을 거절할 수 있습니다. " + "현재 상태=" + this.status);
+        }
+
+        this.status = MemberStatus.INACTIVE;
+        this.deactivatedAt = OffsetDateTime.now();
+        this.approvedAt = null;
+    }
+
+    public void deactivate() {
+        if (this.status != MemberStatus.ACTIVE) {
+            throw new InvalidMemberStateException("ACTIVE 상태의 회원만 비활성화할 수 있습니다. 현재 상태=" + this.status);
+        }
+
+        this.status = MemberStatus.INACTIVE;
+        this.deactivatedAt = OffsetDateTime.now();
+    }
+
+    public void activate() {
+        if (this.status != MemberStatus.INACTIVE) {
+            throw new InvalidMemberStateException("INACTIVE 상태의 회원만 활성화할 수 있습니다. 현재 상태=" + this.status);
+        }
+
+        this.status = MemberStatus.ACTIVE;
+        this.deactivatedAt = null;
+
+        if (this.approvedAt == null) {
+            this.approvedAt = OffsetDateTime.now();
+        }
+    }
+
+    public void updateProfileByAdmin(
+            String name,
+            String phone,
+            String email,
+            District district,
+            String department,
+            Team team,
+            Position position
+    ) {
+        if (name != null) {this.name = name.trim();}
+
+        if (phone != null) {this.phone = phone.trim();}
+
+        if (email != null) {this.email = email.trim().toLowerCase(Locale.ROOT);}
+
+        if (district != null) {this.district = district;}
+
+        if (department != null) {this.department = department.trim();}
+
+        if (team != null) {this.team = team;}
+
+        if (position != null) {this.position = position;}
+    }
+
+    public void promoteToAdmin() {
+        if (this.role != MemberRole.USER) {
+            throw new InvalidMemberRoleException("USER 권한의 회원만 ADMIN으로 변경할 수 있습니다. 현재 권한=" + this.role);
+        }
+
+        if (this.status != MemberStatus.ACTIVE) {
+            throw new InvalidMemberStateException("ACTIVE 상태의 회원만 ADMIN 권한을 부여할 수 있습니다. 현재 상태=" + this.status);
+        }
+
+        this.role = MemberRole.ADMIN;
+    }
+
+    public void demoteToUser() {
+        if (this.role != MemberRole.ADMIN) {
+            throw new InvalidMemberRoleException("ADMIN 권한의 회원만 USER로 변경할 수 있습니다. 현재 권한=" + this.role);
+        }
+
+        this.role = MemberRole.USER;
     }
 
     public static MemberJpaEntity fromDomain(Member member) {

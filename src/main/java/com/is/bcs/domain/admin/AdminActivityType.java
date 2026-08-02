@@ -1,0 +1,12 @@
+package com.is.bcs.domain.admin;
+
+public enum AdminActivityType {
+
+    MEMBER_APPROVED,
+    MEMBER_REJECTED,
+    MEMBER_DEACTIVATED,
+    MEMBER_ACTIVATED,
+    MEMBER_PROFILE_UPDATED,
+    MEMBER_PROMOTED_TO_ADMIN,
+    MEMBER_DEMOTED_TO_USER
+}

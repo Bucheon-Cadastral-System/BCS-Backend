@@ -4,11 +4,14 @@ import java.time.Instant;
 
 public interface ExchangeOAuthCodeUseCase {
 
-    ExchangeOAuthCodeResult exchange(String code);
+    ExchangeOAuthCodeResult exchange(String code, String codeVerifier);
 
     record ExchangeOAuthCodeResult(
             String accessToken,
-            Instant accessTokenExpiresAt
+            Instant accessTokenExpiresAt,
+            String refreshToken,
+            Instant refreshTokenExpiresAt
     ) {
     }
+
 }

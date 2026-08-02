@@ -12,6 +12,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -34,16 +36,20 @@ public class SecurityConfig {
         return http
 
                 .cors(Customizer.withDefaults())
-
+                /** CSRF 설정 (각 세션마다 CSRF 토큰 만들어서 세션에 저장) */
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers(
-                                "/api/auth/token/exchange",
-                                "/api/auth/token/refresh",
-                                "/api/auth/logout"
+                        .csrfTokenRepository(
+                                CookieCsrfTokenRepository.withHttpOnlyFalse()
                         )
+                        .requireCsrfProtectionMatcher(
+                                new RegexRequestMatcher("^/api/members/me/registration$", "PUT")
+                        )
+
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/members/me").authenticated()
+
                         /** 모두 사용 가능 ! */
                         .requestMatchers(
                                 "/",

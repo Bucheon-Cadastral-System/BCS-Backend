@@ -37,11 +37,10 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
         OAuth2User oauth2User = delegate.loadUser(userRequest); // 여기서 Kakao로 유저 정보 Get
 
+
         KakaoOAuth2UserInfo kakao = new KakaoOAuth2UserInfo(oauth2User.getAttributes());
 
         OAuthLoginResult result = oauthLoginUseCase.login(new OAuthLoginCommand(OAuthProvider.KAKAO, kakao.providerUserId()));
-
-        log.info("로그인 사용자 : {}, Role : {}", result.memberId(), result.role());
 
         return new BcsOAuth2Principal(
                 result.memberId(),

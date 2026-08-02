@@ -11,4 +11,6 @@ public interface MemberJpaRepository extends JpaRepository<MemberJpaEntity, Long
 
     Optional<MemberJpaEntity> findByProviderAndProviderUserId(OAuthProvider provider, String providerUserId);
 
+    boolean existsByEmailAndIdNot(String email, Long id);
+
 }
