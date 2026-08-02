@@ -40,6 +40,7 @@ public class MemberService implements CompleteMemberProfileUseCase, GetMemberSta
     }
 
     @Override
+    @Transactional
     public void update(Long memberId, UpdateMemberProfileUseCase.Command command) {
         Member member = getMember(memberId);
         member.updateProfile(
