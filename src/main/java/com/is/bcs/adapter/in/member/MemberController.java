@@ -78,12 +78,6 @@ public class MemberController {
 
     }
 
-    @Operation(summary = "세션을 사용하는 경우 CSRF 토큰 필요, 해당 API : /me/registration (가입 정보 입력) ")
-    @GetMapping("/api/csrf")
-    public CsrfToken csrf(CsrfToken csrfToken) {
-        return csrfToken;
-    }
-
     @Operation(summary = "내 가입 상태 조회")
     @GetMapping("/me/state")
     public ResponseEntity<MemberStateResponse> getMyState(Authentication authentication) {
