@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.auth;
 
+import com.is.bcs.adapter.in.security.oauth2.OAuth2SessionAttributes;
 import com.is.bcs.application.port.in.auth.ExchangeOAuthCodeUseCase;
 import com.is.bcs.application.port.in.auth.LogoutUseCase;
 import com.is.bcs.application.port.in.auth.RefreshAccessTokenUseCase;
@@ -29,7 +30,6 @@ import java.time.Instant;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-
     private final boolean refreshCookieSecure;
     private final String backendBaseUrl;
     private final LogoutUseCase logoutUseCase;
@@ -56,7 +56,7 @@ public class AuthController {
                                 HttpServletRequest request, HttpServletResponse response) throws IOException {
         HttpSession session = request.getSession(true);
 
-        session.setAttribute("OAUTH_CODE_CHALLENGE", codeChallenge);
+        session.setAttribute(OAuth2SessionAttributes.CODE_CHALLENGE, codeChallenge);
 
         log.info("세션에 codeChallenge 저장 ! {}",  codeChallenge);
 

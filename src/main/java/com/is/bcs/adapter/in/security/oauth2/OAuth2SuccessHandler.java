@@ -24,7 +24,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final String frontendBaseUrl;
     private final CompleteOAuth2LoginUseCase completeOAuth2LoginUseCase;
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
-    private static final String CODE_CHALLENGE_SESSION_ATTRIBUTE = "OAUTH_CODE_CHALLENGE";
 
     public OAuth2SuccessHandler(
             @Value("${app.frontend-base-url}")
@@ -139,7 +138,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             throw new InvalidOAuth2PrincipalException("OAuth 로그인 세션이 없습니다.");
         }
 
-        Object value = session.getAttribute(CODE_CHALLENGE_SESSION_ATTRIBUTE);
+        Object value = session.getAttribute(OAuth2SessionAttributes.CODE_CHALLENGE);
 
         if (!(value instanceof String codeChallenge) || codeChallenge.isBlank()) {
             throw new InvalidOAuth2PrincipalException("코드 챌린지가 없습니다.");
