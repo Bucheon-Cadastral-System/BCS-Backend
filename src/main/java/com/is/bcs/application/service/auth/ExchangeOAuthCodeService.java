@@ -80,7 +80,12 @@ public class ExchangeOAuthCodeService implements ExchangeOAuthCodeUseCase {
     private void validateCodeVerifier(OAuthExchangeGrant exchangeGrant, String codeVerifier) {
         String actualChallenge = createCodeChallenge(codeVerifier);
 
-        if (!exchangeGrant.codeChallenge().equals(actualChallenge)) {
+        boolean match = MessageDigest.isEqual(
+                exchangeGrant.codeChallenge().getBytes(StandardCharsets.US_ASCII),
+                actualChallenge.getBytes(StandardCharsets.US_ASCII)
+        );
+
+        if(!match) {
             throw new InvalidOAuthExchangeCodeException("코드 verifier가 올바르지 않습니다.");
         }
     }
