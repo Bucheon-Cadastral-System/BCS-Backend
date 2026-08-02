@@ -147,8 +147,16 @@ public class AuthController {
         );
     }
 
-    public record OAuthCodeExchangeRequest(@NotBlank String code, @NotBlank String codeVerifier) {
+    public record OAuthCodeExchangeRequest(
+            @NotBlank String code,
 
+            @NotBlank
+            @Pattern(
+                    regexp = "^[A-Za-z0-9._~-]{43,128}$",
+                    message = "code_verifier 형식이 올바르지 않습니다."
+            )
+            String codeVerifier
+    ) {
     }
 
     public record OAuthCodeExchangeResponse(
