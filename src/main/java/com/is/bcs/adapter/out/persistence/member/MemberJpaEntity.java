@@ -19,7 +19,8 @@ import java.util.Locale;
         name = "members",
         schema = "bcs",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_members_oauth", columnNames = {"oauth_provider", "provider_user_id"})
+                @UniqueConstraint(name = "uk_members_oauth", columnNames = {"oauth_provider", "provider_user_id"}),
+                @UniqueConstraint(name = "uk_members_email", columnNames = "email")
         },
         indexes = {
                 @Index(name = "idx_members_status", columnList = "status"),
