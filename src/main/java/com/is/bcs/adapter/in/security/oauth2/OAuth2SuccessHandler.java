@@ -39,26 +39,24 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
 
-        final BcsOAuth2Principal principal;
-
         try {
-            principal = getPrincipal(authentication);
+            BcsOAuth2Principal principal = getPrincipal(authentication);
+
+            MemberStatus status = principal.getStatus();
+
+            switch (status) {
+                case PENDING -> handlePending(response);
+                case ACTIVE -> handleActive(request, response, principal);
+                case INACTIVE -> handleInactive(request, response);
+            }
         } catch (InvalidOAuth2PrincipalException e) {
             oauth2LoginFailureHandler.onAuthenticationFailure(
                     request,
                     response,
                     e
             );
-            return;
         }
 
-        MemberStatus status = principal.getStatus();
-
-        switch (status) {
-            case PENDING -> handlePending(response);
-            case ACTIVE -> handleActive(request, response, principal);
-            case INACTIVE -> handleInactive(request, response);
-        }
     }
 
     private BcsOAuth2Principal getPrincipal(Authentication authentication) {
