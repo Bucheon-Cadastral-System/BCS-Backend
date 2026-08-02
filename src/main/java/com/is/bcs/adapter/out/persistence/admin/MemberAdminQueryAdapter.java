@@ -134,7 +134,7 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
             case "memberStatus" -> memberJpaEntity.status;
             case "memberRole" -> memberJpaEntity.role;
             case "createdAt" -> memberJpaEntity.createdAt;
-            default -> memberJpaEntity.name;
+            default -> throw new IllegalArgumentException("지원하지 않는 정렬 속성입니다: " + property);
         };
     }
 

@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 
 @Getter
 @Entity
@@ -191,7 +192,7 @@ public class MemberJpaEntity extends BaseTime {
 
         if (phone != null) {this.phone = phone.trim();}
 
-        if (email != null) {this.email = email.trim().toLowerCase();}
+        if (email != null) {this.email = email.trim().toLowerCase(Locale.ROOT);}
 
         if (district != null) {this.district = district;}
 
