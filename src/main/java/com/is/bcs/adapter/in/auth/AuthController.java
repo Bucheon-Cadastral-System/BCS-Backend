@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
@@ -52,13 +53,18 @@ public class AuthController {
     }
 
     @GetMapping("/oauth2/kakao")
-    public void startKakaoLogin(@RequestParam("code_challenge") String codeChallenge,
+    public void startKakaoLogin(@RequestParam("code_challenge")
+                                @Pattern(
+                                        regexp = "^[A-Za-z0-9_-]{43}$",
+                                        message = "code_challenge 형식이 올바르지 않습니다."
+                                )
+                                String codeChallenge,
                                 HttpServletRequest request, HttpServletResponse response) throws IOException {
         HttpSession session = request.getSession(true);
 
         session.setAttribute(OAuth2SessionAttributes.CODE_CHALLENGE, codeChallenge);
 
-        log.info("세션에 codeChallenge 저장 ! {}",  codeChallenge);
+        log.debug("세션에 codeChallenge 저장 완료");
 
         response.sendRedirect(backendBaseUrl+"/oauth2/authorization/kakao");
     }
