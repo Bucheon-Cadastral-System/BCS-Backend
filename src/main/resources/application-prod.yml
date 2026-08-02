@@ -131,3 +131,5 @@ app:
       same-site: Lax
       path: /api/auth
 
+    oauth:
+      exchange-code-ttl: 60s
