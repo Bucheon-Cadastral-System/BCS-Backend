@@ -27,8 +27,8 @@ public interface GetMemberAdminUseCase {
     record Result(
             Long id,
             String name,
-            String email,
             String phone,
+            String email,
             District district,
             Team team,
             Position position,

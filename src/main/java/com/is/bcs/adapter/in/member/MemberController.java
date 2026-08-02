@@ -55,7 +55,9 @@ public class MemberController {
     @PutMapping("/me/registration")
     public ResponseEntity<Void> completeRegistration(Authentication authentication, @Valid @RequestBody CompleteRegistrationRequest request
     ) {
+        log.info("가입 정보 입력 시작!");
         Long memberId = currentMemberIdResolver.resolve(authentication);
+        log.info("memberId: {}", memberId);
 
         completeMemberProfileUseCase.complete(
                 memberId,
