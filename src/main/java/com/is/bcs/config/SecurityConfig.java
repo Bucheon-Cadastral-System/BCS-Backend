@@ -48,35 +48,34 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/members/me").authenticated()
+                        /** 관리자(ADMIN) 만 가능한 곳 */
+//                        .requestMatchers(
+//                                "/api/admin/**"
+//                        ).hasRole("ADMIN")
 
-                        /** 모두 사용 가능 ! */
+                        /** 개발 단계: 모든 요청 허용. 운영 전환 시 공개/회원/관리자 경로를 분리한다. */
                         .requestMatchers(
-                                "/",
-                                "/error",
-                                "/login/**",
-                                "/oauth2/**",
-
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-
-                                "/v3/api-docs",
-                                "/v3/api-docs/**",
-                                "/item/v3/api-docs",
-                                "/item/v3/api-docs/**",
-
-                                "/api/auth/token/exchange",
-                                "/api/auth/token/refresh",
-                                "/api/auth/logout",
+//                                "/",
+//                                "/error",
+//                                "/login/**",
+//                                "/oauth2/**",
+//
+//                                "/swagger-ui.html",
+//                                "/swagger-ui/**",
+//
+//                                "/v3/api-docs",
+//                                "/v3/api-docs/**",
+//                                "/item/v3/api-docs",
+//                                "/item/v3/api-docs/**",
+//
+//                                "/api/auth/oauth2/kakao",
+//                                "/api/auth/token/exchange",
+//                                "/api/auth/token/refresh",
+//                                "/api/auth/logout",
+//                                "/api/csrf",
                                 "/**"
 
                         ).permitAll()
-
-
-                        /** 관리자(ADMIN) 만 가능한 곳! */
-                        .requestMatchers(
-                                "/api/admin/**"
-                        ).hasRole("ADMIN")
 
                         // 그 외
                         .anyRequest()
