@@ -1,14 +1,7 @@
 package com.is.bcs.adapter.out.persistence.admin;
 
 import com.is.bcs.domain.admin.AdminActivityType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +10,13 @@ import java.time.OffsetDateTime;
 
 @Getter
 @Entity
-@Table(name = "admin_activity_log")
+@Table(name = "admin_activity_log",
+        indexes = {
+                @Index(
+                        name = "idx_admin_activity_log_created_at_id",
+                        columnList = "created_at, id"
+                )
+        })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AdminActivityLogJpaEntity {
 
