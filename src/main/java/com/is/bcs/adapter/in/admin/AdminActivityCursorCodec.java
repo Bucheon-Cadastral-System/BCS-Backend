@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 
 @Component
@@ -39,8 +40,9 @@ public class AdminActivityCursorCodec {
                     OffsetDateTime.parse(values[0]),
                     Long.valueOf(values[1])
             );
-        } catch (IllegalArgumentException exception) {
+        }catch (IllegalArgumentException | DateTimeParseException exception) {
             throw new InvalidCursorException();
         }
+
     }
 }
