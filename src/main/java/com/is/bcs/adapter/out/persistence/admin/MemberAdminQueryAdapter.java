@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.admin;
 
+import com.is.bcs.adapter.in.web.exception.InvalidPageRequestException;
 import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.application.port.in.admin.GetMemberAdminUseCase;
 import com.is.bcs.application.port.out.admin.GetMemberAdminPort;
@@ -134,7 +135,7 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
             case "memberStatus" -> memberJpaEntity.status;
             case "memberRole" -> memberJpaEntity.role;
             case "createdAt" -> memberJpaEntity.createdAt;
-            default -> throw new IllegalArgumentException("지원하지 않는 정렬 속성입니다: " + property);
+            default -> throw new InvalidPageRequestException("지원하지 않는 정렬 기준입니다: " + property);
         };
     }
 
