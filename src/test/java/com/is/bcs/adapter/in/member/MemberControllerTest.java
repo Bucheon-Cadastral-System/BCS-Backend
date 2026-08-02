@@ -1,8 +1,10 @@
 package com.is.bcs.adapter.in.member;
 
+import com.is.bcs.adapter.in.security.CurrentMemberIdResolver;
 import com.is.bcs.application.port.in.member.CompleteMemberProfileUseCase;
 import com.is.bcs.application.port.in.member.GetMemberStateUseCase;
 import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
+import com.is.bcs.application.port.in.member.UpdateMemberProfileUseCase;
 import com.is.bcs.application.port.out.token.AccessTokenClaims;
 import com.is.bcs.domain.member.*;
 import org.junit.jupiter.api.Test;
@@ -20,12 +22,18 @@ class MemberControllerTest {
 
     @Test
     void getMyProfileUsesMemberIdFromAccessTokenPrincipal() {
-        GetMyProfileUseCase getMyProfileUseCase = mock(GetMyProfileUseCase.class);
+        GetMyProfileUseCase getMyProfileUseCase =
+                mock(GetMyProfileUseCase.class);
+
         MemberController controller = new MemberController(
                 mock(CompleteMemberProfileUseCase.class),
                 mock(GetMemberStateUseCase.class),
-                getMyProfileUseCase
+                getMyProfileUseCase,
+                mock(UpdateMemberProfileUseCase.class),
+                mock(CurrentMemberIdResolver.class)
         );
+
+
         AccessTokenClaims claims = new AccessTokenClaims(
                 7L,
                 MemberRole.USER,
