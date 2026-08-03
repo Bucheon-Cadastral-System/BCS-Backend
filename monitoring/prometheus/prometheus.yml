@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+# BCS 애플리케이션 수집 설정은 /actuator/prometheus 활성화 단계에서 추가한다.
