@@ -36,7 +36,7 @@ class SurveyJpaEntityTest {
     @DisplayName("조사기록 왕복에서 프로젝트×기준점·결과·조사 시각이 보존된다")
     void recordRoundTrip_preservesAttributes() {
         OffsetDateTime surveyedAt = OffsetDateTime.parse("2025-09-08T10:00:00+09:00");
-        SurveyRecord origin = SurveyRecord.restore(7L, 1L, 10L, SurveyResult.LOST, surveyedAt, "대상(2건)");
+        SurveyRecord origin = SurveyRecord.restore(7L, 1L, 10L, SurveyResult.LOST, surveyedAt, "대상(2건)", 9L);
 
         SurveyRecord restored = SurveyRecordJpaEntity.fromDomain(origin).toDomain();
 
@@ -46,13 +46,14 @@ class SurveyJpaEntityTest {
         assertEquals(SurveyResult.LOST, restored.getResult());
         assertEquals(surveyedAt, restored.getSurveyedAt());
         assertEquals("대상(2건)", restored.getNote());
+        assertEquals(9L, restored.getSurveyedById());
     }
 
     @Test
     @DisplayName("비고 없는 조사기록은 왕복 후에도 note가 null이다")
     void recordRoundTrip_withoutNote_keepsNull() {
         SurveyRecord origin = SurveyRecord.restore(
-                7L, 1L, 10L, SurveyResult.INTACT, OffsetDateTime.parse("2025-09-08T10:00:00+09:00"), null);
+                7L, 1L, 10L, SurveyResult.INTACT, OffsetDateTime.parse("2025-09-08T10:00:00+09:00"), null, null);
 
         assertNull(SurveyRecordJpaEntity.fromDomain(origin).toDomain().getNote());
     }

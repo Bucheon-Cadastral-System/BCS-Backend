@@ -4,6 +4,7 @@ import com.is.bcs.application.port.out.file.Table;
 import com.is.bcs.application.port.out.file.TableExtractor;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -41,6 +42,12 @@ public class SpreadsheetTableExtractor implements TableExtractor {
     private static final String UTF8_BOM = "\uFEFF";
     /** 제목 행은 보통 한 칸만 채워져 있어, 두 칸 이상 채워진 첫 행을 헤더로 본다. */
     private static final int HEADER_MIN_FILLED_CELLS = 2;
+
+    static {
+        // xlsx는 zip이라 작은 파일이 수 GB로 풀리는 압축 폭탄이 가능하다.
+        // POI의 비율 방어(기본 1:100)에 절대 상한을 더해, 업로드 상한(20MB)짜리 파일이 힙을 다 먹기 전에 끊는다.
+        ZipSecureFile.setMaxEntrySize(64L * 1024 * 1024);
+    }
 
     @Override
     public Table extract(byte[] content) {

@@ -28,8 +28,8 @@ class ControlPointJpaEntityTest {
                 new GeoCoordinate(126.794623, 37.506423),
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
-                new TraverseInfo("1", null, null, false)
-        );
+                new TraverseInfo("1", null, null, false),
+                "망실,안보임", LocalDate.of(2026, 6, 23), 3L);
     }
 
     @Test
@@ -44,8 +44,8 @@ class ControlPointJpaEntityTest {
         assertEquals(PointType.DOGEUN, restored.getType());
         assertEquals("1465공", restored.getName());
         assertEquals(CoordinateSystem.GRS80_CENTRAL, restored.getTm().crs());
-        assertEquals(new BigDecimal("545236.77"), restored.getTm().northing());
-        assertEquals(new BigDecimal("181840.96"), restored.getTm().easting());
+        assertEquals(0, new BigDecimal("545236.77").compareTo(restored.getTm().northing()));
+        assertEquals(0, new BigDecimal("181840.96").compareTo(restored.getTm().easting()));
         assertEquals(126.794623, restored.getGeo().longitude());
         assertEquals(37.506423, restored.getGeo().latitude());
         assertEquals("10300", restored.getRegionCode());
@@ -55,6 +55,26 @@ class ControlPointJpaEntityTest {
         assertEquals(InstallType.INSTALLED, restored.getInstallType());
         assertEquals(LocalDate.of(2018, 2, 21), restored.getInstalledDate());
         assertEquals(new TraverseInfo("1", null, null, false), restored.getTraverse());
+        assertEquals("망실,안보임", restored.getLastSurveyResult());
+        assertEquals(LocalDate.of(2026, 6, 23), restored.getLastSurveyedOn());
+        assertEquals(3L, restored.getLastSurveyedById());
+    }
+
+    @Test
+    @DisplayName("성과 좌표는 소수 4자리 스케일까지 그대로 보존된다")
+    void roundTrip_keepsCoordinateScale() {
+        ControlPoint origin = ControlPoint.register(
+                "41192D000009999", PointType.DOGEUN, "스케일",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545236.7712"), new BigDecimal("181840.9605")),
+                new GeoCoordinate(126.794623, 37.506423),
+                null, null, null, null, null, null, null, null, null, null);
+
+        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin).toDomain();
+
+        // compareTo는 스케일을 무시하므로 equals로 자릿수까지 본다
+        assertEquals(new BigDecimal("545236.7712"), restored.getTm().northing());
+        assertEquals(new BigDecimal("181840.9605"), restored.getTm().easting());
     }
 
     @Test
@@ -66,7 +86,7 @@ class ControlPointJpaEntityTest {
                         new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
                 null, null, null, null, null, null, null
-        );
+        , null, null, null);
 
         ControlPoint restored = ControlPointJpaEntity.fromDomain(origin).toDomain();
 

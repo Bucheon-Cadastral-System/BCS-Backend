@@ -1,9 +1,9 @@
 package com.is.bcs.adapter.in.web.controlpoint;
 
 import com.is.bcs.adapter.in.web.common.ContentResponse;
+import com.is.bcs.application.dto.RegisterControlPointResult;
 import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.application.port.in.controlpoint.RegisterControlPointUseCase;
-import com.is.bcs.domain.controlpoint.ControlPoint;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,13 +24,19 @@ public class ControlPointController {
     private final GetControlPointsUseCase getControlPointsUseCase;
 
     @PostMapping
-    public ResponseEntity<ControlPointResponse> register(@Valid @RequestBody RegisterControlPointRequest request) {
-        ControlPoint point = registerControlPointUseCase.register(request.toCommand());
+    public ResponseEntity<RegisterControlPointResponse> register(
+            @Valid @RequestBody RegisterControlPointRequest request) {
+        RegisterControlPointResult result = registerControlPointUseCase.register(request.toCommand());
+        RegisterControlPointResponse body = RegisterControlPointResponse.from(result);
+        if (!result.created()) {
+            // 임포트와 같은 규칙이라 기존 점 갱신·재사용으로 끝날 수 있다 — 만든 자원이 없으므로 201이 아니다
+            return ResponseEntity.ok(body);
+        }
         return ResponseEntity
                 // 관리번호는 형식 미확정 입력이라 경로 세그먼트로 인코딩해 Location을 만든다
                 .created(UriComponentsBuilder.fromPath("/api/control-points/{pointNo}")
-                        .buildAndExpand(point.getPointNo()).encode().toUri())
-                .body(ControlPointResponse.from(point));
+                        .buildAndExpand(result.point().getPointNo()).encode().toUri())
+                .body(body);
     }
 
     @GetMapping

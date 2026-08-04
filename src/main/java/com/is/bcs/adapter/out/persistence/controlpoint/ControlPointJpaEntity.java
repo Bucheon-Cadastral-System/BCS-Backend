@@ -66,10 +66,10 @@ public class ControlPointJpaEntity extends BaseTime {
     private CoordinateSystem crs;
 
     // 성과 좌표는 오차 없는 보존을 위해 numeric — 소수 3자리(mm)까지
-    @Column(name = "tm_northing", nullable = false, precision = 12, scale = 3)
+    @Column(name = "tm_northing", nullable = false, precision = 12, scale = TmCoordinate.SCALE)
     private BigDecimal tmNorthing;
 
-    @Column(name = "tm_easting", nullable = false, precision = 12, scale = 3)
+    @Column(name = "tm_easting", nullable = false, precision = 12, scale = TmCoordinate.SCALE)
     private BigDecimal tmEasting;
 
     @Column(name = "lng", nullable = false)
@@ -110,12 +110,23 @@ public class ControlPointJpaEntity extends BaseTime {
     @Column(name = "traverse_intersection")
     private Boolean traverseIntersection;
 
+    // 파일 문구 그대로 — 어휘를 강제하면 "망실,안보임" 같은 실제 값이 거부되고, 길이를 자르면 보존이 깨진다
+    @Column(name = "last_survey_result", columnDefinition = "text")
+    private String lastSurveyResult;
+
+    @Column(name = "last_surveyed_on")
+    private LocalDate lastSurveyedOn;
+
+    @Column(name = "last_surveyed_by")
+    private Long lastSurveyedById;
+
     private ControlPointJpaEntity(
             Long id, String pointNo, PointType type, String name,
             CoordinateSystem crs, BigDecimal tmNorthing, BigDecimal tmEasting, double lng, double lat,
             String regionCode, String regionName, String address,
             MarkerMaterial markerMaterial, InstallType installType, LocalDate installedDate,
-            String traverseGrade, String traverseLineName, String traverseLineNo, Boolean traverseIntersection
+            String traverseGrade, String traverseLineName, String traverseLineNo, Boolean traverseIntersection,
+            String lastSurveyResult, LocalDate lastSurveyedOn, Long lastSurveyedById
     ) {
         this.id = id;
         this.pointNo = pointNo;
@@ -136,6 +147,9 @@ public class ControlPointJpaEntity extends BaseTime {
         this.traverseLineName = traverseLineName;
         this.traverseLineNo = traverseLineNo;
         this.traverseIntersection = traverseIntersection;
+        this.lastSurveyResult = lastSurveyResult;
+        this.lastSurveyedOn = lastSurveyedOn;
+        this.lastSurveyedById = lastSurveyedById;
     }
 
     public static ControlPointJpaEntity fromDomain(ControlPoint point) {
@@ -149,7 +163,8 @@ public class ControlPointJpaEntity extends BaseTime {
                 traverse != null ? traverse.grade() : null,
                 traverse != null ? traverse.lineName() : null,
                 traverse != null ? traverse.lineNo() : null,
-                traverse != null ? traverse.intersection() : null
+                traverse != null ? traverse.intersection() : null,
+                point.getLastSurveyResult(), point.getLastSurveyedOn(), point.getLastSurveyedById()
         );
     }
 
@@ -160,7 +175,8 @@ public class ControlPointJpaEntity extends BaseTime {
                 new GeoCoordinate(lng, lat),
                 regionCode, regionName, address,
                 markerMaterial, installType, installedDate,
-                toTraverse()
+                toTraverse(),
+                lastSurveyResult, lastSurveyedOn, lastSurveyedById
         );
     }
 

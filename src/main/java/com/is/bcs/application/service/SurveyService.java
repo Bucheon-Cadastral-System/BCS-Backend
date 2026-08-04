@@ -77,8 +77,9 @@ public class SurveyService implements CreateSurveyProjectUseCase, GetSurveyProje
                     existing.revise(command.result(), now, command.note());
                     return existing;
                 })
+                // 조사원은 인증 주체로 채울 값이라 인증이 붙기 전까지 비워 둔다
                 .orElseGet(() -> SurveyRecord.create(
-                        command.projectId(), command.pointId(), command.result(), now, command.note()));
+                        command.projectId(), command.pointId(), command.result(), now, command.note(), null));
 
         return saveSurveyRecordPort.save(record);
     }

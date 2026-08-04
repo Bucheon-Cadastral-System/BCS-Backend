@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.controlpoint;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class ControlPointApiTest {
 
+    // 경위도는 보내지 않는다 — 서버가 성과(TM)에서 파생한다
     private static final String CSV_ROW1_JSON = """
             {
               "pointNo": "41192D000001265",
@@ -33,8 +35,6 @@ class ControlPointApiTest {
               "crs": "GRS80_CENTRAL",
               "northing": 545236.77,
               "easting": 181840.96,
-              "longitude": 126.794623,
-              "latitude": 37.506423,
               "regionCode": "10300",
               "regionName": "춘의동",
               "address": "경기도 부천시 춘의동 102-16",
@@ -67,25 +67,54 @@ class ControlPointApiTest {
     }
 
     @Test
-    @DisplayName("등록 — 201과 Location, 등록된 리소스를 반환한다")
+    @DisplayName("등록 — 201과 Location, 서버가 파생한 경위도를 실은 리소스를 반환한다")
     void register_returns201WithLocation() throws Exception {
         MvcResult result = register();
 
         assertEquals(201, result.getResponse().getStatus());
         assertEquals("/api/control-points/41192D000001265", result.getResponse().getHeader("Location"));
         String body = bodyOf(result);
+        assertTrue(body.contains("\"created\":true"));
         assertTrue(body.contains("\"pointNo\":\"41192D000001265\""));
         assertTrue(body.contains("\"northing\":545236.77"));
         assertTrue(body.contains("\"easting\":181840.96"));
+        // 정답지 = 대상지 CSV 같은 행의 경위도 — 문자열 접두가 아니라 수치 오차로 본다
+        assertEquals(126.794623, JsonPath.<Double>read(body, "$.point.longitude"), 1e-6);
+        assertEquals(37.506423, JsonPath.<Double>read(body, "$.point.latitude"), 1e-6);
         assertTrue(body.contains("\"id\":"));
     }
 
     @Test
-    @DisplayName("중복 관리번호 등록 — 409 CONTROL_POINT_DUPLICATE")
-    void register_duplicate_409() throws Exception {
+    @DisplayName("같은 점을 다시 등록 — 임포트와 같은 규칙이라 거부가 아니라 200(변경 없음)이다")
+    void register_samePointAgain_returns200Unchanged() throws Exception {
         register();
 
         MvcResult result = register();
+
+        assertEquals(200, result.getResponse().getStatus());
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"created\":false"));
+        assertTrue(body.contains("\"updated\":false"));
+    }
+
+    @Test
+    @DisplayName("다른 이름의 점이 쓰는 관리번호 등록 — 409 CONTROL_POINT_DUPLICATE")
+    void register_pointNoTakenByOtherName_409() throws Exception {
+        register();
+
+        MvcResult result = mockMvc.perform(post("/api/control-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "pointNo": "41192D000001265",
+                                  "type": "DOGEUN",
+                                  "name": "9999공",
+                                  "crs": "GRS80_CENTRAL",
+                                  "northing": 545000.00,
+                                  "easting": 181000.00
+                                }
+                                """))
+                .andReturn();
 
         assertEquals(409, result.getResponse().getStatus());
         assertTrue(bodyOf(result).contains("\"code\":\"CONTROL_POINT_DUPLICATE\""));

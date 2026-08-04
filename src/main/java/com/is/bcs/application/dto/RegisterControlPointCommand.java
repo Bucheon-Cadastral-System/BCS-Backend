@@ -9,6 +9,7 @@ import com.is.bcs.domain.controlpoint.TraverseInfo;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/** 경위도는 받지 않는다 — 권위값(TM 성과)에서 서버가 파생해야 두 값이 어긋날 길이 없다. */
 public record RegisterControlPointCommand(
         String pointNo,
         PointType type,
@@ -16,8 +17,6 @@ public record RegisterControlPointCommand(
         CoordinateSystem crs,
         BigDecimal northing,
         BigDecimal easting,
-        double longitude,
-        double latitude,
         String regionCode,
         String regionName,
         String address,
