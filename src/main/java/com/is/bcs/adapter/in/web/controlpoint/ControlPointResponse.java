@@ -26,7 +26,10 @@ public record ControlPointResponse(
         MarkerMaterial markerMaterial,
         InstallType installType,
         LocalDate installedDate,
-        TraverseResponse traverse
+        TraverseResponse traverse,
+        /** 최근 조사 요약 — 파일의 최종조사 열 문구 그대로. 조사원 표시는 회원 조회가 생길 때 함께 */
+        String lastSurveyResult,
+        LocalDate lastSurveyedOn
 ) {
 
     public record TraverseResponse(String grade, String lineName, String lineNo, Boolean intersection) {
@@ -47,7 +50,8 @@ public record ControlPointResponse(
                 point.getGeo().longitude(), point.getGeo().latitude(),
                 point.getRegionCode(), point.getRegionName(), point.getAddress(),
                 point.getMarkerMaterial(), point.getInstallType(), point.getInstalledDate(),
-                TraverseResponse.from(point.getTraverse())
+                TraverseResponse.from(point.getTraverse()),
+                point.getLastSurveyResult(), point.getLastSurveyedOn()
         );
     }
 }
