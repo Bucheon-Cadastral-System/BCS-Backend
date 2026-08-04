@@ -19,8 +19,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -139,32 +141,39 @@ public class ControlPointRegistrar {
 
     /**
      * 기존 점이 있으면 그 점을 파일 값으로 되살리고(갱신, id 보존), 없으면 새 점으로 만든다.
-     * 최종조사*는 파일에 값이 있을 때만 반영한다 — 그 열이 없는 파일(조사 대상지 등)이 기존 요약을 지우지 않게.
-     * 최종조사원은 파일에 없는 값이라 언제나 기존 값을 지킨다.
+     * 선택 항목은 값이 있을 때만 반영한다 — 열 없는 파일(최소 6열)과 입력 칸 없는 수동 등록이
+     * 기존 값을 지우지 않게. 빈 칸은 '모른다'이고, 지우기는 화면의 몫이다.
+     * 최종조사원은 파일·입력에 없는 값이라 언제나 기존 값을 지킨다.
      */
     private static ControlPoint toPoint(ControlPoint found, Row row) {
-        String lastResult = row.lastResult() != null
-                ? row.lastResult() : found != null ? found.getLastSurveyResult() : null;
-        LocalDate lastSurveyedOn = row.lastSurveyDate() != null
-                ? row.lastSurveyDate() : found != null ? found.getLastSurveyedOn() : null;
-        Long lastSurveyedById = found != null ? found.getLastSurveyedById() : null;
-        if (found == null) {
-            return ControlPoint.register(
-                    row.pointNo(), row.type(), row.name(), row.tm(), row.geo(),
-                    row.regionCode(), row.regionName(), row.address(),
-                    row.markerMaterial(), row.installType(), row.installedDate(), row.traverse(),
-                    lastResult, lastSurveyedOn, lastSurveyedById);
-        }
-        return ControlPoint.restore(
-                found.getId(), row.pointNo(), row.type(), row.name(), row.tm(), row.geo(),
-                row.regionCode(), row.regionName(), row.address(),
-                row.markerMaterial(), row.installType(), row.installedDate(), row.traverse(),
-                lastResult, lastSurveyedOn, lastSurveyedById);
+        return found == null
+                ? ControlPoint.register(
+                        row.pointNo(), row.type(), row.name(), row.tm(), row.geo(),
+                        row.regionCode(), row.regionName(), row.address(),
+                        row.markerMaterial(), row.installType(), row.installedDate(), row.traverse(),
+                        row.lastResult(), row.lastSurveyDate(), null)
+                : ControlPoint.restore(
+                        found.getId(), row.pointNo(), row.type(), row.name(), row.tm(), row.geo(),
+                        orKept(row.regionCode(), found, ControlPoint::getRegionCode),
+                        orKept(row.regionName(), found, ControlPoint::getRegionName),
+                        orKept(row.address(), found, ControlPoint::getAddress),
+                        orKept(row.markerMaterial(), found, ControlPoint::getMarkerMaterial),
+                        orKept(row.installType(), found, ControlPoint::getInstallType),
+                        orKept(row.installedDate(), found, ControlPoint::getInstalledDate),
+                        orKept(row.traverse(), found, ControlPoint::getTraverse),
+                        orKept(row.lastResult(), found, ControlPoint::getLastSurveyResult),
+                        orKept(row.lastSurveyDate(), found, ControlPoint::getLastSurveyedOn),
+                        found.getLastSurveyedById());
+    }
+
+    private static <T> T orKept(T fromRow, ControlPoint found, Function<ControlPoint, T> kept) {
+        return fromRow != null ? fromRow : kept.apply(found);
     }
 
     /**
      * 기존 점이 파일 행과 어디가 다른지 — 비어 있으면 갱신이 필요 없다(재사용).
      * 관리번호가 같아도 좌표·주소·설치정보가 바뀌었으면 그 항목이 담긴다.
+     * 선택 항목은 행에 값이 있을 때만 비교한다 — toPoint의 유지 규칙과 어긋나면 보여 준 것과 실제가 갈린다.
      * BigDecimal은 자릿수 차이를 무시하려 compareTo로 본다.
      *
      * 등록과 미리보기가 이 판정을 함께 쓴다 — 따로 두면 보여 준 것과 실제로 벌어지는 일이 어긋난다.
@@ -180,14 +189,27 @@ public class ControlPointRegistrar {
             changes.add(new FieldChange("Y좌표", p.getTm().easting().toPlainString(), row.tm().easting().toPlainString()));
         }
         addIfDiffers(changes, "경위도", geoText(p.getGeo()), geoText(row.geo()));
-        addIfDiffers(changes, "법정동코드", p.getRegionCode(), row.regionCode());
-        addIfDiffers(changes, "소재지", p.getRegionName(), row.regionName());
-        addIfDiffers(changes, "상세주소", p.getAddress(), row.address());
-        addIfDiffers(changes, "표지재질", p.getMarkerMaterial(), row.markerMaterial());
-        addIfDiffers(changes, "설치구분", p.getInstallType(), row.installType());
-        addIfDiffers(changes, "설치일자", p.getInstalledDate(), row.installedDate());
-        addIfDiffers(changes, "도선정보", p.getTraverse(), row.traverse());
-        // 최종조사*는 값이 있는 파일만 반영하므로(toPoint와 같은 규칙) 비어 있는 행은 차이로 세지 않는다
+        if (row.regionCode() != null) {
+            addIfDiffers(changes, "법정동코드", p.getRegionCode(), row.regionCode());
+        }
+        if (row.regionName() != null) {
+            addIfDiffers(changes, "소재지", p.getRegionName(), row.regionName());
+        }
+        if (row.address() != null) {
+            addIfDiffers(changes, "상세주소", p.getAddress(), row.address());
+        }
+        if (row.markerMaterial() != null) {
+            addIfDiffers(changes, "표지재질", p.getMarkerMaterial(), row.markerMaterial());
+        }
+        if (row.installType() != null) {
+            addIfDiffers(changes, "설치구분", p.getInstallType(), row.installType());
+        }
+        if (row.installedDate() != null) {
+            addIfDiffers(changes, "설치일자", p.getInstalledDate(), row.installedDate());
+        }
+        if (row.traverse() != null) {
+            addIfDiffers(changes, "도선정보", p.getTraverse(), row.traverse());
+        }
         if (row.lastResult() != null) {
             addIfDiffers(changes, "최종조사내용", p.getLastSurveyResult(), row.lastResult());
         }
@@ -229,7 +251,8 @@ public class ControlPointRegistrar {
     }
 
     private static String geoText(GeoCoordinate geo) {
-        return "%.6f, %.6f".formatted(geo.longitude(), geo.latitude());
+        // 소수 구분자가 쉼표인 로케일로 서버가 떠도 값이 흔들리지 않게 고정한다
+        return String.format(Locale.ROOT, "%.6f, %.6f", geo.longitude(), geo.latitude());
     }
 
 }

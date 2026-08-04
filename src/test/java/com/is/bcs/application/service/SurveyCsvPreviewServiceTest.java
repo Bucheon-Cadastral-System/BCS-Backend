@@ -25,14 +25,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 대상지 파일 미리보기 검증 — 등록하지 않고 건수·열 매핑·오류만 돌려준다. */
+/** 파일 미리보기 검증 — 대상지는 건수·열 매핑·오류를, 기준점은 저장소 대조(신규/갱신·충돌·행 경고)까지 돌려준다. */
 class SurveyCsvPreviewServiceTest {
 
     private final FakeControlPointStore pointStore = new FakeControlPointStore();
+    // 좌표계 정의는 초기화 이후 읽기만 하므로 하나를 나눠 쓴다
+    private final Proj4jCoordinateTransformer transformer = new Proj4jCoordinateTransformer();
     private final SurveyCsvPreviewService service = new SurveyCsvPreviewService(
             new SpreadsheetTableExtractor(),
-            new SurveyTargetMapper(new Proj4jCoordinateTransformer()),
-            new ControlPointFileMapper(new Proj4jCoordinateTransformer()),
+            new SurveyTargetMapper(transformer),
+            new ControlPointFileMapper(transformer),
             new ControlPointRegistrar(pointStore, pointStore));
 
     private byte[] sampleCsv() throws Exception {
@@ -148,7 +150,7 @@ class SurveyCsvPreviewServiceTest {
                 CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"));
         pointStore.save(ControlPoint.register(
                 "41192D000000003", PointType.DOGEUN, "그대로", tm,
-                new Proj4jCoordinateTransformer().toWgs84(tm),
+                transformer.toWgs84(tm),
                 null, null, null, null, null, null, null,
                 "망실", LocalDate.of(2025, 9, 8), null));
 

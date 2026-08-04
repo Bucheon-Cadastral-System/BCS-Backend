@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -385,8 +386,9 @@ public abstract class ImportFileMapper {
         if (ServiceArea.BUCHEON.contains(row.geo())) {
             return Optional.empty();
         }
-        return Optional.of("%s(이)가 %s 범위 밖입니다(위도 %.5f, 경도 %.5f) — 좌표계구분을 확인해 주세요."
-                .formatted(row.name(), ServiceArea.BUCHEON.name(), row.geo().latitude(), row.geo().longitude()));
+        return Optional.of(String.format(Locale.ROOT,
+                "%s(이)가 %s 범위 밖입니다(위도 %.5f, 경도 %.5f) — 좌표계구분을 확인해 주세요.",
+                row.name(), ServiceArea.BUCHEON.name(), row.geo().latitude(), row.geo().longitude()));
     }
 
     /** 해석하지 않는 열은 이름과 값을 적힌 그대로 옮긴다 — 뜻을 모르므로 형식 검사도 하지 않는다. */

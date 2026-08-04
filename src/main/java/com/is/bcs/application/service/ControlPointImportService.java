@@ -2,8 +2,12 @@ package com.is.bcs.application.service;
 
 import com.is.bcs.application.dto.ControlPointImportResult;
 import com.is.bcs.application.dto.ControlPointSeedResult;
+import com.is.bcs.application.dto.SeedControlPointsCommand;
+import com.is.bcs.application.dto.SeedControlPointsResult;
 import com.is.bcs.application.port.in.imports.ImportControlPointsUseCase;
 import com.is.bcs.application.port.in.imports.SeedControlPointsUseCase;
+import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
+import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.file.TableExtractor;
 import com.is.bcs.application.service.ImportFileMapper.MappingResult;
 import com.is.bcs.application.service.ImportFileMapper.Row;
@@ -28,6 +32,8 @@ public class ControlPointImportService implements ImportControlPointsUseCase, Se
     private final ControlPointFileMapper controlPointFileMapper;
     private final ControlPointRegistrar controlPointRegistrar;
     private final TransactionTemplate transactionTemplate;
+    private final LoadControlPointPort loadControlPointPort;
+    private final SaveControlPointPort saveControlPointPort;
 
     @Override
     public ControlPointImportResult importControlPoints(byte[] content) {
@@ -37,9 +43,21 @@ public class ControlPointImportService implements ImportControlPointsUseCase, Se
         return transactionTemplate.execute(status -> store(mapped.rows()));
     }
 
-    /** 시드는 읽히는 행만 넣는다 — 담당자가 올린 파일이 아니라 함께 배포되는 파일이라, 고칠 사람이 그 자리에 없다. */
     @Override
-    public ControlPointSeedResult seed(byte[] content) {
+    public SeedControlPointsResult seedIfEmpty(SeedControlPointsCommand command) {
+        if (loadControlPointPort.count() > 0) {
+            return SeedControlPointsResult.skipped();
+        }
+        // 성과 점을 먼저, 파일을 나중에 — 겹치는 점은 파일 값이 남는다
+        int basePoints = transactionTemplate.execute(status -> saveControlPointPort.saveAll(command.points())).size();
+        List<SeedControlPointsResult.FileSeed> files = command.files().stream()
+                .map(file -> new SeedControlPointsResult.FileSeed(file.name(), seed(file.content())))
+                .toList();
+        return new SeedControlPointsResult(true, basePoints, files);
+    }
+
+    /** 시드는 읽히는 행만 넣는다 — 담당자가 올린 파일이 아니라 함께 배포되는 파일이라, 고칠 사람이 그 자리에 없다. */
+    private ControlPointSeedResult seed(byte[] content) {
         MappingResult mapped = controlPointFileMapper.map(tableExtractor.extract(content));
         ControlPointImportResult stored = transactionTemplate.execute(status -> store(mapped.rows()));
 

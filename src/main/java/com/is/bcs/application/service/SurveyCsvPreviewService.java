@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -74,7 +75,8 @@ public class SurveyCsvPreviewService implements PreviewSurveyCsvUseCase, Preview
                 row.sourceRow(), row.pointNo(), row.type(), row.name(),
                 row.tm().crs().getDisplayName(),
                 row.tm().northing().toPlainString(), row.tm().easting().toPlainString(),
-                "%.6f".formatted(row.geo().longitude()), "%.6f".formatted(row.geo().latitude()),
+                String.format(Locale.ROOT, "%.6f", row.geo().longitude()),
+                String.format(Locale.ROOT, "%.6f", row.geo().latitude()),
                 action, changes, warning);
     }
 

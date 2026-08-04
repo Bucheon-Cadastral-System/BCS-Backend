@@ -4,6 +4,8 @@ import com.is.bcs.adapter.out.file.SpreadsheetTableExtractor;
 import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.ControlPointImportResult;
 import com.is.bcs.application.dto.ControlPointSeedResult;
+import com.is.bcs.application.dto.SeedControlPointsCommand;
+import com.is.bcs.application.dto.SeedControlPointsResult;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
@@ -18,8 +20,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,7 +39,7 @@ class ControlPointImportServiceTest {
             new SpreadsheetTableExtractor(),
             new ControlPointFileMapper(new Proj4jCoordinateTransformer()),
             new ControlPointRegistrar(store, store),
-            directTransaction());
+            directTransaction(), store, store);
 
     private byte[] read(String resource) throws Exception {
         try (var in = getClass().getResourceAsStream(resource)) {
@@ -90,19 +95,55 @@ class ControlPointImportServiceTest {
     }
 
     @Test
-    @DisplayName("시드는 넣은 뒤 확인이 필요한 행을 사유와 함께 알린다")
+    @DisplayName("시드는 비어 있을 때만 넣고, 확인이 필요한 행을 파일 이름·사유와 함께 알린다")
     void seed_reportsRowsToCheck() throws Exception {
-        ControlPointSeedResult result = service.seed(read(CUSTOMER_FILE));
+        SeedControlPointsResult result = service.seedIfEmpty(new SeedControlPointsCommand(
+                List.of(), List.of(new SeedControlPointsCommand.SeedFile("정리분", read(CUSTOMER_FILE)))));
 
-        assertEquals(107, result.seeded());
-        assertTrue(result.skipped().isEmpty());
-        assertEquals(1, result.warnings().size());
-        assertTrue(result.warnings().getFirst().startsWith("76행: "), result.warnings().getFirst());
+        assertTrue(result.seeded());
+        ControlPointSeedResult file = result.files().getFirst().result();
+        assertEquals(107, file.seeded());
+        assertTrue(file.skipped().isEmpty());
+        assertEquals(1, file.warnings().size());
+        assertTrue(file.warnings().getFirst().startsWith("76행: "), file.warnings().getFirst());
         // 도근점만 있는 성과 파일과 달리 삼각보조점이 섞여 있다 — 종류 어휘가 그대로 읽혔는지 함께 본다
         assertEquals(4L, store.countByType().get(PointType.TRIANGULATION_AUX));
     }
 
+    @Test
+    @DisplayName("기준점이 이미 있으면 시드는 아무것도 하지 않는다")
+    void seed_nonEmptyStore_skips() throws Exception {
+        service.importControlPoints(read(CUSTOMER_FILE));
+
+        SeedControlPointsResult result = service.seedIfEmpty(new SeedControlPointsCommand(
+                List.of(), List.of(new SeedControlPointsCommand.SeedFile("정리분", read(CUSTOMER_FILE)))));
+
+        assertFalse(result.seeded());
+        assertEquals(107, store.count());
+    }
+
     /** 페이크 저장소에는 트랜잭션이 없다 — 경계만 통과시키고 커밋·롤백은 하지 않는다. */
+    @Test
+    @DisplayName("선택 열이 없는 파일은 기존 점의 선택 항목을 지우지 않는다 — 값이 같으면 갱신도 아니다")
+    void importControlPoints_minimalColumns_keepExistingOptionalValues() {
+        String full = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,상세주소,표지재질,최종조사내용
+                41192D000000002,도근점,보존,세계,545100,181100,경기도 부천시 어딘가,철재,망실
+                """;
+        service.importControlPoints(full.getBytes(StandardCharsets.UTF_8));
+
+        String minimal = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                41192D000000002,도근점,보존,세계,545100,181100
+                """;
+        ControlPointImportResult second = service.importControlPoints(minimal.getBytes(StandardCharsets.UTF_8));
+
+        ControlPoint kept = store.findByNameAndType("보존", PointType.DOGEUN).orElseThrow();
+        assertEquals("경기도 부천시 어딘가", kept.getAddress());
+        assertEquals("망실", kept.getLastSurveyResult());
+        assertEquals(0, second.updatedPoints()); // 지워지지 않으므로 갱신도 아니다
+    }
+
     @Test
     @DisplayName("최종조사 열이 있는 파일은 요약을 채우고, 그 열이 없는 파일이 와도 지우지 않는다")
     void importControlPoints_lastSurveyMergeRule() {

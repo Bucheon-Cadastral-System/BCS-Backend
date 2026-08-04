@@ -81,6 +81,26 @@ class ControlPointServiceTest {
     }
 
     @Test
+    @DisplayName("입력 칸에 없는 선택 항목은 등록이 지우지 않는다 — 성과까지 같으면 갱신도 아니다")
+    void register_withoutOptionalFields_keepsExistingValues() {
+        service.register(csvRow1Command());
+
+        RegisterControlPointCommand bare = new RegisterControlPointCommand(
+                "41192D000001265", PointType.DOGEUN, "1465공",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545236.77"), new BigDecimal("181840.96"),
+                null, null, null, null, null, null, null
+        );
+        RegisterControlPointResult result = service.register(bare);
+
+        assertFalse(result.created());
+        assertFalse(result.updated());
+        assertEquals("경기도 부천시 춘의동 102-16", result.point().getAddress());
+        assertEquals(MarkerMaterial.STEEL, result.point().getMarkerMaterial());
+        assertEquals(LocalDate.of(2018, 2, 21), result.point().getInstalledDate());
+    }
+
+    @Test
     @DisplayName("값까지 같은 점을 다시 등록하면 아무것도 바꾸지 않고 그 점을 돌려준다")
     void register_identicalPoint_reusesWithoutChange() {
         service.register(csvRow1Command());

@@ -27,12 +27,12 @@ class ControlPointSeedRunnerTest {
     private static final int DOGEUN_SEED_POINTS = 2146;
 
     private final FakeControlPointStore store = new FakeControlPointStore();
-    private final ControlPointSeedRunner runner = new ControlPointSeedRunner(store, store,
+    private final ControlPointSeedRunner runner = new ControlPointSeedRunner(
             new ControlPointImportService(
                     new SpreadsheetTableExtractor(),
                     new ControlPointFileMapper(new Proj4jCoordinateTransformer()),
                     new ControlPointRegistrar(store, store),
-                    directTransaction()));
+                    directTransaction(), store, store));
 
     @Test
     @DisplayName("기준점이 하나도 없으면 도근점 성과와 고객사 파일을 함께 등록한다")

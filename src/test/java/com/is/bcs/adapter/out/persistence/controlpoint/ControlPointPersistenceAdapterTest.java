@@ -50,6 +50,24 @@ class ControlPointPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("성과 좌표는 DB 왕복 후에도 소수 4자리 스케일까지 보존된다")
+    void save_keepsCoordinateScaleThroughDatabase() {
+        ControlPoint saved = adapter.save(ControlPoint.register(
+                "41192D000009998", PointType.DOGEUN, "스케일",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545236.7712"), new BigDecimal("181840.9605")),
+                new GeoCoordinate(126.794623, 37.506423),
+                null, null, null, null, null, null, null, null, null, null));
+        repository.flush();
+
+        ControlPoint found = adapter.findById(saved.getId()).orElseThrow();
+
+        // compareTo는 스케일을 무시하므로 equals로 자릿수까지 본다 — 컬럼 scale이 짧으면 여기서 걸린다
+        assertEquals(new BigDecimal("545236.7712"), found.getTm().northing());
+        assertEquals(new BigDecimal("181840.9605"), found.getTm().easting());
+    }
+
+    @Test
     @DisplayName("이름이나 관리번호가 겹치는 점을 한 번에 조회한다 — 임포트가 행마다 찾지 않도록")
     void findAllByNameInOrPointNoIn_returnsMatchingPoints() {
         adapter.save(csvRow1());

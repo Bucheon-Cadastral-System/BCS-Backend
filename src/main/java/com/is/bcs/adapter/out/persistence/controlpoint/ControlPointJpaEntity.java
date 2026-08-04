@@ -110,8 +110,8 @@ public class ControlPointJpaEntity extends BaseTime {
     @Column(name = "traverse_intersection")
     private Boolean traverseIntersection;
 
-    // 파일 문구 그대로 — 어휘를 강제하면 "망실,안보임" 같은 실제 값이 거부된다
-    @Column(name = "last_survey_result", length = 100)
+    // 파일 문구 그대로 — 어휘를 강제하면 "망실,안보임" 같은 실제 값이 거부되고, 길이를 자르면 보존이 깨진다
+    @Column(name = "last_survey_result", columnDefinition = "text")
     private String lastSurveyResult;
 
     @Column(name = "last_surveyed_on")

@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -51,8 +52,8 @@ public class ControlPointService implements RegisterControlPointUseCase, GetCont
 
         // 부천 밖이어도 등록은 한다(관리 지역이 넓어질 수 있다) — 좌표계·성과를 확인하라는 요청만 함께 보낸다
         String warning = ServiceArea.BUCHEON.contains(geo) ? null
-                : "%s 범위 밖 좌표입니다(위도 %.5f, 경도 %.5f) — 원점과 성과를 확인해 주세요."
-                        .formatted(ServiceArea.BUCHEON.name(), geo.latitude(), geo.longitude());
+                : String.format(Locale.ROOT, "%s 범위 밖 좌표입니다(위도 %.5f, 경도 %.5f) — 원점과 성과를 확인해 주세요.",
+                        ServiceArea.BUCHEON.name(), geo.latitude(), geo.longitude());
         return new RegisterControlPointResult(
                 result.pointOf(row), result.newPoints() == 1, result.updatedPoints() == 1, warning);
     }
