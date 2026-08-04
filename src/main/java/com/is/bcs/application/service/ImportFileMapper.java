@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -136,6 +137,12 @@ public abstract class ImportFileMapper {
      * 없는 열로 가려내는 것과 방향이 반대이고, 저만의 열이 없는 서식은 이쪽으로만 가려낼 수 있다.
      */
     protected abstract List<String> foreignColumns();
+
+    /**
+     * 표기 흔들림으로 보는 문자 — 정규화가 셀마다 불리므로 패턴은 한 번만 만든다.
+     * 아래 정적 사전들이 초기화 중에 normalize를 부르므로 이 상수는 그보다 앞에 있어야 한다.
+     */
+    private static final Pattern DECORATION = Pattern.compile("[\\s()\\[\\]_.\\-/]");
 
     /** 이 매퍼가 읽을 줄 아는 항목 전부 — 여기 없는 열은 무시된다. */
     private static final List<String> KNOWN_COLUMNS = List.of(
@@ -339,9 +346,9 @@ public abstract class ImportFileMapper {
         return ALIASES.getOrDefault(normalizedHeader, normalizedHeader);
     }
 
-    /** 띄어쓰기·괄호·기호는 표기 흔들림일 뿐이므로 지우고 비교한다. */
+    /** 띄어쓰기·괄호·기호는 표기 흔들림일 뿐이므로 지우고 비교한다. 소문자화는 서버 로케일과 무관하게 고정한다. */
     private static String normalize(String header) {
-        return header.replaceAll("[\\s()\\[\\]_.\\-/]", "").toLowerCase();
+        return DECORATION.matcher(header).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
     private Row mapRow(int sourceRow,
