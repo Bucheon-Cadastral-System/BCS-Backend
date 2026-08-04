@@ -34,7 +34,7 @@ class DogeunSeedCsvTest {
         assertEquals("1254", first.getName());
         assertEquals(126.7939202, first.getGeo().longitude());
         assertEquals(37.494528, first.getGeo().latitude());
-        assertEquals(new BigDecimal("181706.08"), first.getTm().easting());
-        assertEquals(new BigDecimal("443611.77"), first.getTm().northing());
+        assertEquals(0, new BigDecimal("181706.08").compareTo(first.getTm().easting()));
+        assertEquals(0, new BigDecimal("443611.77").compareTo(first.getTm().northing()));
     }
 }
