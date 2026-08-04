@@ -319,7 +319,7 @@ class SurveyServiceTest {
             long id = record.getId() != null ? record.getId() : ++recordSeq;
             SurveyRecord saved = SurveyRecord.restore(
                     id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), null);
+                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
             records.put(id, saved);
             return saved;
         }

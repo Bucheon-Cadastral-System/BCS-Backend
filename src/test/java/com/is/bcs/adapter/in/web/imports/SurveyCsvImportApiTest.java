@@ -79,6 +79,16 @@ class SurveyCsvImportApiTest {
         assertTrue(bodyOf(projects).contains("\"content\":[]"), bodyOf(projects));
     }
 
+
+    @Test
+    @DisplayName("같은 기준점 파일을 다시 올리면 새 점이 없어 200으로 끝난다")
+    void importControlPointsTwice_secondReturns200() throws Exception {
+        mockMvc.perform(multipart("/api/imports/control-points").file(sampleFile()))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(multipart("/api/imports/control-points").file(sampleFile()))
+                .andExpect(status().isOk());
+    }
     @Test
     @DisplayName("실파일 업로드 — 201과 요약(49점·조사 44건), 프로젝트·기준점·기록이 조회된다")
     void importRealFile_endToEnd() throws Exception {

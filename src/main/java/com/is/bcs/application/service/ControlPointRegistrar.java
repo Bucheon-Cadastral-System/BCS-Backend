@@ -40,7 +40,13 @@ public class ControlPointRegistrar {
     public record Result(Map<String, ControlPoint> byKey, int newPoints, int updatedPoints, int existingPoints) {
 
         public ControlPoint pointOf(Row row) {
-            return byKey.get(pointKey(row.name(), row.type()));
+            ControlPoint point = byKey.get(pointKey(row.name(), row.type()));
+            if (point == null) {
+                // 파일 내 중복은 매퍼가 걸러 여기 올 수 없다 — 온다면 내부 불변식이 깨진 것이라 행을 밝혀 남긴다
+                throw new IllegalStateException(
+                        row.sourceRow() + "행의 기준점을 저장 결과에서 찾지 못했습니다: " + row.name());
+            }
+            return point;
         }
     }
 
@@ -86,7 +92,7 @@ public class ControlPointRegistrar {
             rejectIfPointNoTaken(row, found, candidates.pointNoOwner(row));
             if (found == null) {
                 toRegister.add(toPoint(null, row));
-            } else if (unchanged(found, row)) {
+            } else if (changes(found, row).isEmpty()) {
                 resolved.put(pointKey(row.name(), row.type()), found); // 성과·속성이 파일과 동일 — 재사용
             } else {
                 // 기존 점의 성과·속성이 파일과 다르면(관리번호가 같아도) 파일의 확정값으로 갱신하고 id는 보존
@@ -229,7 +235,4 @@ public class ControlPointRegistrar {
         return "%.6f, %.6f".formatted(geo.longitude(), geo.latitude());
     }
 
-    private static boolean unchanged(ControlPoint p, Row row) {
-        return changes(p, row).isEmpty();
-    }
 }

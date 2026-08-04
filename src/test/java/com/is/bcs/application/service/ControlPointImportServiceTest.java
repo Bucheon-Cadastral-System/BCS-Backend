@@ -80,8 +80,9 @@ class ControlPointImportServiceTest {
     }
 
     @Test
-    @DisplayName("관리 지역을 벗어난 좌표는 등록하되 확인할 행으로 알린다")
-    void importControlPoints_outsideServiceArea_warnsWithoutBlocking() throws Exception {
+    // 경고 내용 자체는 시드 결과(seed_reportsRowsToCheck)와 미리보기 검증이 본다 — 여기서는 등록되는 것만 확인한다
+    @DisplayName("관리 지역을 벗어난 좌표도 행이 거부되지 않고 등록된다")
+    void importControlPoints_outsideServiceArea_registers() throws Exception {
         ControlPointImportResult result = service.importControlPoints(read(CUSTOMER_FILE));
 
         assertEquals(107, result.totalRows());
@@ -102,23 +103,6 @@ class ControlPointImportServiceTest {
     }
 
     /** 페이크 저장소에는 트랜잭션이 없다 — 경계만 통과시키고 커밋·롤백은 하지 않는다. */
-    private static TransactionTemplate directTransaction() {
-        return new TransactionTemplate(new PlatformTransactionManager() {
-
-            @Override
-            public TransactionStatus getTransaction(TransactionDefinition definition) {
-                return new SimpleTransactionStatus();
-            }
-
-            @Override
-            public void commit(TransactionStatus status) {
-            }
-
-            @Override
-            public void rollback(TransactionStatus status) {
-            }
-        });
-    }
     @Test
     @DisplayName("최종조사 열이 있는 파일은 요약을 채우고, 그 열이 없는 파일이 와도 지우지 않는다")
     void importControlPoints_lastSurveyMergeRule() {
@@ -141,5 +125,23 @@ class ControlPointImportServiceTest {
         assertEquals("망실", kept.getLastSurveyResult()); // 열이 없다 = 모른다 — 지우지 않는다
         assertEquals(LocalDate.of(2025, 9, 8), kept.getLastSurveyedOn());
         assertEquals(0, second.updatedPoints()); // 지워지지 않으므로 갱신도 아니다
+    }
+
+    private static TransactionTemplate directTransaction() {
+        return new TransactionTemplate(new PlatformTransactionManager() {
+
+            @Override
+            public TransactionStatus getTransaction(TransactionDefinition definition) {
+                return new SimpleTransactionStatus();
+            }
+
+            @Override
+            public void commit(TransactionStatus status) {
+            }
+
+            @Override
+            public void rollback(TransactionStatus status) {
+            }
+        });
     }
 }

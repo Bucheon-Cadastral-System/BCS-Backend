@@ -31,7 +31,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 대상지 표의 각 행을 도메인 값으로 읽는다.
+ * 업로드된 표의 각 행을 도메인 값으로 읽는 공통 기반 — 서식별 차이(요구·기대·구분 열)는 하위 클래스가 정한다.
  * 열은 위치가 아니라 이름으로 찾는다 — 고객사가 기본 양식에 열을 더하거나 빼도 그대로 읽히게.
  *
  * 기본 양식의 열만 도메인 필드로 해석하고, 그 밖의 열은 뜻을 묻지 않고 이름·값 그대로 넘긴다(extras).
@@ -358,8 +358,8 @@ public abstract class ImportFileMapper {
                 require(cell(cells, columns, NAME), NAME),
                 tm,
                 coordinateTransformer.toWgs84(tm),
-                optionalNumber(cell(cells, columns, LONGITUDE), "경도"),
-                optionalNumber(cell(cells, columns, LATITUDE), "위도"),
+                optionalNumber(cell(cells, columns, LONGITUDE), LONGITUDE),
+                optionalNumber(cell(cells, columns, LATITUDE), LATITUDE),
                 regionCode,
                 regionName,
                 cell(cells, columns, ADDRESS),

@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.imports;
 
+import com.is.bcs.application.dto.ControlPointImportResult;
 import com.is.bcs.application.dto.ImportSurveyCsvCommand;
 import com.is.bcs.application.dto.SurveyCsvImportResult;
 import com.is.bcs.application.port.in.imports.ImportControlPointsUseCase;
@@ -67,7 +68,9 @@ public class ImportController {
     @PostMapping("/control-points")
     public ResponseEntity<ControlPointImportResponse> importControlPoints(@RequestPart("file") MultipartFile file)
             throws IOException {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ControlPointImportResponse.from(importControlPointsUseCase.importControlPoints(file.getBytes())));
+        ControlPointImportResult result = importControlPointsUseCase.importControlPoints(file.getBytes());
+        // 새 점이 없으면 만든 자원이 없다 — 갱신·재사용뿐인 업로드는 200(수동 등록의 created 분기와 같은 규칙)
+        return ResponseEntity.status(result.newPoints() > 0 ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(ControlPointImportResponse.from(result));
     }
 }

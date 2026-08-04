@@ -17,13 +17,14 @@ class SurveyRecordTest {
     @Test
     @DisplayName("조사기록 생성 — 프로젝트×기준점·결과·조사 시각을 갖는다")
     void create_keepsAttributes() {
-        SurveyRecord record = SurveyRecord.create(1L, 10L, SurveyResult.INTACT, SURVEYED_AT, "대상(2건)", null);
+        SurveyRecord record = SurveyRecord.create(1L, 10L, SurveyResult.INTACT, SURVEYED_AT, "대상(2건)", 5L);
 
         assertEquals(1L, record.getProjectId());
         assertEquals(10L, record.getPointId());
         assertEquals(SurveyResult.INTACT, record.getResult());
         assertEquals(SURVEYED_AT, record.getSurveyedAt());
         assertEquals("대상(2건)", record.getNote());
+        assertEquals(5L, record.getSurveyedById());
         assertFalse(record.isLost());
     }
 

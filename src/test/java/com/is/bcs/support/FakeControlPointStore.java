@@ -70,6 +70,7 @@ public class FakeControlPointStore implements LoadControlPointPort, SaveControlP
     @Override
     public ControlPoint save(ControlPoint point) {
         long id = point.getId() != null ? point.getId() : ++sequence;
+        sequence = Math.max(sequence, id); // 복원 점을 저장해도 다음 id가 그 뒤에서 발급되게
         ControlPoint saved = ControlPoint.restore(
                 id, point.getPointNo(), point.getType(), point.getName(),
                 point.getTm(), point.getGeo(),

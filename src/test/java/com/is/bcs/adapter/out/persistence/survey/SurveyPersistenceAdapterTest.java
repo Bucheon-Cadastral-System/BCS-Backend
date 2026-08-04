@@ -70,11 +70,12 @@ class SurveyPersistenceAdapterTest {
     void saveAndFindRecord_preservesAttributes() {
         SurveyProject project = savedProject();
 
-        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, "대상(2건)", null));
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, "대상(2건)", 5L));
 
         SurveyRecord found = adapter.findRecordByProjectIdAndPointId(project.getId(), 10L).orElseThrow();
         assertEquals(SurveyResult.LOST, found.getResult());
         assertEquals("대상(2건)", found.getNote());
+        assertEquals(5L, found.getSurveyedById());
         // timestamptz는 instant 보존(offset은 정규화될 수 있음) — 같은 순간인지로 비교
         assertTrue(found.getSurveyedAt().isEqual(SURVEYED_AT));
         assertEquals(1, adapter.findRecordsByProjectId(project.getId()).size());
