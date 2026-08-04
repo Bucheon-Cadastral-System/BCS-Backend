@@ -29,7 +29,7 @@ class ControlPointJpaEntityTest {
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", null, null, false)
-        );
+        , null, null, null);
     }
 
     @Test
@@ -44,8 +44,8 @@ class ControlPointJpaEntityTest {
         assertEquals(PointType.DOGEUN, restored.getType());
         assertEquals("1465공", restored.getName());
         assertEquals(CoordinateSystem.GRS80_CENTRAL, restored.getTm().crs());
-        assertEquals(new BigDecimal("545236.77"), restored.getTm().northing());
-        assertEquals(new BigDecimal("181840.96"), restored.getTm().easting());
+        assertEquals(0, new BigDecimal("545236.77").compareTo(restored.getTm().northing()));
+        assertEquals(0, new BigDecimal("181840.96").compareTo(restored.getTm().easting()));
         assertEquals(126.794623, restored.getGeo().longitude());
         assertEquals(37.506423, restored.getGeo().latitude());
         assertEquals("10300", restored.getRegionCode());
@@ -66,7 +66,7 @@ class ControlPointJpaEntityTest {
                         new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
                 null, null, null, null, null, null, null
-        );
+        , null, null, null);
 
         ControlPoint restored = ControlPointJpaEntity.fromDomain(origin).toDomain();
 

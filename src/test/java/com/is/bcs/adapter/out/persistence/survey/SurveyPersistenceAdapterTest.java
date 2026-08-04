@@ -70,7 +70,7 @@ class SurveyPersistenceAdapterTest {
     void saveAndFindRecord_preservesAttributes() {
         SurveyProject project = savedProject();
 
-        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, "대상(2건)"));
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, "대상(2건)", null));
 
         SurveyRecord found = adapter.findRecordByProjectIdAndPointId(project.getId(), 10L).orElseThrow();
         assertEquals(SurveyResult.LOST, found.getResult());
@@ -84,7 +84,7 @@ class SurveyPersistenceAdapterTest {
     @DisplayName("조사기록을 프로젝트×기준점으로 삭제한다")
     void deleteByProjectIdAndPointId_removesRecord() {
         SurveyProject project = savedProject();
-        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null, null));
 
         adapter.deleteByProjectIdAndPointId(project.getId(), 10L);
 
@@ -95,10 +95,10 @@ class SurveyPersistenceAdapterTest {
     @DisplayName("같은 프로젝트×기준점의 조사기록은 두 번 만들 수 없다")
     void duplicateProjectPoint_rejected() {
         SurveyProject project = savedProject();
-        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null, null));
 
         assertThrows(DataIntegrityViolationException.class, () -> {
-            adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, null));
+            adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.LOST, SURVEYED_AT, null, null));
             recordRepository.flush(); // 유니크 제약은 flush 시점에 검증된다
         });
     }
@@ -111,12 +111,12 @@ class SurveyPersistenceAdapterTest {
         for (long pointId : new long[]{10L, 11L, 12L}) {
             targetAdapter.save(SurveyTarget.create(project.getId(), pointId));
         }
-        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null));
-        adapter.save(SurveyRecord.create(project.getId(), 11L, SurveyResult.LOST, SURVEYED_AT, null));
-        adapter.save(SurveyRecord.create(project.getId(), 12L, SurveyResult.INTACT, SURVEYED_AT, null));
-        adapter.save(SurveyRecord.create(other.getId(), 10L, SurveyResult.ETC, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(project.getId(), 10L, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        adapter.save(SurveyRecord.create(project.getId(), 11L, SurveyResult.LOST, SURVEYED_AT, null, null));
+        adapter.save(SurveyRecord.create(project.getId(), 12L, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        adapter.save(SurveyRecord.create(other.getId(), 10L, SurveyResult.ETC, SURVEYED_AT, null, null));
         // 대상으로 지정되지 않은 점의 기록 — 진행률이 오탐되지 않도록 집계에서 빠져야 한다
-        adapter.save(SurveyRecord.create(project.getId(), 13L, SurveyResult.INTACT, SURVEYED_AT, null));
+        adapter.save(SurveyRecord.create(project.getId(), 13L, SurveyResult.INTACT, SURVEYED_AT, null, null));
 
         Map<SurveyResult, Long> counts = adapter.countByResult(project.getId());
 

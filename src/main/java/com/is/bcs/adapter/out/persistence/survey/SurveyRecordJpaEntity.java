@@ -57,9 +57,12 @@ public class SurveyRecordJpaEntity extends BaseTime {
     @Column(name = "note")
     private String note;
 
+    @Column(name = "surveyed_by")
+    private Long surveyedById;
+
     private SurveyRecordJpaEntity(
             Long id, Long projectId, Long pointId,
-            SurveyResult result, OffsetDateTime surveyedAt, String note
+            SurveyResult result, OffsetDateTime surveyedAt, String note, Long surveyedById
     ) {
         this.id = id;
         this.projectId = projectId;
@@ -67,15 +70,16 @@ public class SurveyRecordJpaEntity extends BaseTime {
         this.result = result;
         this.surveyedAt = surveyedAt;
         this.note = note;
+        this.surveyedById = surveyedById;
     }
 
     public static SurveyRecordJpaEntity fromDomain(SurveyRecord record) {
         return new SurveyRecordJpaEntity(
                 record.getId(), record.getProjectId(), record.getPointId(),
-                record.getResult(), record.getSurveyedAt(), record.getNote());
+                record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
     }
 
     public SurveyRecord toDomain() {
-        return SurveyRecord.restore(id, projectId, pointId, result, surveyedAt, note);
+        return SurveyRecord.restore(id, projectId, pointId, result, surveyedAt, note, surveyedById);
     }
 }
