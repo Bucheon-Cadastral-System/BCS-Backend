@@ -65,6 +65,21 @@ class SurveyCsvImportApiTest {
     }
 
     @Test
+    @DisplayName("기준점만 업로드 — 201과 등록 건수를 돌려주고 조사는 만들지 않는다")
+    void importControlPoints_withoutProject() throws Exception {
+        MvcResult result = mockMvc.perform(multipart("/api/imports/control-points").file(sampleFile()))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"totalRows\":49"), body);
+        assertTrue(body.contains("\"newPoints\":49"), body);
+
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects")).andExpect(status().isOk()).andReturn();
+        assertTrue(bodyOf(projects).contains("\"content\":[]"), bodyOf(projects));
+    }
+
+    @Test
     @DisplayName("실파일 업로드 — 201과 요약(49점·조사 44건), 프로젝트·기준점·기록이 조회된다")
     void importRealFile_endToEnd() throws Exception {
         MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv")
