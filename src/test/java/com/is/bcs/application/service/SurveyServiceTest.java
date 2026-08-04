@@ -319,7 +319,7 @@ class SurveyServiceTest {
             long id = record.getId() != null ? record.getId() : ++recordSeq;
             SurveyRecord saved = SurveyRecord.restore(
                     id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote());
+                    record.getResult(), record.getSurveyedAt(), record.getNote(), null);
             records.put(id, saved);
             return saved;
         }
@@ -360,7 +360,7 @@ class SurveyServiceTest {
                     new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                             new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                     new GeoCoordinate(126.79, 37.50),
-                    null, null, null, null, null, null, null));
+                    null, null, null, null, null, null, null, null, null, null));
         }
 
         @Override

@@ -7,7 +7,7 @@ import com.is.bcs.domain.survey.SurveyResult;
 public record SurveyProgressSummary(
         String projectName, long totalPoints,
         long surveyedPoints, long notSurveyedPoints,
-        long intactPoints, long lostPoints, long etcPoints
+        long intactPoints, long lostPoints, long unavailablePoints, long etcPoints
 ) {
 
     public static SurveyProgressSummary from(SurveyProgress progress) {
@@ -18,6 +18,7 @@ public record SurveyProgressSummary(
                 progress.surveyedPoints(), progress.notSurveyedPoints(),
                 progress.countByResult().getOrDefault(SurveyResult.INTACT, 0L),
                 progress.countByResult().getOrDefault(SurveyResult.LOST, 0L),
+                progress.countByResult().getOrDefault(SurveyResult.UNAVAILABLE, 0L),
                 progress.countByResult().getOrDefault(SurveyResult.ETC, 0L));
     }
 }

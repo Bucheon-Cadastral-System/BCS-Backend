@@ -13,6 +13,8 @@ public enum SurveyResult {
 
     INTACT("완전"),
     LOST("망실"),
+    /** 접근이 막혀 있는 등의 사유로 확인하지 못한 점 — 없어진 것이 아니므로 망실과 가른다. */
+    UNAVAILABLE("조사불가"),
     ETC("기타");
 
     private final String displayName;

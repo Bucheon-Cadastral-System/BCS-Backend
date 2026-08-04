@@ -12,6 +12,7 @@ import java.util.Objects;
  * 식별은 이름이 아니라 관리번호(pointNo)로 한다 — 이름은 중복 가능성이 있어 식별자로 쓰지 않는다.
  * 망실 여부는 이 애그리거트에 없다 — 망실은 시점·프로젝트마다 다른 조사 결과이므로
  * 조사기록(SurveyRecord)이 소유한다.
+ * 최종조사*는 그 규칙의 예외가 아니라 최근 조사의 요약(비정규화 표시값)이다 — 권위는 파일·조사기록에 있다.
  */
 @Getter
 public class ControlPoint {
@@ -33,6 +34,10 @@ public class ControlPoint {
     private LocalDate installedDate; // 설치일자(원천이 날짜라 LocalDate — 시각으로 바꾸면 UTC 정규화 때 날짜가 밀린다)
     private TraverseInfo traverse; // 도선 정보 — 도근점 외에는 null
 
+    private String lastSurveyResult; // 최종조사내용 — 파일 문구 그대로("망실,안보임" 같은 자유 표기가 실재해 어휘를 강제하지 않는다)
+    private LocalDate lastSurveyedOn; // 최종조사일
+    private Long lastSurveyedById; // 최종조사원(회원 id) — 파일에는 없는 값이라 앱 내 조사 기록이 채운다(인증 전 null)
+
     private ControlPoint(
             Long id,
             String pointNo,
@@ -46,7 +51,10 @@ public class ControlPoint {
             MarkerMaterial markerMaterial,
             InstallType installType,
             LocalDate installedDate,
-            TraverseInfo traverse
+            TraverseInfo traverse,
+            String lastSurveyResult,
+            LocalDate lastSurveyedOn,
+            Long lastSurveyedById
     ) {
         this.id = id;
         this.pointNo = requireText(pointNo, "관리번호");
@@ -61,6 +69,9 @@ public class ControlPoint {
         this.installType = installType;
         this.installedDate = installedDate;
         this.traverse = traverse;
+        this.lastSurveyResult = lastSurveyResult;
+        this.lastSurveyedOn = lastSurveyedOn;
+        this.lastSurveyedById = lastSurveyedById;
     }
 
     /** 신규 등록(데이터 임포트 포함). */
@@ -76,11 +87,15 @@ public class ControlPoint {
             MarkerMaterial markerMaterial,
             InstallType installType,
             LocalDate installedDate,
-            TraverseInfo traverse
+            TraverseInfo traverse,
+            String lastSurveyResult,
+            LocalDate lastSurveyedOn,
+            Long lastSurveyedById
     ) {
         return new ControlPoint(
                 null, pointNo, type, name, tm, geo,
-                regionCode, regionName, address, markerMaterial, installType, installedDate, traverse
+                regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
+                lastSurveyResult, lastSurveyedOn, lastSurveyedById
         );
     }
 
@@ -98,11 +113,15 @@ public class ControlPoint {
             MarkerMaterial markerMaterial,
             InstallType installType,
             LocalDate installedDate,
-            TraverseInfo traverse
+            TraverseInfo traverse,
+            String lastSurveyResult,
+            LocalDate lastSurveyedOn,
+            Long lastSurveyedById
     ) {
         return new ControlPoint(
                 id, pointNo, type, name, tm, geo,
-                regionCode, regionName, address, markerMaterial, installType, installedDate, traverse
+                regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
+                lastSurveyResult, lastSurveyedOn, lastSurveyedById
         );
     }
 
