@@ -74,6 +74,20 @@ public abstract class ImportFileMapper {
             String note,
             List<ExtraColumn> extras
     ) {
+
+        /**
+         * 수동 등록 한 점 — 파일에만 있는 항목(대조용 경위도·조사 이력·비고·보관 열)은 없다.
+         * 위치 인자 21개를 밖에서 늘어놓으면 같은 타입끼리 자리가 어긋나도 컴파일이 잡지 못한다.
+         */
+        public static Row manual(
+                String pointNo, PointType type, String name, TmCoordinate tm, GeoCoordinate geo,
+                String regionCode, String regionName, String address,
+                MarkerMaterial markerMaterial, InstallType installType, LocalDate installedDate,
+                TraverseInfo traverse) {
+            return new Row(0, pointNo, type, name, tm, geo, null, null,
+                    regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
+                    null, null, null, null, null, List.of());
+        }
     }
 
     /** 표준 열 이름 — 오류 메시지에도 이 이름으로 나간다. */
@@ -358,7 +372,7 @@ public abstract class ImportFileMapper {
                 pointType(cell(cells, columns, TYPE)),
                 require(cell(cells, columns, NAME), NAME),
                 tm,
-                coordinateTransformer.toWgs84(tm),
+                deriveGeo(coordinateTransformer, tm),
                 optionalNumber(cell(cells, columns, LONGITUDE), LONGITUDE),
                 optionalNumber(cell(cells, columns, LATITUDE), LATITUDE),
                 regionCode,
@@ -375,6 +389,22 @@ public abstract class ImportFileMapper {
                 cell(cells, columns, TARGET_NOTE),
                 extras(cells, headers, extraPositions)
         );
+    }
+
+    /**
+     * 성과에서 경위도를 파생한다 — 황당한 성과 값은 투영 계산 자체가 실패할 수 있어,
+     * 라이브러리 예외를 행 오류 어휘(InvalidControlPointException)로 바꾼다. 범위·유한성 검증은 GeoCoordinate가 한다.
+     */
+    public static GeoCoordinate deriveGeo(CoordinateTransformer transformer, TmCoordinate tm) {
+        try {
+            return transformer.toWgs84(tm);
+        } catch (InvalidControlPointException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new InvalidControlPointException(
+                    "좌표를 변환할 수 없습니다: X " + tm.northing().toPlainString()
+                            + ", Y " + tm.easting().toPlainString());
+        }
     }
 
     /**

@@ -6,6 +6,7 @@ import com.is.bcs.application.service.ControlPointFileMapper;
 import com.is.bcs.application.service.ControlPointImportService;
 import com.is.bcs.application.service.ControlPointRegistrar;
 import com.is.bcs.domain.controlpoint.ControlPoint;
+import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.ServiceArea;
 import com.is.bcs.support.FakeControlPointStore;
@@ -42,6 +43,10 @@ class ControlPointSeedRunnerTest {
         // 고객사 파일에는 도근점에 없던 삼각보조점이 들어 있어, 두 파일이 모두 읽혔는지 종류로 확인된다
         assertTrue(store.count() > DOGEUN_SEED_POINTS, "고객사 파일이 등록되지 않았습니다");
         assertTrue(store.countByType().getOrDefault(PointType.TRIANGULATION_AUX, 0L) > 0);
+        // 삼각보조점은 지역좌표 파일에도 있어 위 단언만으로는 세계좌표 파일 누락을 못 잡는다 —
+        // 세계 좌표계 점은 그 파일에서만 오므로 존재 여부로 가른다
+        assertTrue(store.findAll().stream().anyMatch(p -> p.getTm().crs() == CoordinateSystem.GRS80_CENTRAL),
+                "세계좌표 파일이 등록되지 않았습니다");
     }
 
     @Test

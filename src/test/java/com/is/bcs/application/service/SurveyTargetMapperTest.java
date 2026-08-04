@@ -411,6 +411,25 @@ class SurveyTargetMapperTest {
         assertTrue(thrown.getMessage().contains("좌표계구분"), thrown.getMessage());
     }
     @Test
+    @DisplayName("좌표 변환이 실패한 행은 파일을 멈추지 않고 행 오류가 된다")
+    void map_transformFailure_isRowError() {
+        // 황당한 성과 값은 투영 라이브러리가 자체 예외를 던질 수 있다 — 파일 문제지 서버 오류가 아니다
+        ImportFileMapper failing = new ControlPointFileMapper(tm -> {
+            throw new RuntimeException("projection failure");
+        });
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(List.of("41192D000000001", "도근점", "변환불가", "세계", "545236.77", "181840.96")));
+
+        MappingResult result = failing.map(table);
+
+        assertTrue(result.rows().isEmpty());
+        assertEquals(1, result.errors().size());
+        assertTrue(result.errors().getFirst().message().contains("변환할 수 없습니다"),
+                result.errors().getFirst().message());
+    }
+
+    @Test
     @DisplayName("최종조사내용·최종조사일자 열을 읽는다 — 기준점 마스터의 최근 조사 요약이 된다")
     void map_lastSurveyColumns() {
         Table table = new Table(

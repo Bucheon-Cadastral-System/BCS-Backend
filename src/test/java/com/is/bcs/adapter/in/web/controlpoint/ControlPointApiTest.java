@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.controlpoint;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -77,9 +78,9 @@ class ControlPointApiTest {
         assertTrue(body.contains("\"pointNo\":\"41192D000001265\""));
         assertTrue(body.contains("\"northing\":545236.77"));
         assertTrue(body.contains("\"easting\":181840.96"));
-        // 정답지 = 대상지 CSV 같은 행의 경위도(126.794623, 37.506423) — 파생 오차가 소수 4자리 안이다
-        assertTrue(body.contains("\"longitude\":126.7946"), body);
-        assertTrue(body.contains("\"latitude\":37.5064"), body);
+        // 정답지 = 대상지 CSV 같은 행의 경위도 — 문자열 접두가 아니라 수치 오차로 본다
+        assertEquals(126.794623, JsonPath.<Double>read(body, "$.point.longitude"), 1e-6);
+        assertEquals(37.506423, JsonPath.<Double>read(body, "$.point.latitude"), 1e-6);
         assertTrue(body.contains("\"id\":"));
     }
 

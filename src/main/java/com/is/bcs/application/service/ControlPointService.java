@@ -40,13 +40,12 @@ public class ControlPointService implements RegisterControlPointUseCase, GetCont
     @Override
     public RegisterControlPointResult register(RegisterControlPointCommand command) {
         TmCoordinate tm = new TmCoordinate(command.crs(), command.northing(), command.easting());
-        GeoCoordinate geo = coordinateTransformer.toWgs84(tm);
+        GeoCoordinate geo = ImportFileMapper.deriveGeo(coordinateTransformer, tm);
         // 파일 경로는 셀을 다듬어(trim) 맞추므로 여기도 같은 형태로 — 공백만 다른 값이 갱신으로 오판되지 않게
-        Row row = new Row(
-                0, command.pointNo().trim(), command.type(), command.name().trim(), tm, geo, null, null,
+        Row row = Row.manual(
+                command.pointNo().trim(), command.type(), command.name().trim(), tm, geo,
                 command.regionCode(), command.regionName(), command.address(),
-                command.markerMaterial(), command.installType(), command.installedDate(), command.traverse(),
-                null, null, null, null, null, List.of());
+                command.markerMaterial(), command.installType(), command.installedDate(), command.traverse());
 
         ControlPointRegistrar.Result result = controlPointRegistrar.register(List.of(row));
 
