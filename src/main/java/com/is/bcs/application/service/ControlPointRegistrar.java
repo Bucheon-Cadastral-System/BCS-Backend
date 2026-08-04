@@ -1,5 +1,6 @@
 package com.is.bcs.application.service;
 
+import com.is.bcs.application.dto.FieldChange;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.service.ImportFileMapper.Row;
@@ -159,10 +160,6 @@ public class ControlPointRegistrar {
                 row.regionCode(), row.regionName(), row.address(),
                 row.markerMaterial(), row.installType(), row.installedDate(), row.traverse(),
                 lastResult, lastSurveyedOn, lastSurveyedById);
-    }
-
-    /** 갱신되는 항목 하나 — 무엇이 어떤 값에서 어떤 값으로 바뀌는지. */
-    public record FieldChange(String field, String before, String after) {
     }
 
     /**

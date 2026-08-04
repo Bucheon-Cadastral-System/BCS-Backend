@@ -3,6 +3,7 @@ package com.is.bcs.application.service;
 import com.is.bcs.application.dto.ControlPointPreviewResult;
 import com.is.bcs.application.dto.ControlPointPreviewResult.Action;
 import com.is.bcs.application.dto.ControlPointPreviewResult.PointPreview;
+import com.is.bcs.application.dto.FieldChange;
 import com.is.bcs.application.dto.ImportPreviewResult;
 import com.is.bcs.application.port.in.imports.PreviewControlPointsUseCase;
 import com.is.bcs.application.port.in.imports.PreviewSurveyCsvUseCase;
@@ -65,7 +66,7 @@ public class SurveyCsvPreviewService implements PreviewSurveyCsvUseCase, Preview
     }
 
     private static PointPreview toPreview(Row row, ControlPoint found, String warning) {
-        List<ControlPointRegistrar.FieldChange> changes =
+        List<FieldChange> changes =
                 found == null ? List.of() : ControlPointRegistrar.changes(found, row);
         Action action = found == null ? Action.NEW : changes.isEmpty() ? Action.UNCHANGED : Action.UPDATE;
 

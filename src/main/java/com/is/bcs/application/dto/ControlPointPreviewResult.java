@@ -1,6 +1,5 @@
 package com.is.bcs.application.dto;
 
-import com.is.bcs.application.service.ControlPointRegistrar.FieldChange;
 import com.is.bcs.domain.controlpoint.PointType;
 
 import java.util.List;
