@@ -8,6 +8,7 @@ import com.is.bcs.domain.member.exception.*;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import com.is.bcs.domain.token.exception.ExpiredOAuthExchangeCodeException;
 import com.is.bcs.domain.token.exception.ExpiredTokenException;
 import com.is.bcs.domain.token.exception.InvalidOAuthExchangeCodeException;
@@ -242,6 +243,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(SurveyRecordNotFoundException.class)
     public ProblemDetail handleSurveyRecordNotFound(SurveyRecordNotFoundException e) {
         return problem(SurveyErrorCode.SURVEY_RECORD_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(SurveyTargetNotFoundException.class)
+    public ProblemDetail handleSurveyTargetNotFound(SurveyTargetNotFoundException e) {
+        return problem(SurveyErrorCode.SURVEY_TARGET_NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(InvalidSurveyException.class)

@@ -30,6 +30,7 @@ import com.is.bcs.domain.survey.SurveyTarget;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -94,7 +96,9 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
 
     /** 대상 점 검증 — 같은 점을 두 번 적어도 대상은 한 번만 지정되고, 없는 점이 섞여 있으면 전체를 거부한다. */
     private List<Long> requireTargetPoints(List<Long> targetPointIds) {
-        if (targetPointIds == null || targetPointIds.isEmpty()) {
+        // null 요소는 값이 오지 않은 것 — 흘려보내면 조회 단계에서 서버 오류(5xx)로 둔갑한다
+        if (targetPointIds == null || targetPointIds.isEmpty()
+                || targetPointIds.stream().anyMatch(Objects::isNull)) {
             throw new InvalidSurveyException("대상 기준점을 1점 이상 지정해 주세요.");
         }
         List<Long> pointIds = targetPointIds.stream().distinct().toList();
@@ -126,6 +130,8 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     public SurveyRecord record(RecordSurveyCommand command) {
         requireProject(command.projectId());
         requirePoint(command.pointId());
+        // 기록은 대상으로 지정한 점에만 — 비대상 기록을 허용하면 화면 밖 경로(직접 호출)로 진행률의 전제가 깨진다
+        requireTarget(command.projectId(), command.pointId());
 
         OffsetDateTime now = OffsetDateTime.now(clock);
         SurveyRecord record = loadSurveyRecordPort
@@ -184,6 +190,12 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         boolean complete = totalPoints > 0 && notSurveyedPoints == 0;
         return new SurveyProgress(
                 project.getName(), totalPoints, surveyed, notSurveyedPoints, complete, countByResult);
+    }
+
+    private void requireTarget(Long projectId, Long pointId) {
+        if (!loadSurveyTargetPort.existsByProjectIdAndPointId(projectId, pointId)) {
+            throw new SurveyTargetNotFoundException("프로젝트의 조사 대상이 아닌 기준점입니다: " + pointId);
+        }
     }
 
     private SurveyProject requireProject(Long id) {

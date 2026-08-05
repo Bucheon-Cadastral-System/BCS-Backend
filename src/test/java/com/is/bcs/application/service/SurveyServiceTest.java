@@ -27,6 +27,7 @@ import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
+import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -119,6 +121,10 @@ class SurveyServiceTest {
                 new CreateSurveyProjectCommand("일제조사", STARTED, null, null, List.of())));
         assertThrows(InvalidSurveyException.class, () -> service.create(
                 new CreateSurveyProjectCommand("일제조사", STARTED, null, null, null)));
+        // null 요소는 값이 오지 않은 것 — 흘려보내면 조회 단계에서 5xx 로 둔갑한다
+        pointStore.add(10L);
+        assertThrows(InvalidSurveyException.class, () -> service.create(
+                new CreateSurveyProjectCommand("일제조사", STARTED, null, null, Arrays.asList(10L, null))));
         assertTrue(service.getAll().isEmpty());
     }
 
@@ -186,8 +192,7 @@ class SurveyServiceTest {
     @Test
     @DisplayName("조사를 기록하면 조사 시각이 Clock(KST)으로 찍힌 레코드가 생긴다")
     void record_createsRecordWithClockTime() {
-        SurveyProject project = sampleProject();
-        pointStore.add(10L);
+        SurveyProject project = sampleProject(10L);
 
         SurveyRecord record = service.record(
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, "대상(2건)"));
@@ -201,8 +206,7 @@ class SurveyServiceTest {
     @Test
     @DisplayName("같은 프로젝트×기준점에 다시 기록하면 새 레코드가 아니라 판정 정정이다")
     void record_existing_revisesInsteadOfDuplicate() {
-        SurveyProject project = sampleProject();
-        pointStore.add(10L);
+        SurveyProject project = sampleProject(10L);
         SurveyRecord first = service.record(
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
 
@@ -218,8 +222,7 @@ class SurveyServiceTest {
     @Test
     @DisplayName("없는 프로젝트·기준점에는 조사를 기록할 수 없다")
     void record_missingProjectOrPoint_throws() {
-        SurveyProject project = sampleProject();
-        pointStore.add(10L);
+        SurveyProject project = sampleProject(10L);
 
         assertThrows(SurveyProjectNotFoundException.class,
                 () -> service.record(new RecordSurveyCommand(99L, 10L, SurveyResult.INTACT, null)));
@@ -228,10 +231,20 @@ class SurveyServiceTest {
     }
 
     @Test
+    @DisplayName("대상이 아닌 점에는 기록할 수 없다 — 기록은 대상으로 지정한 점에만 남는다")
+    void record_nonTargetPoint_rejected() {
+        SurveyProject project = sampleProject(10L);
+        pointStore.add(11L); // 등록된 점이지만 이 프로젝트의 대상은 아니다
+
+        assertThrows(SurveyTargetNotFoundException.class,
+                () -> service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.INTACT, null)));
+        assertTrue(service.getByProjectId(project.getId()).isEmpty());
+    }
+
+    @Test
     @DisplayName("조사 취소는 레코드를 삭제하고, 없는 기록 취소는 SurveyRecordNotFoundException")
     void cancel_deletesRecord() {
-        SurveyProject project = sampleProject();
-        pointStore.add(10L);
+        SurveyProject project = sampleProject(10L);
         service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
 
         service.cancel(project.getId(), 10L);
@@ -328,7 +341,8 @@ class SurveyServiceTest {
         SurveyProject project = sampleProject(1L); // 대상은 1번만
         Long pid = project.getId();
         pointStore.add(2L);
-        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.INTACT, null)); // 비대상 2번에 기록
+        // 쓰기 경로는 비대상 기록을 거부하므로 저장소에 직접 심는다 — 집계 필터가 방어적 중복으로 남아 있는지 본다
+        store.save(SurveyRecord.create(pid, 2L, SurveyResult.INTACT, FIXED_KST, null, null));
 
         SurveyProgress progress = service.getProgress(pid);
 
@@ -452,6 +466,12 @@ class SurveyServiceTest {
         @Override
         public boolean existsByPointId(Long pointId) {
             return targets.stream().anyMatch(t -> t.getPointId().equals(pointId));
+        }
+
+        @Override
+        public boolean existsByProjectIdAndPointId(Long projectId, Long pointId) {
+            return targets.stream()
+                    .anyMatch(t -> t.getProjectId().equals(projectId) && t.getPointId().equals(pointId));
         }
 
         @Override

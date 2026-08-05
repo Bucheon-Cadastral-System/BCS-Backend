@@ -150,6 +150,36 @@ class SurveyApiTest {
                 .andExpect(status().isNotFound())
                 .andReturn();
         assertTrue(bodyOf(missing).contains("\"code\":\"CONTROL_POINT_NOT_FOUND\""));
+
+        // null 요소는 요청 계약에서 걸러 400 — 흘려보내면 조회 단계에서 5xx 로 둔갑한다
+        mockMvc.perform(post("/api/survey-projects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-07-01\", \"targetPointIds\": [null]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("대상이 아닌 점에 기록 — 404 SURVEY_TARGET_NOT_FOUND")
+    void record_nonTargetPoint_404() throws Exception {
+        long targetPointId = registerPoint();
+        long projectId = createProject(targetPointId);
+        MvcResult other = mockMvc.perform(post("/api/control-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000009998", "type": "DOGEUN", "name": "9998공",
+                                 "crs": "GRS80_CENTRAL", "northing": 545100.00, "easting": 181100.00}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long otherPointId = extractId(bodyOf(other));
+
+        MvcResult result = mockMvc.perform(
+                        put("/api/survey-projects/" + projectId + "/records/" + otherPointId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"result\": \"INTACT\"}"))
+                .andExpect(status().isNotFound())
+                .andReturn();
+        assertTrue(bodyOf(result).contains("\"code\":\"SURVEY_TARGET_NOT_FOUND\""));
     }
 
     @Test

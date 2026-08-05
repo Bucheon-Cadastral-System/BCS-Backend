@@ -315,6 +315,11 @@ class ControlPointServiceTest {
         }
 
         @Override
+        public boolean existsByProjectIdAndPointId(Long projectId, Long pointId) {
+            return false;
+        }
+
+        @Override
         public boolean existsRecordByPointId(Long pointId) {
             return recordUsed;
         }
