@@ -208,6 +208,22 @@ class SurveyApiTest {
     }
 
     @Test
+    @DisplayName("프로젝트 삭제 뒤에는 그 점을 지울 수 있다 — 대상·기록 행이 실제로 사라졌다는 교차 검증")
+    void deleteProject_freesPointReferences() throws Exception {
+        long pointId = registerPoint();
+        long projectId = createProject(pointId);
+        mockMvc.perform(put("/api/survey-projects/" + projectId + "/records/" + pointId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"result\": \"INTACT\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/survey-projects/" + projectId)).andExpect(status().isNoContent());
+
+        // 기준점 삭제는 대상·기록 참조가 남아 있으면 409 로 막힌다 — 204 는 두 참조가 실제로 지워졌다는 뜻이다
+        mockMvc.perform(delete("/api/control-points/" + pointId)).andExpect(status().isNoContent());
+    }
+
+    @Test
     @DisplayName("프로젝트 삭제 — 대상·기록까지 지워지고 204, 없는 프로젝트 삭제는 404")
     void deleteProject_cascades() throws Exception {
         long projectId = importSample(); // 대상 49·기록 44가 실린 프로젝트 — 동반 삭제를 실데이터로 검증
