@@ -383,6 +383,11 @@ class SurveyServiceTest {
         }
 
         @Override
+        public boolean existsRecordByPointId(Long pointId) {
+            return records.values().stream().anyMatch(r -> r.getPointId().equals(pointId));
+        }
+
+        @Override
         public Map<SurveyResult, Long> countByResult(Long projectId) {
             Set<Long> targetPoints = targetStore.targets.stream()
                     .filter(t -> t.getProjectId().equals(projectId))
@@ -442,6 +447,11 @@ class SurveyServiceTest {
                     .filter(t -> t.getProjectId().equals(projectId))
                     .map(SurveyTarget::getPointId)
                     .toList();
+        }
+
+        @Override
+        public boolean existsByPointId(Long pointId) {
+            return targets.stream().anyMatch(t -> t.getPointId().equals(pointId));
         }
 
         @Override
