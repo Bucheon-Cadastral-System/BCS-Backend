@@ -4,13 +4,20 @@ import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
+import com.is.bcs.application.dto.UpdateControlPointCommand;
+import com.is.bcs.application.dto.UpdateControlPointResult;
+import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
+import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.InstallType;
 import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
+import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
+import com.is.bcs.domain.survey.SurveyRecord;
+import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.support.FakeControlPointStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +25,8 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,8 +39,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlPointServiceTest {
 
     private final FakeControlPointStore store = new FakeControlPointStore();
+    private final FakeSurveyUsage surveyUsage = new FakeSurveyUsage();
     private final ControlPointService service = new ControlPointService(
-            store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer());
+            store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
+            surveyUsage, surveyUsage);
 
     private static RegisterControlPointCommand csvRow1Command() {
         return new RegisterControlPointCommand(
@@ -149,6 +160,89 @@ class ControlPointServiceTest {
     }
 
     @Test
+    @DisplayName("수정 — 식별·성과가 바뀌고 경위도는 재파생되며, 화면에 없는 선택 항목은 그대로다")
+    void update_changesIdentityAndKeepsOptionalFields() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        UpdateControlPointResult result = service.update(new UpdateControlPointCommand(
+                id, " 41192D000012345 ", PointType.DOGEUN, " 1465공(이설) ",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545240.00"), new BigDecimal("181845.00")));
+
+        assertEquals(id, result.point().getId());
+        assertEquals("41192D000012345", result.point().getPointNo()); // 다듬어(trim) 저장
+        assertEquals("1465공(이설)", result.point().getName());
+        assertEquals(0, new BigDecimal("545240.00").compareTo(result.point().getTm().northing()));
+        assertEquals(37.506423, result.point().getGeo().latitude(), 1e-4); // 성과에서 다시 파생
+        assertEquals("경기도 부천시 춘의동 102-16", result.point().getAddress()); // 요청에 없는 항목은 유지
+        assertEquals(MarkerMaterial.STEEL, result.point().getMarkerMaterial());
+        assertNull(result.warning());
+        assertEquals(1, store.findAll().size());
+    }
+
+    @Test
+    @DisplayName("수정 — 자기 자신의 관리번호·이름은 충돌이 아니고, 없는 점 수정은 거부한다")
+    void update_selfIdentityAllowed_missingPointRejected() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        UpdateControlPointResult result = service.update(new UpdateControlPointCommand(
+                id, "41192D000001265", PointType.DOGEUN, "1465공",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545300.00"), new BigDecimal("181900.00")));
+
+        assertEquals(id, result.point().getId());
+        assertThrows(ControlPointNotFoundException.class, () -> service.update(new UpdateControlPointCommand(
+                999L, "41192D000000001", PointType.DOGEUN, "이름",
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00"))));
+    }
+
+    @Test
+    @DisplayName("수정 — 다른 점의 관리번호나 이름·종류로는 바꿀 수 없다(임포트 매칭 키 보호)")
+    void update_conflictsWithOtherPoint_throws() {
+        service.register(csvRow1Command());
+        RegisterControlPointCommand other = new RegisterControlPointCommand(
+                "41192D000009999", PointType.DOGEUN, "9999공",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545100.00"), new BigDecimal("181100.00"),
+                null, null, null, null, null, null, null);
+        Long otherId = service.register(other).point().getId();
+
+        assertThrows(DuplicateControlPointException.class, () -> service.update(new UpdateControlPointCommand(
+                otherId, "41192D000001265", PointType.DOGEUN, "9999공",
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"))));
+        assertThrows(DuplicateControlPointException.class, () -> service.update(new UpdateControlPointCommand(
+                otherId, "41192D000009999", PointType.DOGEUN, "1465공",
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"))));
+        assertEquals("9999공", service.getByPointNo("41192D000009999").getName()); // 거부된 수정은 남지 않는다
+    }
+
+    @Test
+    @DisplayName("삭제 — 점이 지워지고, 없는 점 삭제는 거부한다")
+    void delete_removesPoint() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        service.delete(id);
+
+        assertEquals(0, store.findAll().size());
+        assertThrows(ControlPointNotFoundException.class, () -> service.delete(id));
+    }
+
+    @Test
+    @DisplayName("삭제 — 조사 프로젝트가 대상이나 기록으로 쓰는 점은 지울 수 없다(조사 데이터는 프로젝트 소유)")
+    void delete_referencedBySurvey_rejected() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        surveyUsage.targetUsed = true;
+        assertThrows(ControlPointInUseException.class, () -> service.delete(id));
+
+        surveyUsage.targetUsed = false;
+        surveyUsage.recordUsed = true;
+        assertThrows(ControlPointInUseException.class, () -> service.delete(id));
+
+        assertEquals(1, store.findAll().size()); // 거부된 삭제는 점을 남긴다
+    }
+
+    @Test
     @DisplayName("부천 범위 밖 좌표도 등록은 되고, 확인하라는 경고가 함께 온다")
     void register_outsideServiceArea_registersWithWarning() {
         // 위도가 부천 남쪽으로 크게 벗어나는 성과 — 좌표계를 잘못 고른 상황과 같은 모양
@@ -207,5 +301,47 @@ class ControlPointServiceTest {
                 new BigDecimal("545000.00"), new BigDecimal("181000.00"),
                 null, null, null, null, null, null, null
         );
+    }
+
+    /** 점 삭제 가부 판정용 페이크 — 대상·기록 참조 여부만 흉내 내고 나머지 조회는 쓰지 않는다. */
+    private static class FakeSurveyUsage implements LoadSurveyTargetPort, LoadSurveyRecordPort {
+
+        boolean targetUsed = false;
+        boolean recordUsed = false;
+
+        @Override
+        public boolean existsByPointId(Long pointId) {
+            return targetUsed;
+        }
+
+        @Override
+        public boolean existsRecordByPointId(Long pointId) {
+            return recordUsed;
+        }
+
+        @Override
+        public long countByProjectId(Long projectId) {
+            return 0;
+        }
+
+        @Override
+        public List<Long> findPointIdsByProjectId(Long projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Map<SurveyResult, Long> countByResult(Long projectId) {
+            return Map.of();
+        }
     }
 }

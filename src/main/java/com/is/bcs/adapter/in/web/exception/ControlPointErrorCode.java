@@ -12,7 +12,10 @@ public enum ControlPointErrorCode implements ErrorCode {
     CONTROL_POINT_INVALID(HttpStatus.BAD_REQUEST),
 
     /** 관리번호 중복 */
-    CONTROL_POINT_DUPLICATE(HttpStatus.CONFLICT);
+    CONTROL_POINT_DUPLICATE(HttpStatus.CONFLICT),
+
+    /** 조사 프로젝트가 대상·기록으로 참조 중 — 삭제 불가 */
+    CONTROL_POINT_IN_USE(HttpStatus.CONFLICT);
 
     private final HttpStatus status;
 

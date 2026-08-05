@@ -14,11 +14,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** 기준점 API 계약 검증 — DB 필요(bcs/docker-compose). 데이터는 고객사 대상지 CSV 실측값. */
@@ -57,6 +61,13 @@ class ControlPointApiTest {
 
     private String bodyOf(MvcResult result) throws Exception {
         return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+    }
+
+    /** 응답의 첫 id — 등록 응답은 point 가 먼저 실려 point.id 가 잡힌다. */
+    private long extractId(String body) {
+        Matcher m = Pattern.compile("\"id\":(\\d+)").matcher(body);
+        assertTrue(m.find());
+        return Long.parseLong(m.group(1));
     }
 
     private MvcResult register() throws Exception {
@@ -133,6 +144,60 @@ class ControlPointApiTest {
         assertTrue(body.contains("\"code\":\"COMMON_INVALID_INPUT\""));
         assertTrue(body.contains("\"errors\":"));
         assertTrue(body.contains("\"field\":\"pointNo\""));
+    }
+
+    @Test
+    @DisplayName("수정 — 식별·성과가 바뀌고 경위도가 재파생되며, 다른 점의 관리번호로는 409")
+    void updatePoint() throws Exception {
+        long id = extractId(bodyOf(register()));
+
+        MvcResult result = mockMvc.perform(put("/api/control-points/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000012345", "type": "DOGEUN", "name": "1465공(이설)",
+                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"pointNo\":\"41192D000012345\""));
+        assertTrue(body.contains("\"name\":\"1465공(이설)\""));
+        assertEquals(37.506, JsonPath.<Double>read(body, "$.point.latitude"), 1e-3); // 성과에서 재파생
+
+        mockMvc.perform(put("/api/control-points/999999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000000001", "type": "DOGEUN", "name": "이름",
+                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("삭제 — 조사에서 쓰지 않는 점은 204, 대상으로 지정된 점은 409 CONTROL_POINT_IN_USE")
+    void deletePoint() throws Exception {
+        long id = extractId(bodyOf(register()));
+
+        // 조사 대상으로 지정하면 삭제가 거부된다 — 조사 데이터는 프로젝트 소유라 점 삭제가 지울 수 없다
+        MvcResult project = mockMvc.perform(post("/api/survey-projects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "일제조사", "startedOn": "2026-07-01", "targetPointIds": [%d]}
+                                """.formatted(id)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long projectId = extractId(bodyOf(project));
+
+        MvcResult blocked = mockMvc.perform(delete("/api/control-points/" + id))
+                .andExpect(status().isConflict())
+                .andReturn();
+        assertTrue(bodyOf(blocked).contains("\"code\":\"CONTROL_POINT_IN_USE\""));
+
+        // 프로젝트를 지워 참조가 사라지면 삭제된다
+        mockMvc.perform(delete("/api/survey-projects/" + projectId)).andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/control-points/" + id)).andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/control-points/41192D000001265")).andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/control-points/" + id)).andExpect(status().isNotFound());
     }
 
     @Test

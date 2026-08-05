@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.exception;
 
+import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
@@ -175,6 +176,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DuplicateControlPointException.class)
     public ProblemDetail handleDuplicateControlPoint(DuplicateControlPointException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
+    }
+
+    @ExceptionHandler(ControlPointInUseException.class)
+    public ProblemDetail handleControlPointInUse(ControlPointInUseException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IN_USE, e.getMessage());
     }
 
     /**
