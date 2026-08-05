@@ -3,9 +3,11 @@ package com.is.bcs.adapter.in.web.survey;
 import com.is.bcs.adapter.in.web.common.ContentResponse;
 import com.is.bcs.application.port.in.survey.CancelSurveyUseCase;
 import com.is.bcs.application.port.in.survey.CreateSurveyProjectUseCase;
+import com.is.bcs.application.port.in.survey.DeleteSurveyProjectUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyProjectsUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
 import com.is.bcs.application.port.in.survey.RecordSurveyUseCase;
+import com.is.bcs.application.port.in.survey.UpdateSurveyProjectUseCase;
 import com.is.bcs.domain.survey.SurveyProject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,8 @@ import java.net.URI;
 public class SurveyController {
 
     private final CreateSurveyProjectUseCase createSurveyProjectUseCase;
+    private final UpdateSurveyProjectUseCase updateSurveyProjectUseCase;
+    private final DeleteSurveyProjectUseCase deleteSurveyProjectUseCase;
     private final GetSurveyProjectsUseCase getSurveyProjectsUseCase;
     private final RecordSurveyUseCase recordSurveyUseCase;
     private final CancelSurveyUseCase cancelSurveyUseCase;
@@ -50,6 +54,20 @@ public class SurveyController {
     @GetMapping("/{projectId}")
     public SurveyProjectResponse getById(@PathVariable("projectId") Long projectId) {
         return SurveyProjectResponse.from(getSurveyProjectsUseCase.getById(projectId));
+    }
+
+    @PutMapping("/{projectId}")
+    public SurveyProjectResponse update(
+            @PathVariable("projectId") Long projectId,
+            @Valid @RequestBody UpdateSurveyProjectRequest request
+    ) {
+        return SurveyProjectResponse.from(updateSurveyProjectUseCase.update(request.toCommand(projectId)));
+    }
+
+    @DeleteMapping("/{projectId}")
+    public ResponseEntity<Void> delete(@PathVariable("projectId") Long projectId) {
+        deleteSurveyProjectUseCase.delete(projectId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{projectId}/progress")

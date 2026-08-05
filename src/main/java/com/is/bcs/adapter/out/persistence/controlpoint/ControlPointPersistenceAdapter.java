@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.controlpoint;
 
+import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
@@ -7,6 +8,7 @@ import com.is.bcs.domain.controlpoint.PointType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,7 +20,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class ControlPointPersistenceAdapter
-        implements LoadControlPointPort, SaveControlPointPort {
+        implements LoadControlPointPort, SaveControlPointPort, DeleteControlPointPort {
 
     private final ControlPointJpaRepository repository;
 
@@ -49,6 +51,17 @@ public class ControlPointPersistenceAdapter
         return found.values().stream().map(ControlPointJpaEntity::toDomain).toList();
     }
 
+    @Override
+    public List<ControlPoint> findAllByIds(Collection<Long> ids) {
+        List<Long> all = List.copyOf(ids);
+        List<ControlPoint> found = new ArrayList<>(all.size());
+        for (int from = 0; from < all.size(); from += CHUNK_SIZE) {
+            repository.findAllById(all.subList(from, Math.min(from + CHUNK_SIZE, all.size())))
+                    .forEach(entity -> found.add(entity.toDomain()));
+        }
+        return found;
+    }
+
     /** PostgreSQL 의 바인드 변수 상한(65,535)에 여유를 두고 나눈다. */
     private static final int CHUNK_SIZE = 1_000;
 
@@ -62,6 +75,11 @@ public class ControlPointPersistenceAdapter
     @Override
     public List<ControlPoint> findAll() {
         return repository.findAll().stream().map(ControlPointJpaEntity::toDomain).toList();
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
     }
 
     @Override

@@ -3,17 +3,27 @@ package com.is.bcs.application.service;
 import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
+import com.is.bcs.application.dto.UpdateControlPointCommand;
+import com.is.bcs.application.dto.UpdateControlPointResult;
+import com.is.bcs.application.port.in.controlpoint.DeleteControlPointUseCase;
 import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.application.port.in.controlpoint.RegisterControlPointUseCase;
+import com.is.bcs.application.port.in.controlpoint.UpdateControlPointUseCase;
+import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
+import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.geo.CoordinateTransformer;
+import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
+import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.service.ImportFileMapper.Row;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.ServiceArea;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
+import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
+import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +36,16 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ControlPointService implements RegisterControlPointUseCase, GetControlPointsUseCase {
+public class ControlPointService implements RegisterControlPointUseCase, UpdateControlPointUseCase,
+        DeleteControlPointUseCase, GetControlPointsUseCase {
 
     private final LoadControlPointPort loadControlPointPort;
+    private final SaveControlPointPort saveControlPointPort;
+    private final DeleteControlPointPort deleteControlPointPort;
     private final ControlPointRegistrar controlPointRegistrar;
     private final CoordinateTransformer coordinateTransformer;
+    private final LoadSurveyTargetPort loadSurveyTargetPort;
+    private final LoadSurveyRecordPort loadSurveyRecordPort;
 
     /**
      * 한 점 등록도 파일 임포트와 같은 규칙을 쓴다 — 같은 이름·종류의 점이 있으면 새 점을 만들지 않고 그 점을 입력 값으로
@@ -49,12 +64,66 @@ public class ControlPointService implements RegisterControlPointUseCase, GetCont
 
         ControlPointRegistrar.Result result = controlPointRegistrar.register(List.of(row));
 
-        // 부천 밖이어도 등록은 한다(관리 지역이 넓어질 수 있다) — 좌표계·성과를 확인하라는 요청만 함께 보낸다
-        String warning = ServiceArea.BUCHEON.contains(geo) ? null
+        return new RegisterControlPointResult(
+                result.pointOf(row), result.newPoints() == 1, result.updatedPoints() == 1, warningFor(geo));
+    }
+
+    /**
+     * 기준점 수정 — 식별(관리번호·이름·종류)과 성과만 바꾸고, 화면이 다루지 않는 소재지·설치·최종조사 값은 그대로 둔다.
+     * 관리번호와 이름·종류는 다른 점과 겹칠 수 없다 — 겹치면 임포트의 이름·종류 매칭이 비결정이 된다.
+     */
+    @Override
+    public UpdateControlPointResult update(UpdateControlPointCommand command) {
+        ControlPoint existing = requirePoint(command.pointId());
+
+        String pointNo = command.pointNo().trim();
+        String name = command.name().trim();
+        loadControlPointPort.findByPointNo(pointNo)
+                .filter(other -> !other.getId().equals(existing.getId()))
+                .ifPresent(other -> {
+                    throw new DuplicateControlPointException(
+                            "이미 사용 중인 관리번호입니다: " + pointNo + " (" + other.getName() + ")");
+                });
+        loadControlPointPort.findByNameAndType(name, command.type())
+                .filter(other -> !other.getId().equals(existing.getId()))
+                .ifPresent(other -> {
+                    throw new DuplicateControlPointException(
+                            "같은 이름·종류의 기준점이 이미 있습니다(관리번호 " + other.getPointNo() + ").");
+                });
+
+        TmCoordinate tm = new TmCoordinate(command.crs(), command.northing(), command.easting());
+        GeoCoordinate geo = ImportFileMapper.deriveGeo(coordinateTransformer, tm);
+        ControlPoint updated = ControlPoint.restore(
+                existing.getId(), pointNo, command.type(), name, tm, geo,
+                existing.getRegionCode(), existing.getRegionName(), existing.getAddress(),
+                existing.getMarkerMaterial(), existing.getInstallType(), existing.getInstalledDate(),
+                existing.getTraverse(),
+                existing.getLastSurveyResult(), existing.getLastSurveyedOn(), existing.getLastSurveyedById());
+
+        return new UpdateControlPointResult(saveControlPointPort.save(updated), warningFor(geo));
+    }
+
+    /** 조사 데이터는 프로젝트 소유라 점 삭제가 지울 수 없다 — 대상·기록이 걸려 있으면 거부한다. */
+    @Override
+    public void delete(Long pointId) {
+        ControlPoint point = requirePoint(pointId);
+        if (loadSurveyTargetPort.existsByPointId(pointId) || loadSurveyRecordPort.existsRecordByPointId(pointId)) {
+            throw new ControlPointInUseException(
+                    "조사 프로젝트가 대상·기록으로 쓰는 기준점은 삭제할 수 없습니다: " + point.getName());
+        }
+        deleteControlPointPort.deleteById(pointId);
+    }
+
+    private ControlPoint requirePoint(Long pointId) {
+        return loadControlPointPort.findById(pointId)
+                .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
+    }
+
+    /** 부천 밖이어도 저장은 한다(관리 지역이 넓어질 수 있다) — 좌표계·성과를 확인하라는 요청만 함께 보낸다. */
+    private static String warningFor(GeoCoordinate geo) {
+        return ServiceArea.BUCHEON.contains(geo) ? null
                 : String.format(Locale.ROOT, "%s 범위 밖 좌표입니다(위도 %.5f, 경도 %.5f) — 원점과 성과를 확인해 주세요.",
                         ServiceArea.BUCHEON.name(), geo.latitude(), geo.longitude());
-        return new RegisterControlPointResult(
-                result.pointOf(row), result.newPoints() == 1, result.updatedPoints() == 1, warning);
     }
 
     @Override

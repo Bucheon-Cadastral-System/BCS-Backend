@@ -11,6 +11,9 @@ public enum SurveyErrorCode implements ErrorCode {
     /** 조사기록 없음 */
     SURVEY_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND),
 
+    /** 프로젝트의 조사 대상이 아닌 기준점 */
+    SURVEY_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND),
+
     /** 조사 프로젝트·조사기록 필수값 위반 */
     SURVEY_INVALID(HttpStatus.BAD_REQUEST);
 

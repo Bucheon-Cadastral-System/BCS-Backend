@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
+import com.is.bcs.application.port.out.survey.DeleteSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class SurveyPersistenceAdapter
-        implements LoadSurveyProjectPort, SaveSurveyProjectPort,
+        implements LoadSurveyProjectPort, SaveSurveyProjectPort, DeleteSurveyProjectPort,
         LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort {
 
     private final SurveyProjectJpaRepository projectRepository;
@@ -38,6 +39,11 @@ public class SurveyPersistenceAdapter
     @Override
     public SurveyProject save(SurveyProject project) {
         return projectRepository.save(SurveyProjectJpaEntity.fromDomain(project)).toDomain();
+    }
+
+    @Override
+    public void deleteProjectById(Long id) {
+        projectRepository.deleteById(id);
     }
 
     @Override
@@ -70,7 +76,17 @@ public class SurveyPersistenceAdapter
     }
 
     @Override
+    public boolean existsRecordByPointId(Long pointId) {
+        return recordRepository.existsByPointId(pointId);
+    }
+
+    @Override
     public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
         recordRepository.deleteByProjectIdAndPointId(projectId, pointId);
+    }
+
+    @Override
+    public void deleteByProjectId(Long projectId) {
+        recordRepository.deleteByProjectId(projectId);
     }
 }

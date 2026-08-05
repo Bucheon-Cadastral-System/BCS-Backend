@@ -2,14 +2,18 @@ package com.is.bcs.adapter.in.web.controlpoint;
 
 import com.is.bcs.adapter.in.web.common.ContentResponse;
 import com.is.bcs.application.dto.RegisterControlPointResult;
+import com.is.bcs.application.port.in.controlpoint.DeleteControlPointUseCase;
 import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.application.port.in.controlpoint.RegisterControlPointUseCase;
+import com.is.bcs.application.port.in.controlpoint.UpdateControlPointUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +25,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class ControlPointController {
 
     private final RegisterControlPointUseCase registerControlPointUseCase;
+    private final UpdateControlPointUseCase updateControlPointUseCase;
+    private final DeleteControlPointUseCase deleteControlPointUseCase;
     private final GetControlPointsUseCase getControlPointsUseCase;
 
     @PostMapping
@@ -49,5 +55,21 @@ public class ControlPointController {
     @GetMapping("/{pointNo}")
     public ControlPointResponse getByPointNo(@PathVariable("pointNo") String pointNo) {
         return ControlPointResponse.from(getControlPointsUseCase.getByPointNo(pointNo));
+    }
+
+    // 수정·삭제 경로는 관리번호가 아니라 id 다 — 수정이 관리번호 자체를 바꿀 수 있어 경로 식별자로 쓸 수 없다
+
+    @PutMapping("/{pointId}")
+    public UpdateControlPointResponse update(
+            @PathVariable("pointId") Long pointId,
+            @Valid @RequestBody UpdateControlPointRequest request
+    ) {
+        return UpdateControlPointResponse.from(updateControlPointUseCase.update(request.toCommand(pointId)));
+    }
+
+    @DeleteMapping("/{pointId}")
+    public ResponseEntity<Void> delete(@PathVariable("pointId") Long pointId) {
+        deleteControlPointUseCase.delete(pointId);
+        return ResponseEntity.noContent().build();
     }
 }

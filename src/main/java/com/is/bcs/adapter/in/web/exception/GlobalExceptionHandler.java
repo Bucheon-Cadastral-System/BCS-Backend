@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.exception;
 
+import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
@@ -7,6 +8,7 @@ import com.is.bcs.domain.member.exception.*;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import com.is.bcs.domain.token.exception.ExpiredOAuthExchangeCodeException;
 import com.is.bcs.domain.token.exception.ExpiredTokenException;
 import com.is.bcs.domain.token.exception.InvalidOAuthExchangeCodeException;
@@ -177,6 +179,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
     }
 
+    @ExceptionHandler(ControlPointInUseException.class)
+    public ProblemDetail handleControlPointInUse(ControlPointInUseException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IN_USE, e.getMessage());
+    }
+
     /**
      * 저장 제약 위반 — 중복만 409 로 알린다.
      * 외래키·필수값·CHECK 위반까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
@@ -236,6 +243,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(SurveyRecordNotFoundException.class)
     public ProblemDetail handleSurveyRecordNotFound(SurveyRecordNotFoundException e) {
         return problem(SurveyErrorCode.SURVEY_RECORD_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(SurveyTargetNotFoundException.class)
+    public ProblemDetail handleSurveyTargetNotFound(SurveyTargetNotFoundException e) {
+        return problem(SurveyErrorCode.SURVEY_TARGET_NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(InvalidSurveyException.class)
