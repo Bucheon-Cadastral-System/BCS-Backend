@@ -41,7 +41,9 @@ public class ApproveMemberAdminService implements ApproveMemberAdminUseCase {
                                 actorAdminId,
                                 targetMember.getName(),
                                 targetMemberId
-                        )
+                        ),
+                actorAdmin.getName(),
+                targetMember.getName()
         );
     }
 

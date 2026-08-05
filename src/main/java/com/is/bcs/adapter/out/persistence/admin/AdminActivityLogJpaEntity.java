@@ -38,6 +38,12 @@ public class AdminActivityLogJpaEntity {
     private String message;
 
     @Column(nullable = false)
+    private String actorName;
+
+    @Column(nullable = false)
+    private String targetName;
+
+    @Column(nullable = false)
     private OffsetDateTime createdAt;
 
     public AdminActivityLogJpaEntity(
@@ -45,12 +51,16 @@ public class AdminActivityLogJpaEntity {
             Long targetMemberId,
             AdminActivityType activityType,
             String message,
+            String actorName,
+            String targetName,
             OffsetDateTime createdAt
     ) {
         this.actorAdminId = actorAdminId;
         this.targetMemberId = targetMemberId;
         this.activityType = activityType;
         this.message = message;
+        this.actorName = actorName;
+        this.targetName = targetName;
         this.createdAt = createdAt;
     }
 }

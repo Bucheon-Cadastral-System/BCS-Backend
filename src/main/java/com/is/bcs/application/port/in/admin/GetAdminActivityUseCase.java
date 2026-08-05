@@ -23,6 +23,8 @@ public interface GetAdminActivityUseCase {
             Long targetMemberId,
             AdminActivityType activityType,
             String message,
+            String actorName,
+            String targetName,
             OffsetDateTime createdAt
     ) {
     }

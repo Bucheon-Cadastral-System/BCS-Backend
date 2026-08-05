@@ -14,13 +14,16 @@ public class RecordAdminActivityAdapter implements RecordAdminActivityPort {
     private final AdminActivityLogJpaRepository adminActivityLogJpaRepository;
 
     @Override
-    public void record(Long actorAdminId, Long targetMemberId, AdminActivityType activityType, String message) {
+    public void record(Long actorAdminId, Long targetMemberId, AdminActivityType activityType, String message
+            , String actorName, String targetName) {
         AdminActivityLogJpaEntity log =
                 new AdminActivityLogJpaEntity(
                         actorAdminId,
                         targetMemberId,
                         activityType,
                         message,
+                        actorName,
+                        targetName,
                         OffsetDateTime.now()
                 );
 

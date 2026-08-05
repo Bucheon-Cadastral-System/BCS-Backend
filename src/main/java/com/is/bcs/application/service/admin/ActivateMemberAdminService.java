@@ -40,7 +40,9 @@ public class ActivateMemberAdminService implements ActivateMemberAdminUseCase {
                                 actorAdminId,
                                 targetMember.getName(),
                                 targetMemberId
-                        )
+                        ),
+                actorAdmin.getName(),
+                targetMember.getName()
         );
     }
 }
