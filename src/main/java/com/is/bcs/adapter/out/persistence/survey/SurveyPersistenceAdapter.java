@@ -76,6 +76,11 @@ public class SurveyPersistenceAdapter
     }
 
     @Override
+    public boolean existsRecordByPointId(Long pointId) {
+        return recordRepository.existsByPointId(pointId);
+    }
+
+    @Override
     public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
         recordRepository.deleteByProjectIdAndPointId(projectId, pointId);
     }

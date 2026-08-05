@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.controlpoint;
 
+import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class ControlPointPersistenceAdapter
-        implements LoadControlPointPort, SaveControlPointPort {
+        implements LoadControlPointPort, SaveControlPointPort, DeleteControlPointPort {
 
     private final ControlPointJpaRepository repository;
 
@@ -74,6 +75,11 @@ public class ControlPointPersistenceAdapter
     @Override
     public List<ControlPoint> findAll() {
         return repository.findAll().stream().map(ControlPointJpaEntity::toDomain).toList();
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        repository.deleteById(id);
     }
 
     @Override

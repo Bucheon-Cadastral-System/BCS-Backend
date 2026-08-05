@@ -1,5 +1,6 @@
 package com.is.bcs.support;
 
+import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
@@ -16,7 +17,7 @@ import java.util.Optional;
  * 기준점 저장소 페이크 — 저장하면 id를 매기고, id가 있는 점은 그 자리를 덮는다.
  * id 를 매겨야 임포트가 대상·기록을 붙일 점을 되찾을 수 있어, 등록과 갱신을 가르는 동작까지 확인된다.
  */
-public class FakeControlPointStore implements LoadControlPointPort, SaveControlPointPort {
+public class FakeControlPointStore implements LoadControlPointPort, SaveControlPointPort, DeleteControlPointPort {
 
     public final Map<Long, ControlPoint> points = new HashMap<>();
     private long sequence = 0;
@@ -90,5 +91,10 @@ public class FakeControlPointStore implements LoadControlPointPort, SaveControlP
     @Override
     public List<ControlPoint> saveAll(List<ControlPoint> list) {
         return list.stream().map(this::save).toList();
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        points.remove(id);
     }
 }

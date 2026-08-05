@@ -16,6 +16,8 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
 
     Optional<SurveyRecordJpaEntity> findByProjectIdAndPointId(Long projectId, Long pointId);
 
+    boolean existsByPointId(Long pointId);
+
     void deleteByProjectIdAndPointId(Long projectId, Long pointId);
 
     void deleteByProjectId(Long projectId);

@@ -30,6 +30,11 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
     }
 
     @Override
+    public boolean existsByPointId(Long pointId) {
+        return targetRepository.existsByPointId(pointId);
+    }
+
+    @Override
     public SurveyTarget save(SurveyTarget target) {
         return targetRepository.save(SurveyTargetJpaEntity.fromDomain(target)).toDomain();
     }
