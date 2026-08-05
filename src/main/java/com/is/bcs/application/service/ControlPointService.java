@@ -82,13 +82,13 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
                 .filter(other -> !other.getId().equals(existing.getId()))
                 .ifPresent(other -> {
                     throw new DuplicateControlPointException(
-                            "이미 사용 중인 관리번호입니다: " + pointNo + " (" + other.getName() + ")");
+                            "다른 기준점에 등록된 관리번호입니다: " + pointNo + " (" + other.getName() + ")");
                 });
         loadControlPointPort.findByNameAndType(name, command.type())
                 .filter(other -> !other.getId().equals(existing.getId()))
                 .ifPresent(other -> {
                     throw new DuplicateControlPointException(
-                            "같은 이름·종류의 기준점이 이미 있습니다(관리번호 " + other.getPointNo() + ").");
+                            "같은 이름·종류의 기준점이 등록되어 있습니다(관리번호 " + other.getPointNo() + ").");
                 });
 
         TmCoordinate tm = new TmCoordinate(command.crs(), command.northing(), command.easting());
@@ -106,12 +106,24 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
     /** 조사 데이터는 프로젝트 소유라 점 삭제가 지울 수 없다 — 대상·기록이 걸려 있으면 거부한다. */
     @Override
     public void delete(Long pointId) {
-        ControlPoint point = requirePoint(pointId);
-        if (loadSurveyTargetPort.existsByPointId(pointId) || loadSurveyRecordPort.existsRecordByPointId(pointId)) {
-            throw new ControlPointInUseException(
-                    "조사 프로젝트가 대상·기록으로 쓰는 기준점은 삭제할 수 없습니다: " + point.getName());
+        requirePoint(pointId);
+        if (referenced(pointId)) {
+            // 어느 점인지는 화면이 이미 알고 있다 — 이름을 덧붙이면 확인 창에서 같은 정보가 두 번 선다
+            throw new ControlPointInUseException("프로젝트에서 참조 중인 기준점은 삭제할 수 없습니다.");
         }
         deleteControlPointPort.deleteById(pointId);
+    }
+
+    /** 화면이 삭제 확인 창을 열기 전에 가부를 가른다 — 최종 판정은 delete() 가 같은 조건으로 다시 한다(경합 대비). */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isReferenced(Long pointId) {
+        requirePoint(pointId);
+        return referenced(pointId);
+    }
+
+    private boolean referenced(Long pointId) {
+        return loadSurveyTargetPort.existsByPointId(pointId) || loadSurveyRecordPort.existsRecordByPointId(pointId);
     }
 
     private ControlPoint requirePoint(Long pointId) {
@@ -122,7 +134,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
     /** 부천 밖이어도 저장은 한다(관리 지역이 넓어질 수 있다) — 좌표계·성과를 확인하라는 요청만 함께 보낸다. */
     private static String warningFor(GeoCoordinate geo) {
         return ServiceArea.BUCHEON.contains(geo) ? null
-                : String.format(Locale.ROOT, "%s 범위 밖 좌표입니다(위도 %.5f, 경도 %.5f) — 원점과 성과를 확인해 주세요.",
+                : String.format(Locale.ROOT, "%s 범위 밖 좌표입니다(위도 %.5f, 경도 %.5f). 원점과 성과를 확인해 주세요.",
                         ServiceArea.BUCHEON.name(), geo.latitude(), geo.longitude());
     }
 
