@@ -69,4 +69,32 @@ class SurveyProjectTest {
         assertThrows(InvalidSurveyException.class, () -> project.rename(" "));
         assertEquals("정기 조사", project.getName());
     }
+
+    @Test
+    @DisplayName("수정은 생성과 같은 검증을 거쳐 이름·기간·비고를 통째로 바꾼다")
+    void update_replacesAllValues() {
+        SurveyProject project = SurveyProject.create("이름", STARTED, null, "비고");
+
+        project.update(" 새 이름 ", STARTED.plusDays(1), STARTED.plusDays(10), null);
+
+        assertEquals("새 이름", project.getName());
+        assertEquals(STARTED.plusDays(1), project.getStartedOn());
+        assertEquals(STARTED.plusDays(10), project.getEndedOn());
+        assertNull(project.getNote()); // 비고는 비울 수 있는 값이라 null 이 곧 지움이다
+    }
+
+    @Test
+    @DisplayName("수정이 거부되면 기존 값이 그대로 남는다 — 일부만 바뀐 채로 남지 않는다")
+    void update_rejected_keepsOriginalValues() {
+        SurveyProject project = SurveyProject.create("이름", STARTED, null, "비고");
+
+        assertThrows(InvalidSurveyException.class, () -> project.update(" ", STARTED, null, null));
+        assertThrows(InvalidSurveyException.class,
+                () -> project.update("새 이름", STARTED, STARTED.minusDays(1), null));
+
+        assertEquals("이름", project.getName());
+        assertEquals(STARTED, project.getStartedOn());
+        assertNull(project.getEndedOn());
+        assertEquals("비고", project.getNote());
+    }
 }
