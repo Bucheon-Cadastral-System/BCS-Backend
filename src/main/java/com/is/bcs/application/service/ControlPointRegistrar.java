@@ -129,7 +129,7 @@ public class ControlPointRegistrar {
         if (owner == null || (matched != null && owner.getId().equals(matched.getId()))) {
             return null;
         }
-        return "관리번호 " + row.pointNo() + "는 이미 다른 기준점(" + owner.getName() + ")이 쓰고 있습니다.";
+        return "관리번호 " + row.pointNo() + "가 다른 기준점(" + owner.getName() + ")에 등록되어 있습니다.";
     }
 
     private static void rejectIfPointNoTaken(Row row, ControlPoint matched, ControlPoint owner) {
