@@ -51,12 +51,14 @@ class SurveyApiTest {
         return Long.parseLong(m.group(1));
     }
 
-    private long createProject() throws Exception {
+    /** 대상 없는 프로젝트는 만들 수 없으므로 등록해 둔 점 하나를 대상으로 넣는다. */
+    private long createProject(long targetPointId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/survey-projects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name": "2026 일제조사", "startedOn": "2026-07-01", "note": "정기 조사"}
-                                """))
+                                {"name": "2026 일제조사", "startedOn": "2026-07-01", "note": "정기 조사",
+                                 "targetPointIds": [%d]}
+                                """.formatted(targetPointId)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return extractId(bodyOf(result));
@@ -108,9 +110,10 @@ class SurveyApiTest {
     }
 
     @Test
-    @DisplayName("프로젝트 생성·목록·단건 조회")
+    @DisplayName("프로젝트 생성·목록·단건 조회 — 생성 시 지정한 대상이 대상 목록에 실린다")
     void createAndGetProjects() throws Exception {
-        long id = createProject();
+        long pointId = registerPoint();
+        long id = createProject(pointId);
 
         MvcResult list = mockMvc.perform(get("/api/survey-projects"))
                 .andExpect(status().isOk())
@@ -123,14 +126,75 @@ class SurveyApiTest {
                 .andReturn();
         assertTrue(bodyOf(single).contains("\"startedOn\":\"2026-07-01\""));
 
+        MvcResult targets = mockMvc.perform(get("/api/survey-projects/" + id + "/targets"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(targets).contains(String.valueOf(pointId)));
+
         mockMvc.perform(get("/api/survey-projects/999999")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("대상 없는 생성은 400, 없는 점을 대상으로 지정하면 404")
+    void create_withoutTargetsOrMissingPoint() throws Exception {
+        MvcResult empty = mockMvc.perform(post("/api/survey-projects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-07-01\"}"))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertTrue(bodyOf(empty).contains("\"code\":\"COMMON_INVALID_INPUT\""));
+
+        MvcResult missing = mockMvc.perform(post("/api/survey-projects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-07-01\", \"targetPointIds\": [999999]}"))
+                .andExpect(status().isNotFound())
+                .andReturn();
+        assertTrue(bodyOf(missing).contains("\"code\":\"CONTROL_POINT_NOT_FOUND\""));
+    }
+
+    @Test
+    @DisplayName("프로젝트 수정 — 이름·기간·비고가 바뀌고, 없는 프로젝트는 404")
+    void updateProject() throws Exception {
+        long pointId = registerPoint();
+        long id = createProject(pointId);
+
+        MvcResult result = mockMvc.perform(put("/api/survey-projects/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "하반기 조사", "startedOn": "2026-08-01", "endedOn": "2026-08-31"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"name\":\"하반기 조사\""));
+        assertTrue(body.contains("\"startedOn\":\"2026-08-01\""));
+        assertTrue(body.contains("\"endedOn\":\"2026-08-31\""));
+        assertTrue(body.contains("\"note\":null")); // 보낸 대로 — 비고를 비웠다
+
+        mockMvc.perform(put("/api/survey-projects/999999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-08-01\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("프로젝트 삭제 — 대상·기록까지 지워지고 204, 없는 프로젝트 삭제는 404")
+    void deleteProject_cascades() throws Exception {
+        long projectId = importSample(); // 대상 49·기록 44가 실린 프로젝트 — 동반 삭제를 실데이터로 검증
+
+        mockMvc.perform(delete("/api/survey-projects/" + projectId))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/survey-projects/" + projectId)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/survey-projects/" + projectId + "/targets")).andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/survey-projects/" + projectId)).andExpect(status().isNotFound());
     }
 
     @Test
     @DisplayName("조사기록 — 기록은 200, 재기록은 정정, 목록은 content로 반환")
     void recordAndReviseAndList() throws Exception {
-        long projectId = createProject();
         long pointId = registerPoint();
+        long projectId = createProject(pointId);
 
         MvcResult first = mockMvc.perform(
                         put("/api/survey-projects/" + projectId + "/records/" + pointId)
@@ -161,8 +225,8 @@ class SurveyApiTest {
     @Test
     @DisplayName("조사기록 삭제는 204, 없는 기록 삭제·없는 프로젝트 기록은 404")
     void deleteRecord() throws Exception {
-        long projectId = createProject();
         long pointId = registerPoint();
+        long projectId = createProject(pointId);
         mockMvc.perform(put("/api/survey-projects/" + projectId + "/records/" + pointId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"result\": \"INTACT\"}"))
@@ -186,8 +250,8 @@ class SurveyApiTest {
     @Test
     @DisplayName("결과 없는 조사기록 요청 — 400 COMMON_INVALID_INPUT")
     void record_missingResult_400() throws Exception {
-        long projectId = createProject();
         long pointId = registerPoint();
+        long projectId = createProject(pointId);
 
         MvcResult result = mockMvc.perform(
                         put("/api/survey-projects/" + projectId + "/records/" + pointId)
