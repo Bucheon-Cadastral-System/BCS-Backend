@@ -18,7 +18,8 @@ public record CreateSurveyProjectRequest(
         List<@NotNull(message = "대상 기준점 id는 비울 수 없습니다.") Long> targetPointIds
 ) {
 
-    public CreateSurveyProjectCommand toCommand() {
-        return new CreateSurveyProjectCommand(name, startedOn, endedOn, note, targetPointIds);
+    /** 작성자는 요청 본문이 아니라 인증에서 받는다 — 클라이언트가 지정하면 위조할 수 있다. */
+    public CreateSurveyProjectCommand toCommand(Long authorId) {
+        return new CreateSurveyProjectCommand(authorId, name, startedOn, endedOn, note, targetPointIds);
     }
 }

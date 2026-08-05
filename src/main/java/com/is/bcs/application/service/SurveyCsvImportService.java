@@ -53,7 +53,7 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
     /** 읽어 둔 행을 한 트랜잭션으로 저장한다 — 한 행이라도 실패하면 조사째로 되돌린다. */
     private SurveyCsvImportResult store(ImportSurveyCsvCommand command, List<Row> rows) {
         SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
-                command.name(), command.startedOn(), command.endedOn(), command.note()));
+                command.authorId(), command.name(), command.startedOn(), command.endedOn(), command.note()));
 
         ControlPointRegistrar.Result points = controlPointRegistrar.register(rows);
 

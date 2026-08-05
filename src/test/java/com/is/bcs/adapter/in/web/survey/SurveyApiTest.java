@@ -120,6 +120,10 @@ class SurveyApiTest {
                 .andReturn();
         assertTrue(bodyOf(list).contains("\"content\":["));
         assertTrue(bodyOf(list).contains("\"name\":\"2026 일제조사\""));
+        // 목록은 요약이다 — 행별 완료 표시·작성자 표기가 여기 실려 온다(작성자는 인증 전이라 null)
+        assertTrue(bodyOf(list).contains("\"targetCount\":1"));
+        assertTrue(bodyOf(list).contains("\"surveyedCount\":0"));
+        assertTrue(bodyOf(list).contains("\"authorName\":null"));
 
         MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
                 .andExpect(status().isOk())

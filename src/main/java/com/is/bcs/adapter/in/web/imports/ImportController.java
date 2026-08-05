@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.imports;
 
+import com.is.bcs.adapter.in.web.common.OptionalMemberId;
 import com.is.bcs.application.dto.ControlPointImportResult;
 import com.is.bcs.application.dto.ImportSurveyCsvCommand;
 import com.is.bcs.application.dto.SurveyCsvImportResult;
@@ -9,6 +10,7 @@ import com.is.bcs.application.port.in.imports.PreviewControlPointsUseCase;
 import com.is.bcs.application.port.in.imports.PreviewSurveyCsvUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +37,7 @@ public class ImportController {
     private final ImportControlPointsUseCase importControlPointsUseCase;
     private final PreviewSurveyCsvUseCase previewSurveyCsvUseCase;
     private final PreviewControlPointsUseCase previewControlPointsUseCase;
+    private final OptionalMemberId optionalMemberId;
 
     /** 확정 전에 파일만 읽어 본다 — 등록은 일어나지 않으므로 확정할 때 파일을 다시 보낸다. */
     @PostMapping("/survey-csv/preview")
@@ -54,10 +57,11 @@ public class ImportController {
             @RequestParam("name") String name,
             @RequestParam("startedOn") LocalDate startedOn,
             @RequestParam(value = "endedOn", required = false) LocalDate endedOn,
-            @RequestParam(value = "note", required = false) String note
+            @RequestParam(value = "note", required = false) String note,
+            Authentication authentication
     ) throws IOException {
-        SurveyCsvImportResult result = importSurveyCsvUseCase.importCsv(
-                new ImportSurveyCsvCommand(name, startedOn, endedOn, note, file.getBytes()));
+        SurveyCsvImportResult result = importSurveyCsvUseCase.importCsv(new ImportSurveyCsvCommand(
+                optionalMemberId.of(authentication), name, startedOn, endedOn, note, file.getBytes()));
 
         return ResponseEntity
                 .created(URI.create("/api/survey-projects/" + result.projectId()))

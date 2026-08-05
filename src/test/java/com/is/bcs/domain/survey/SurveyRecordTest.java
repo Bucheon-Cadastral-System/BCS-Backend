@@ -34,13 +34,13 @@ class SurveyRecordTest {
         SurveyRecord record = SurveyRecord.create(1L, 10L, SurveyResult.INTACT, SURVEYED_AT, "최초 비고", null);
         OffsetDateTime revisedAt = SURVEYED_AT.plusDays(1);
 
-        record.revise(SurveyResult.LOST, revisedAt, "정정 비고");
+        record.revise(SurveyResult.LOST, revisedAt, "정정 비고", 7L);
 
         assertTrue(record.isLost());
         assertEquals(revisedAt, record.getSurveyedAt());
         assertEquals("정정 비고", record.getNote());
 
-        record.revise(SurveyResult.INTACT, revisedAt, null);
+        record.revise(SurveyResult.INTACT, revisedAt, null, null);
         assertEquals(null, record.getNote()); // 비고 없는 정정은 비고를 지운다(전체 교체)
     }
 

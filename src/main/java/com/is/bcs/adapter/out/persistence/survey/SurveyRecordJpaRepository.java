@@ -39,4 +39,17 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
 
         long getCount();
     }
+
+    // 목록의 완료 표시용 일괄 집계 — 진행률과 같은 규칙으로 '대상'인 점의 기록만 센다
+    @Query("select r.projectId as projectId, count(r) as cnt from SurveyRecordJpaEntity r"
+            + " where exists (select 1 from SurveyTargetJpaEntity t where t.projectId = r.projectId and t.pointId = r.pointId)"
+            + " group by r.projectId")
+    List<ProjectCount> countSurveyedByProject();
+
+    interface ProjectCount {
+
+        Long getProjectId();
+
+        long getCnt();
+    }
 }

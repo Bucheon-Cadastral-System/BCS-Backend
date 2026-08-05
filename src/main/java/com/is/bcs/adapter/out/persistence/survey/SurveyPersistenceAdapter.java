@@ -84,6 +84,14 @@ public class SurveyPersistenceAdapter
     }
 
     @Override
+    public Map<Long, Long> countSurveyedByProject() {
+        return recordRepository.countSurveyedByProject().stream()
+                .collect(Collectors.toMap(
+                        SurveyRecordJpaRepository.ProjectCount::getProjectId,
+                        SurveyRecordJpaRepository.ProjectCount::getCnt));
+    }
+
+    @Override
     public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
         recordRepository.deleteByProjectIdAndPointId(projectId, pointId);
     }

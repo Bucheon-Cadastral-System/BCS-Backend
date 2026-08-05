@@ -3,8 +3,11 @@ package com.is.bcs.application.service;
 import com.is.bcs.application.dto.CreateSurveyProjectCommand;
 import com.is.bcs.application.dto.RecordSurveyCommand;
 import com.is.bcs.application.dto.SurveyProgress;
+import com.is.bcs.application.dto.SurveyProjectSummary;
+import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.application.dto.UpdateSurveyProjectCommand;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
+import com.is.bcs.application.port.out.member.LoadMemberNamesPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyTargetPort;
@@ -64,15 +67,49 @@ class SurveyServiceTest {
     private final FakeTargetStore targetStore = new FakeTargetStore();
     private final FakeSurveyStore store = new FakeSurveyStore(targetStore);
     private final FakePointStore pointStore = new FakePointStore();
+    private final FakeMemberNames memberNames = new FakeMemberNames();
     private final SurveyService service = new SurveyService(
             store, store, store, store, store, store, targetStore, targetStore, targetStore,
-            pointStore, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
+            pointStore, memberNames, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
 
     /** 대상 점을 등록소에 넣고 그 점들을 대상으로 프로젝트를 만든다 — 대상 없는 프로젝트는 만들 수 없다. */
     private SurveyProject sampleProject(Long... targetPointIds) {
         List<Long> ids = targetPointIds.length == 0 ? List.of(1L) : List.of(targetPointIds);
         ids.forEach(pointStore::add);
-        return service.create(new CreateSurveyProjectCommand("2026 일제조사", STARTED, null, "정기 조사", ids));
+        return service.create(new CreateSurveyProjectCommand(null, "2026 일제조사", STARTED, null, "정기 조사", ids));
+    }
+
+    @Test
+    @DisplayName("목록 요약 — 프로젝트마다 대상·조사 수가 실리고, 작성자는 기록이 없으면 null 이다")
+    void getSummaries_carriesCountsPerProject() {
+        SurveyProject first = sampleProject(10L, 11L);
+        service.record(new RecordSurveyCommand(first.getId(), 10L, SurveyResult.INTACT, null, null));
+        pointStore.add(12L);
+        SurveyProject second = service.create(new CreateSurveyProjectCommand(null, "다른 조사", STARTED, null, null, List.of(12L)));
+
+        Map<Long, SurveyProjectSummary> byId = service.getSummaries().stream()
+                .collect(Collectors.toMap(s -> s.project().getId(), s -> s));
+
+        assertEquals(2, byId.size());
+        assertEquals(2, byId.get(first.getId()).targetCount());
+        assertEquals(1, byId.get(first.getId()).surveyedCount());
+        assertEquals(1, byId.get(second.getId()).targetCount());
+        assertEquals(0, byId.get(second.getId()).surveyedCount());
+        assertNull(byId.get(first.getId()).authorName()); // 인증 없는 호출은 작성자 기록이 없다
+    }
+
+    @Test
+    @DisplayName("목록 요약 — 인증 주체로 만든 프로젝트는 작성자 이름이 실려 온다")
+    void getSummaries_resolvesAuthorName() {
+        pointStore.add(10L);
+        memberNames.names.put(7L, "김측량");
+
+        SurveyProject project = service.create(
+                new CreateSurveyProjectCommand(7L, "일제조사", STARTED, null, null, List.of(10L)));
+
+        SurveyProjectSummary summary = service.getSummaries().stream()
+                .filter(s -> s.project().getId().equals(project.getId())).findFirst().orElseThrow();
+        assertEquals("김측량", summary.authorName());
     }
 
     @Test
@@ -80,7 +117,7 @@ class SurveyServiceTest {
     void getTargetPointIds() {
         SurveyProject project = sampleProject(10L, 11L);
         pointStore.add(12L);
-        service.create(new CreateSurveyProjectCommand("다른 조사", STARTED, null, null, List.of(12L)));
+        service.create(new CreateSurveyProjectCommand(null, "다른 조사", STARTED, null, null, List.of(12L)));
 
         assertEquals(List.of(10L, 11L), service.getTargetPointIds(project.getId()));
         assertThrows(SurveyProjectNotFoundException.class, () -> service.getTargetPointIds(999L));
@@ -108,7 +145,7 @@ class SurveyServiceTest {
         pointStore.add(10L);
         pointStore.add(11L);
 
-        SurveyProject project = service.create(new CreateSurveyProjectCommand(
+        SurveyProject project = service.create(new CreateSurveyProjectCommand(null, 
                 "일제조사", STARTED, null, null, List.of(10L, 10L, 11L)));
 
         assertEquals(List.of(10L, 11L), service.getTargetPointIds(project.getId()));
@@ -118,13 +155,13 @@ class SurveyServiceTest {
     @DisplayName("생성 — 대상이 비어 있으면 거부한다(프로젝트는 점을 지정해 조사 여부를 적는 단위다)")
     void create_withoutTargets_rejected() {
         assertThrows(InvalidSurveyException.class, () -> service.create(
-                new CreateSurveyProjectCommand("일제조사", STARTED, null, null, List.of())));
+                new CreateSurveyProjectCommand(null, "일제조사", STARTED, null, null, List.of())));
         assertThrows(InvalidSurveyException.class, () -> service.create(
-                new CreateSurveyProjectCommand("일제조사", STARTED, null, null, null)));
+                new CreateSurveyProjectCommand(null, "일제조사", STARTED, null, null, null)));
         // null 요소는 값이 오지 않은 것 — 흘려보내면 조회 단계에서 5xx 로 둔갑한다
         pointStore.add(10L);
         assertThrows(InvalidSurveyException.class, () -> service.create(
-                new CreateSurveyProjectCommand("일제조사", STARTED, null, null, Arrays.asList(10L, null))));
+                new CreateSurveyProjectCommand(null, "일제조사", STARTED, null, null, Arrays.asList(10L, null))));
         assertTrue(service.getAll().isEmpty());
     }
 
@@ -134,7 +171,7 @@ class SurveyServiceTest {
         pointStore.add(10L);
 
         ControlPointNotFoundException thrown = assertThrows(ControlPointNotFoundException.class,
-                () -> service.create(new CreateSurveyProjectCommand(
+                () -> service.create(new CreateSurveyProjectCommand(null, 
                         "일제조사", STARTED, null, null, List.of(10L, 99L))));
 
         assertTrue(thrown.getMessage().contains("99"));
@@ -146,7 +183,7 @@ class SurveyServiceTest {
     @DisplayName("수정 — 이름·기간·비고가 바뀌고, 같은 대상을 다시 적으면 대상·기록은 그대로다")
     void update_changesValues_keepsTargets() {
         SurveyProject project = sampleProject(10L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
 
         SurveyProject updated = service.update(new UpdateSurveyProjectCommand(
                 project.getId(), " 2026 하반기 조사 ", STARTED.plusDays(1), STARTED.plusDays(30), null, List.of(10L)));
@@ -166,16 +203,16 @@ class SurveyServiceTest {
     void update_reassignsTargets_deletesRemovedPointRecords() {
         SurveyProject project = sampleProject(10L, 11L);
         pointStore.add(12L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
-        service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null));
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
+        service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null, null));
 
         service.update(new UpdateSurveyProjectCommand(
                 project.getId(), "2026 일제조사", STARTED, null, null, List.of(11L, 12L)));
 
         assertEquals(List.of(11L, 12L), service.getTargetPointIds(project.getId()));
-        List<SurveyRecord> records = service.getByProjectId(project.getId());
+        List<SurveyRecordSummary> records = service.getByProjectId(project.getId());
         assertEquals(1, records.size()); // 10번 점의 기록은 대상에서 빠지며 함께 지워졌다
-        assertEquals(11L, records.get(0).getPointId());
+        assertEquals(11L, records.get(0).record().getPointId());
     }
 
     @Test
@@ -198,7 +235,7 @@ class SurveyServiceTest {
     @DisplayName("수정 — 없는 점이 섞이면 전체를 거부하고 이름·대상·기록 모두 그대로다")
     void update_missingTargetPoint_rejectedWithoutChanges() {
         SurveyProject project = sampleProject(10L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
 
         assertThrows(ControlPointNotFoundException.class, () -> service.update(new UpdateSurveyProjectCommand(
                 project.getId(), "바꾼 이름", STARTED, null, null, List.of(99L))));
@@ -223,7 +260,7 @@ class SurveyServiceTest {
     @DisplayName("삭제 — 프로젝트와 함께 대상 지정·조사 기록도 지운다")
     void delete_removesProjectWithTargetsAndRecords() {
         SurveyProject project = sampleProject(10L, 11L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
 
         service.delete(project.getId());
 
@@ -244,7 +281,7 @@ class SurveyServiceTest {
         SurveyProject project = sampleProject(10L);
 
         SurveyRecord record = service.record(
-                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, "대상(2건)"));
+                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, "대상(2건)", null)).record();
 
         assertNotNull(record.getId());
         assertEquals(FIXED_KST, record.getSurveyedAt());
@@ -253,18 +290,20 @@ class SurveyServiceTest {
     }
 
     @Test
-    @DisplayName("같은 프로젝트×기준점에 다시 기록하면 새 레코드가 아니라 판정 정정이다")
+    @DisplayName("같은 프로젝트×기준점에 다시 기록하면 새 레코드가 아니라 판정 정정이고, 조사원 이름이 실려 온다")
     void record_existing_revisesInsteadOfDuplicate() {
         SurveyProject project = sampleProject(10L);
+        memberNames.names.put(7L, "김측량");
         SurveyRecord first = service.record(
-                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null)).record();
 
-        SurveyRecord revised = service.record(
-                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, "정정 비고"));
+        SurveyRecordSummary revised = service.record(
+                new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, "정정 비고", 7L));
 
-        assertEquals(first.getId(), revised.getId()); // 레코드는 하나 — id 유지
-        assertTrue(revised.isLost());
-        assertEquals("정정 비고", revised.getNote()); // 정정 시 비고도 교체된다
+        assertEquals(first.getId(), revised.record().getId()); // 레코드는 하나 — id 유지
+        assertTrue(revised.record().isLost());
+        assertEquals("정정 비고", revised.record().getNote()); // 정정 시 비고도 교체된다
+        assertEquals("김측량", revised.surveyorName()); // 마지막 판정의 주체가 남는다
         assertEquals(1, service.getByProjectId(project.getId()).size());
     }
 
@@ -274,9 +313,9 @@ class SurveyServiceTest {
         SurveyProject project = sampleProject(10L);
 
         assertThrows(SurveyProjectNotFoundException.class,
-                () -> service.record(new RecordSurveyCommand(99L, 10L, SurveyResult.INTACT, null)));
+                () -> service.record(new RecordSurveyCommand(99L, 10L, SurveyResult.INTACT, null, null)));
         assertThrows(ControlPointNotFoundException.class,
-                () -> service.record(new RecordSurveyCommand(project.getId(), 99L, SurveyResult.INTACT, null)));
+                () -> service.record(new RecordSurveyCommand(project.getId(), 99L, SurveyResult.INTACT, null, null)));
     }
 
     @Test
@@ -286,7 +325,7 @@ class SurveyServiceTest {
         pointStore.add(11L); // 등록된 점이지만 이 프로젝트의 대상은 아니다
 
         assertThrows(SurveyTargetNotFoundException.class,
-                () -> service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.INTACT, null)));
+                () -> service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.INTACT, null, null)));
         assertTrue(service.getByProjectId(project.getId()).isEmpty());
     }
 
@@ -294,7 +333,7 @@ class SurveyServiceTest {
     @DisplayName("조사 취소는 레코드를 삭제하고, 없는 기록 취소는 SurveyRecordNotFoundException")
     void cancel_deletesRecord() {
         SurveyProject project = sampleProject(10L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
 
         service.cancel(project.getId(), 10L);
 
@@ -312,9 +351,9 @@ class SurveyServiceTest {
     @DisplayName("조사 현황 — 조사됨=기록 존재(망실 포함), 결과별 개수는 없는 결과도 0으로 채워 준다")
     void getProgress_countsRecordsByResult() {
         SurveyProject project = sampleProject(10L, 11L, 12L, 13L, 14L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
-        service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null));
-        service.record(new RecordSurveyCommand(project.getId(), 12L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
+        service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null, null));
+        service.record(new RecordSurveyCommand(project.getId(), 12L, SurveyResult.INTACT, null, null));
 
         SurveyProgress progress = service.getProgress(project.getId());
 
@@ -359,8 +398,8 @@ class SurveyServiceTest {
         for (long i = 5; i <= 10; i++) {
             pointStore.add(i);
         }
-        service.record(new RecordSurveyCommand(pid, 1L, SurveyResult.INTACT, null));
-        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.LOST, null));
+        service.record(new RecordSurveyCommand(pid, 1L, SurveyResult.INTACT, null, null));
+        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.LOST, null, null));
 
         SurveyProgress progress = service.getProgress(pid);
 
@@ -375,8 +414,8 @@ class SurveyServiceTest {
     void getProgress_allTargetsSurveyed_complete() {
         SurveyProject project = sampleProject(1L, 2L);
         Long pid = project.getId();
-        service.record(new RecordSurveyCommand(pid, 1L, SurveyResult.INTACT, null));
-        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.LOST, null));
+        service.record(new RecordSurveyCommand(pid, 1L, SurveyResult.INTACT, null, null));
+        service.record(new RecordSurveyCommand(pid, 2L, SurveyResult.LOST, null, null));
 
         SurveyProgress progress = service.getProgress(pid);
 
@@ -448,6 +487,17 @@ class SurveyServiceTest {
         @Override
         public boolean existsRecordByPointId(Long pointId) {
             return records.values().stream().anyMatch(r -> r.getPointId().equals(pointId));
+        }
+
+        @Override
+        public Map<Long, Long> countSurveyedByProject() {
+            // 실제 쿼리처럼 '대상'인 점의 기록만 센다
+            Map<Long, Long> counts = new HashMap<>();
+            records.values().stream()
+                    .filter(r -> targetStore.targets.stream().anyMatch(
+                            t -> t.getProjectId().equals(r.getProjectId()) && t.getPointId().equals(r.getPointId())))
+                    .forEach(r -> counts.merge(r.getProjectId(), 1L, Long::sum));
+            return counts;
         }
 
         @Override
@@ -524,6 +574,13 @@ class SurveyServiceTest {
         }
 
         @Override
+        public Map<Long, Long> countTargetsByProject() {
+            Map<Long, Long> counts = new HashMap<>();
+            targets.forEach(t -> counts.merge(t.getProjectId(), 1L, Long::sum));
+            return counts;
+        }
+
+        @Override
         public boolean existsByProjectIdAndPointId(Long projectId, Long pointId) {
             return targets.stream()
                     .anyMatch(t -> t.getProjectId().equals(projectId) && t.getPointId().equals(pointId));
@@ -549,6 +606,21 @@ class SurveyServiceTest {
         @Override
         public void deleteByProjectIdAndPointIds(Long projectId, List<Long> pointIds) {
             targets.removeIf(t -> t.getProjectId().equals(projectId) && pointIds.contains(t.getPointId()));
+        }
+    }
+
+    /** 작성자 이름 조회 페이크 — 등록된 회원만 이름을 돌려준다. */
+    private static class FakeMemberNames implements LoadMemberNamesPort {
+
+        final Map<Long, String> names = new HashMap<>();
+
+        @Override
+        public Map<Long, String> findNamesByIds(Collection<Long> ids) {
+            Map<Long, String> found = new HashMap<>();
+            ids.forEach(id -> {
+                if (names.containsKey(id)) found.put(id, names.get(id));
+            });
+            return found;
         }
     }
 

@@ -3,7 +3,10 @@ package com.is.bcs.application.service;
 import com.is.bcs.application.dto.CreateSurveyProjectCommand;
 import com.is.bcs.application.dto.RecordSurveyCommand;
 import com.is.bcs.application.dto.SurveyProgress;
+import com.is.bcs.application.dto.SurveyProjectSummary;
+import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.application.dto.UpdateSurveyProjectCommand;
+import com.is.bcs.application.port.out.member.LoadMemberNamesPort;
 import com.is.bcs.application.port.in.survey.CancelSurveyUseCase;
 import com.is.bcs.application.port.in.survey.CreateSurveyProjectUseCase;
 import com.is.bcs.application.port.in.survey.DeleteSurveyProjectUseCase;
@@ -61,6 +64,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     private final SaveSurveyTargetPort saveSurveyTargetPort;
     private final DeleteSurveyTargetPort deleteSurveyTargetPort;
     private final LoadControlPointPort loadControlPointPort;
+    private final LoadMemberNamesPort loadMemberNamesPort;
     private final Clock clock;
 
     /**
@@ -70,8 +74,8 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     @Override
     public SurveyProject create(CreateSurveyProjectCommand command) {
         List<Long> pointIds = requireTargetPoints(command.targetPointIds());
-        SurveyProject project = saveSurveyProjectPort.save(
-                SurveyProject.create(command.name(), command.startedOn(), command.endedOn(), command.note()));
+        SurveyProject project = saveSurveyProjectPort.save(SurveyProject.create(
+                command.authorId(), command.name(), command.startedOn(), command.endedOn(), command.note()));
         saveSurveyTargetPort.saveAll(pointIds.stream()
                 .map(pointId -> SurveyTarget.create(project.getId(), pointId))
                 .toList());
@@ -143,6 +147,24 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         return loadSurveyProjectPort.findAllProjects();
     }
 
+    /** 목록 요약 — 행별 진행률 조회(N+1) 대신 프로젝트·대상·조사 수를 각각 한 번에 모아 붙인다. */
+    @Override
+    @Transactional(readOnly = true)
+    public List<SurveyProjectSummary> getSummaries() {
+        List<SurveyProject> projects = loadSurveyProjectPort.findAllProjects();
+        Map<Long, Long> targetCounts = loadSurveyTargetPort.countTargetsByProject();
+        Map<Long, Long> surveyedCounts = loadSurveyRecordPort.countSurveyedByProject();
+        Map<Long, String> authorNames = loadMemberNamesPort.findNamesByIds(projects.stream()
+                .map(SurveyProject::getAuthorId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        return projects.stream()
+                .map(project -> new SurveyProjectSummary(
+                        project,
+                        targetCounts.getOrDefault(project.getId(), 0L),
+                        surveyedCounts.getOrDefault(project.getId(), 0L),
+                        project.getAuthorId() == null ? null : authorNames.get(project.getAuthorId())))
+                .toList();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public SurveyProject getById(Long id) {
@@ -151,7 +173,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
 
     /** 조사 수행 기록 — 이미 조사한 점이면 새 레코드가 아니라 판정 정정(revise)으로 처리한다. */
     @Override
-    public SurveyRecord record(RecordSurveyCommand command) {
+    public SurveyRecordSummary record(RecordSurveyCommand command) {
         requireProject(command.projectId());
         requirePoint(command.pointId());
         // 기록은 대상으로 지정한 점에만 — 비대상 기록을 허용하면 화면 밖 경로(직접 호출)로 진행률의 전제가 깨진다
@@ -161,14 +183,14 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         SurveyRecord record = loadSurveyRecordPort
                 .findRecordByProjectIdAndPointId(command.projectId(), command.pointId())
                 .map(existing -> {
-                    existing.revise(command.result(), now, command.note());
+                    existing.revise(command.result(), now, command.note(), command.surveyorId());
                     return existing;
                 })
-                // 조사원은 인증 주체로 채울 값이라 인증이 붙기 전까지 비워 둔다
                 .orElseGet(() -> SurveyRecord.create(
-                        command.projectId(), command.pointId(), command.result(), now, command.note(), null));
+                        command.projectId(), command.pointId(), command.result(), now, command.note(),
+                        command.surveyorId()));
 
-        return saveSurveyRecordPort.save(record);
+        return withSurveyorName(saveSurveyRecordPort.save(record));
     }
 
     @Override
@@ -182,9 +204,24 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
 
     @Override
     @Transactional(readOnly = true)
-    public List<SurveyRecord> getByProjectId(Long projectId) {
+    public List<SurveyRecordSummary> getByProjectId(Long projectId) {
         requireProject(projectId);
-        return loadSurveyRecordPort.findRecordsByProjectId(projectId);
+        List<SurveyRecord> records = loadSurveyRecordPort.findRecordsByProjectId(projectId);
+        Map<Long, String> names = loadMemberNamesPort.findNamesByIds(records.stream()
+                .map(SurveyRecord::getSurveyedById).filter(Objects::nonNull).collect(Collectors.toSet()));
+        return records.stream()
+                .map(record -> new SurveyRecordSummary(
+                        record, record.getSurveyedById() == null ? null : names.get(record.getSurveyedById())))
+                .toList();
+    }
+
+    /** 한 건에 조사원 이름을 붙인다 — 기록 응답만으로 화면이 이름을 그릴 수 있게. */
+    private SurveyRecordSummary withSurveyorName(SurveyRecord record) {
+        if (record.getSurveyedById() == null) {
+            return new SurveyRecordSummary(record, null);
+        }
+        return new SurveyRecordSummary(record,
+                loadMemberNamesPort.findNamesByIds(Set.of(record.getSurveyedById())).get(record.getSurveyedById()));
     }
 
     /** 프로젝트의 조사 대상 점 id — 없는 프로젝트면 거부한다. */

@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 조사 대상 영속 어댑터 — 조사기록 어댑터와 분리한다.
@@ -32,6 +34,14 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
     @Override
     public boolean existsByPointId(Long pointId) {
         return targetRepository.existsByPointId(pointId);
+    }
+
+    @Override
+    public Map<Long, Long> countTargetsByProject() {
+        return targetRepository.countByProject().stream()
+                .collect(Collectors.toMap(
+                        SurveyTargetJpaRepository.ProjectCount::getProjectId,
+                        SurveyTargetJpaRepository.ProjectCount::getCnt));
     }
 
     @Override

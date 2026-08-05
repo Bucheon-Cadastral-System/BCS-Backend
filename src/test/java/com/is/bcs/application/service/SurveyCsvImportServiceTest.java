@@ -97,7 +97,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("임포트 — 조사 프로젝트가 생기고 기준점 49개 등록, 기존조사 44건이 기록된다")
     void importCsv_createsProjectPointsAndRecords() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, "정기 조사", sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, "정기 조사", sampleCsv()));
 
         assertEquals(49, result.totalRows());
         assertEquals(49, result.newPoints());
@@ -117,7 +117,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("조사기록의 시각은 기존조사일의 KST 자정이고 결과·비고가 보존된다")
     void importCsv_recordUsesPriorSurveyDate() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         ControlPoint row1Point = pointStore.findByPointNo("41192D000001265").orElseThrow();
         SurveyRecord record = surveyStore.records.values().stream()
@@ -133,10 +133,10 @@ class SurveyCsvImportServiceTest {
     @Test
     @DisplayName("재임포트하면 기준점은 전부 기존으로 집계되고 마스터는 다시 만들지 않는다")
     void importCsv_again_reusesExistingPoints() throws Exception {
-        service.importCsv(new ImportSurveyCsvCommand("1차", STARTED, null, null, sampleCsv()));
+        service.importCsv(new ImportSurveyCsvCommand(null, "1차", STARTED, null, null, sampleCsv()));
 
         SurveyCsvImportResult second = service.importCsv(
-                new ImportSurveyCsvCommand("2차", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2차", STARTED, null, null, sampleCsv()));
 
         assertEquals(0, second.newPoints());
         assertEquals(49, second.existingPoints());
@@ -157,7 +157,7 @@ class SurveyCsvImportServiceTest {
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
                 new TraverseInfo("2", "ㅁ", "78", false), null, null, null));
 
-        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
         assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
         assertEquals(48, result.newPoints());    // 나머지 48건은 신규
 
@@ -192,7 +192,7 @@ class SurveyCsvImportServiceTest {
                 new TraverseInfo("2", "ㅁ", "78", false), null, null, null));
 
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         assertEquals(1, result.updatedPoints()); // 관리번호가 같아도 성과가 달라 갱신
         ControlPoint merged = pointStore.points.values().stream()
@@ -208,7 +208,7 @@ class SurveyCsvImportServiceTest {
             basicCsv = in.readAllBytes();
         }
 
-        service.importCsv(new ImportSurveyCsvCommand("기본 양식 조사", STARTED, null, null, basicCsv));
+        service.importCsv(new ImportSurveyCsvCommand(null, "기본 양식 조사", STARTED, null, null, basicCsv));
 
         ControlPoint first = pointStore.findByPointNo("41192D000001265").orElseThrow();
         // 기준값은 경위도 열이 덧붙은 확장 양식(/survey-target-sample.csv)의 같은 행에 적힌 값이다
@@ -220,7 +220,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("임포트하면 모든 행이 프로젝트의 조사 대상으로 등록된다")
     void importCsv_registersAllRowsAsTargets() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         assertEquals(49, targetStore.targets.size());
         assertTrue(targetStore.targets.stream().allMatch(t -> t.getProjectId().equals(result.projectId())));
@@ -240,7 +240,7 @@ class SurveyCsvImportServiceTest {
                 """.getBytes(StandardCharsets.UTF_8);
 
         assertThrows(InvalidControlPointException.class, () -> service.importCsv(
-                new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
+                new ImportSurveyCsvCommand(null, "중복 조사", STARTED, null, null, csv)));
 
         // 매퍼가 행 오류로 걸러 트랜잭션에 들어가기 전에 거부하므로 저장이 아예 시작되지 않는다
         assertTrue(pointStore.points.isEmpty());
@@ -261,7 +261,7 @@ class SurveyCsvImportServiceTest {
                 """.getBytes(StandardCharsets.UTF_8);
 
         InvalidControlPointException thrown = assertThrows(InvalidControlPointException.class,
-                () -> service.importCsv(new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
+                () -> service.importCsv(new ImportSurveyCsvCommand(null, "중복 조사", STARTED, null, null, csv)));
 
         // 거부는 3행 하나뿐이어야 한다 — 4행까지 '같은 기준점'으로 걸리면 담당자가 멀쩡한 행을 고치게 된다
         assertTrue(thrown.getMessage().contains("3행"), thrown.getMessage());
@@ -283,7 +283,7 @@ class SurveyCsvImportServiceTest {
                 """.getBytes(StandardCharsets.UTF_8);
 
         DuplicateControlPointException thrown = assertThrows(DuplicateControlPointException.class,
-                () -> service.importCsv(new ImportSurveyCsvCommand("충돌 조사", STARTED, null, null, csv)));
+                () -> service.importCsv(new ImportSurveyCsvCommand(null, "충돌 조사", STARTED, null, null, csv)));
 
         assertTrue(thrown.getMessage().contains("41192D000000001"), thrown.getMessage());
     }
@@ -291,7 +291,7 @@ class SurveyCsvImportServiceTest {
     @Test
     @DisplayName("기본 양식에 없어 기준점으로 옮기지 못한 열은 조사 대상에 그대로 보관된다")
     void importCsv_keepsUnrecognizedColumnsOnTarget() throws Exception {
-        service.importCsv(new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+        service.importCsv(new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         ControlPoint row1Point = pointStore.findByPointNo("41192D000001265").orElseThrow();
         SurveyTarget target = targetStore.targets.stream()

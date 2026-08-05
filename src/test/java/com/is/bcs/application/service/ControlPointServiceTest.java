@@ -344,6 +344,16 @@ class ControlPointServiceTest {
         }
 
         @Override
+        public java.util.Map<Long, Long> countTargetsByProject() {
+            return java.util.Map.of();
+        }
+
+        @Override
+        public java.util.Map<Long, Long> countSurveyedByProject() {
+            return java.util.Map.of();
+        }
+
+        @Override
         public List<Long> findPointIdsByProjectId(Long projectId) {
             return List.of();
         }
