@@ -39,9 +39,11 @@ class SurveyRecordTest {
         assertTrue(record.isLost());
         assertEquals(revisedAt, record.getSurveyedAt());
         assertEquals("정정 비고", record.getNote());
+        assertEquals(7L, record.getSurveyedById()); // 정정하면 마지막 판정 주체로 갈아탄다
 
         record.revise(SurveyResult.INTACT, revisedAt, null, null);
         assertEquals(null, record.getNote()); // 비고 없는 정정은 비고를 지운다(전체 교체)
+        assertEquals(null, record.getSurveyedById()); // 인증 없는 정정도 전체 교체 — 이전 조사원을 남기지 않는다
     }
 
     @Test
