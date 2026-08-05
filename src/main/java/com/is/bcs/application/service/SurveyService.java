@@ -78,11 +78,35 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         return project;
     }
 
+    /**
+     * 수정은 값 갱신과 대상 재지정을 함께 다룬다 — 대상 목록은 부분 수정이 아니라 수정 후의 전체를 다시 적는 값이다.
+     * 대상에서 빠진 점의 조사 기록은 함께 지운다: 기록은 그 프로젝트가 그 점을 조사하기로 한 데 딸린 데이터라,
+     * 연결만 끊어 남기면 어느 화면에도 닿지 않으면서 기준점 삭제만 막는 주인 없는 행이 된다(프로젝트 삭제와 같은 원칙).
+     */
     @Override
     public SurveyProject update(UpdateSurveyProjectCommand command) {
         SurveyProject project = requireProject(command.projectId());
+        // 값 대입 전에 검증을 전부 끝낸다 — 거부된 수정이 일부만 반영된 채 남지 않게(update 의 원자성과 같은 결)
+        List<Long> pointIds = requireTargetPoints(command.targetPointIds());
         project.update(command.name(), command.startedOn(), command.endedOn(), command.note());
-        return saveSurveyProjectPort.save(project);
+        SurveyProject saved = saveSurveyProjectPort.save(project);
+
+        Set<Long> current = Set.copyOf(loadSurveyTargetPort.findPointIdsByProjectId(saved.getId()));
+        Set<Long> requested = Set.copyOf(pointIds);
+        List<Long> removed = current.stream().filter(id -> !requested.contains(id)).toList();
+        if (!removed.isEmpty()) {
+            // 프로젝트 삭제와 같은 순서(기록→대상) — 대상이 먼저 사라지면 기록이 잠깐 비대상 상태로 남는다
+            deleteSurveyRecordPort.deleteByProjectIdAndPointIds(saved.getId(), removed);
+            deleteSurveyTargetPort.deleteByProjectIdAndPointIds(saved.getId(), removed);
+        }
+        List<SurveyTarget> added = pointIds.stream()
+                .filter(id -> !current.contains(id))
+                .map(id -> SurveyTarget.create(saved.getId(), id))
+                .toList();
+        if (!added.isEmpty()) {
+            saveSurveyTargetPort.saveAll(added);
+        }
+        return saved;
     }
 
     /** 대상 지정·조사 기록은 프로젝트에 속한 데이터라 함께 지운다 — 남기면 주인 없는 행이 된다. */

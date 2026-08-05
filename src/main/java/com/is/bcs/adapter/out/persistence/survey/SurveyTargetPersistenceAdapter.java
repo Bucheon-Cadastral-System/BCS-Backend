@@ -55,4 +55,15 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
     public void deleteByProjectId(Long projectId) {
         targetRepository.deleteByProjectId(projectId);
     }
+
+    @Override
+    public void deleteByProjectIdAndPointIds(Long projectId, List<Long> pointIds) {
+        // PostgreSQL 바인드 변수 상한(65,535)에 여유를 두고 나눈다 — 점 조회 어댑터와 같은 규칙
+        for (int from = 0; from < pointIds.size(); from += CHUNK_SIZE) {
+            targetRepository.deleteByProjectIdAndPointIdIn(
+                    projectId, pointIds.subList(from, Math.min(from + CHUNK_SIZE, pointIds.size())));
+        }
+    }
+
+    private static final int CHUNK_SIZE = 1_000;
 }

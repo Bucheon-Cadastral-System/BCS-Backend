@@ -143,12 +143,13 @@ class SurveyServiceTest {
     }
 
     @Test
-    @DisplayName("수정 — 이름·기간·비고가 바뀌고 대상 지정은 그대로다")
+    @DisplayName("수정 — 이름·기간·비고가 바뀌고, 같은 대상을 다시 적으면 대상·기록은 그대로다")
     void update_changesValues_keepsTargets() {
         SurveyProject project = sampleProject(10L);
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
 
         SurveyProject updated = service.update(new UpdateSurveyProjectCommand(
-                project.getId(), " 2026 하반기 조사 ", STARTED.plusDays(1), STARTED.plusDays(30), null));
+                project.getId(), " 2026 하반기 조사 ", STARTED.plusDays(1), STARTED.plusDays(30), null, List.of(10L)));
 
         assertEquals("2026 하반기 조사", updated.getName());
         assertEquals(STARTED.plusDays(1), updated.getStartedOn());
@@ -157,6 +158,54 @@ class SurveyServiceTest {
         assertEquals(project.getId(), updated.getId());
         assertEquals("2026 하반기 조사", service.getById(project.getId()).getName());
         assertEquals(List.of(10L), service.getTargetPointIds(project.getId()));
+        assertEquals(1, service.getByProjectId(project.getId()).size());
+    }
+
+    @Test
+    @DisplayName("수정 — 대상 재지정: 빠진 점은 대상·기록이 함께 지워지고, 남긴 점의 기록은 유지되고, 새 점은 대상에 든다")
+    void update_reassignsTargets_deletesRemovedPointRecords() {
+        SurveyProject project = sampleProject(10L, 11L);
+        pointStore.add(12L);
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+        service.record(new RecordSurveyCommand(project.getId(), 11L, SurveyResult.LOST, null));
+
+        service.update(new UpdateSurveyProjectCommand(
+                project.getId(), "2026 일제조사", STARTED, null, null, List.of(11L, 12L)));
+
+        assertEquals(List.of(11L, 12L), service.getTargetPointIds(project.getId()));
+        List<SurveyRecord> records = service.getByProjectId(project.getId());
+        assertEquals(1, records.size()); // 10번 점의 기록은 대상에서 빠지며 함께 지워졌다
+        assertEquals(11L, records.get(0).getPointId());
+    }
+
+    @Test
+    @DisplayName("수정 — 대상이 비어 있거나 null 요소가 섞이면 거부한다(생성과 같은 규칙)")
+    void update_withoutTargets_rejected() {
+        SurveyProject project = sampleProject(10L);
+
+        assertThrows(InvalidSurveyException.class, () -> service.update(new UpdateSurveyProjectCommand(
+                project.getId(), "이름", STARTED, null, null, List.of())));
+        assertThrows(InvalidSurveyException.class, () -> service.update(new UpdateSurveyProjectCommand(
+                project.getId(), "이름", STARTED, null, null, null)));
+        assertThrows(InvalidSurveyException.class, () -> service.update(new UpdateSurveyProjectCommand(
+                project.getId(), "이름", STARTED, null, null, Arrays.asList(10L, null))));
+        // 거부된 수정은 아무것도 남기지 않는다
+        assertEquals("2026 일제조사", service.getById(project.getId()).getName());
+        assertEquals(List.of(10L), service.getTargetPointIds(project.getId()));
+    }
+
+    @Test
+    @DisplayName("수정 — 없는 점이 섞이면 전체를 거부하고 이름·대상·기록 모두 그대로다")
+    void update_missingTargetPoint_rejectedWithoutChanges() {
+        SurveyProject project = sampleProject(10L);
+        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null));
+
+        assertThrows(ControlPointNotFoundException.class, () -> service.update(new UpdateSurveyProjectCommand(
+                project.getId(), "바꾼 이름", STARTED, null, null, List.of(99L))));
+
+        assertEquals("2026 일제조사", service.getById(project.getId()).getName());
+        assertEquals(List.of(10L), service.getTargetPointIds(project.getId()));
+        assertEquals(1, service.getByProjectId(project.getId()).size());
     }
 
     @Test
@@ -165,9 +214,9 @@ class SurveyServiceTest {
         SurveyProject project = sampleProject();
 
         assertThrows(SurveyProjectNotFoundException.class, () -> service.update(
-                new UpdateSurveyProjectCommand(999L, "이름", STARTED, null, null)));
+                new UpdateSurveyProjectCommand(999L, "이름", STARTED, null, null, List.of(1L))));
         assertThrows(InvalidSurveyException.class, () -> service.update(
-                new UpdateSurveyProjectCommand(project.getId(), "이름", STARTED, STARTED.minusDays(1), null)));
+                new UpdateSurveyProjectCommand(project.getId(), "이름", STARTED, STARTED.minusDays(1), null, List.of(1L))));
     }
 
     @Test
@@ -440,6 +489,12 @@ class SurveyServiceTest {
         }
 
         @Override
+        public void deleteByProjectIdAndPointIds(Long projectId, List<Long> pointIds) {
+            records.values().removeIf(
+                    r -> r.getProjectId().equals(projectId) && pointIds.contains(r.getPointId()));
+        }
+
+        @Override
         public void deleteProjectById(Long id) {
             projects.remove(id);
         }
@@ -489,6 +544,11 @@ class SurveyServiceTest {
         @Override
         public void deleteByProjectId(Long projectId) {
             targets.removeIf(t -> t.getProjectId().equals(projectId));
+        }
+
+        @Override
+        public void deleteByProjectIdAndPointIds(Long projectId, List<Long> pointIds) {
+            targets.removeIf(t -> t.getProjectId().equals(projectId) && pointIds.contains(t.getPointId()));
         }
     }
 

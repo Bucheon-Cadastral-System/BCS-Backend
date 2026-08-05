@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +22,9 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
     void deleteByProjectIdAndPointId(Long projectId, Long pointId);
 
     void deleteByProjectId(Long projectId);
+
+    /** 대상 재지정에서 빠진 점들의 기록. */
+    void deleteByProjectIdAndPointIdIn(Long projectId, Collection<Long> pointIds);
 
     // 진행률은 프로젝트 '대상' 점의 기록만 센다 — 대상 아닌 점의 기록이 조사됨에 섞여 완료가 오탐되지 않도록
     @Query("select r.result as result, count(r) as count from SurveyRecordJpaEntity r"

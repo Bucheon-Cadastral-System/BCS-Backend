@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -22,4 +23,7 @@ public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpa
 
     /** 파생 삭제(엔티티 단위) — 벌크 JPQL 이면 추가 열(@ElementCollection) 행이 남아 FK 에 걸린다. */
     void deleteByProjectId(Long projectId);
+
+    /** 대상 재지정에서 빠진 점들 — 같은 이유로 파생 삭제(엔티티 단위)를 쓴다. */
+    void deleteByProjectIdAndPointIdIn(Long projectId, Collection<Long> pointIds);
 }
