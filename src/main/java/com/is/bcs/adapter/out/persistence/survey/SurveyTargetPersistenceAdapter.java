@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
+import com.is.bcs.application.port.out.survey.DeleteSurveyTargetPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyTargetPort;
 import com.is.bcs.domain.survey.SurveyTarget;
@@ -14,7 +15,7 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
-public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, SaveSurveyTargetPort {
+public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, SaveSurveyTargetPort, DeleteSurveyTargetPort {
 
     private final SurveyTargetJpaRepository targetRepository;
 
@@ -37,5 +38,11 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
     public List<SurveyTarget> saveAll(List<SurveyTarget> targets) {
         return targetRepository.saveAll(targets.stream().map(SurveyTargetJpaEntity::fromDomain).toList())
                 .stream().map(SurveyTargetJpaEntity::toDomain).toList();
+    }
+
+    // 파생 삭제는 엔티티를 읽어 하나씩 지운다 — 벌크 JPQL 이면 추가 열(@ElementCollection) 행이 남아 FK 에 걸린다
+    @Override
+    public void deleteByProjectId(Long projectId) {
+        targetRepository.deleteByProjectId(projectId);
     }
 }

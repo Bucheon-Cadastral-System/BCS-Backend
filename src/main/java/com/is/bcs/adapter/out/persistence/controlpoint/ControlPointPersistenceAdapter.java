@@ -7,6 +7,7 @@ import com.is.bcs.domain.controlpoint.PointType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +48,17 @@ public class ControlPointPersistenceAdapter
         forEachChunk(names, chunk -> repository.findAllByNameIn(chunk).forEach(e -> found.put(e.getId(), e)));
         forEachChunk(pointNos, chunk -> repository.findAllByPointNoIn(chunk).forEach(e -> found.put(e.getId(), e)));
         return found.values().stream().map(ControlPointJpaEntity::toDomain).toList();
+    }
+
+    @Override
+    public List<ControlPoint> findAllByIds(Collection<Long> ids) {
+        List<Long> all = List.copyOf(ids);
+        List<ControlPoint> found = new ArrayList<>(all.size());
+        for (int from = 0; from < all.size(); from += CHUNK_SIZE) {
+            repository.findAllById(all.subList(from, Math.min(from + CHUNK_SIZE, all.size())))
+                    .forEach(entity -> found.add(entity.toDomain()));
+        }
+        return found;
     }
 
     /** PostgreSQL 의 바인드 변수 상한(65,535)에 여유를 두고 나눈다. */

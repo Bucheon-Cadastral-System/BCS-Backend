@@ -27,6 +27,11 @@ public class FakeControlPointStore implements LoadControlPointPort, SaveControlP
     }
 
     @Override
+    public List<ControlPoint> findAllByIds(Collection<Long> ids) {
+        return ids.stream().flatMap(id -> findById(id).stream()).toList();
+    }
+
+    @Override
     public Optional<ControlPoint> findByPointNo(String pointNo) {
         return points.values().stream().filter(p -> p.getPointNo().equals(pointNo)).findFirst();
     }

@@ -18,6 +18,8 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
 
     void deleteByProjectIdAndPointId(Long projectId, Long pointId);
 
+    void deleteByProjectId(Long projectId);
+
     // 진행률은 프로젝트 '대상' 점의 기록만 센다 — 대상 아닌 점의 기록이 조사됨에 섞여 완료가 오탐되지 않도록
     @Query("select r.result as result, count(r) as count from SurveyRecordJpaEntity r"
             + " where r.projectId = :projectId"
