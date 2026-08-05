@@ -9,7 +9,8 @@ public record RecordSurveyRequest(
         String note
 ) {
 
-    public RecordSurveyCommand toCommand(Long projectId, Long pointId) {
-        return new RecordSurveyCommand(projectId, pointId, result, note);
+    /** 조사원은 요청 본문이 아니라 인증에서 받는다 — 클라이언트가 지정하면 위조할 수 있다. */
+    public RecordSurveyCommand toCommand(Long projectId, Long pointId, Long surveyorId) {
+        return new RecordSurveyCommand(projectId, pointId, result, note, surveyorId);
     }
 }

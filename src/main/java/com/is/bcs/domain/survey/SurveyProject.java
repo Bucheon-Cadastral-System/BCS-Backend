@@ -33,8 +33,9 @@ public class SurveyProject {
         this.note = note;
     }
 
-    public static SurveyProject create(String name, LocalDate startedOn, LocalDate endedOn, String note) {
-        return new SurveyProject(null, null, name, startedOn, endedOn, note);
+    /** authorId 는 인증 주체다 — 인증이 없는 호출(개발용 개방 구간)에서는 null 로 만든다. */
+    public static SurveyProject create(Long authorId, String name, LocalDate startedOn, LocalDate endedOn, String note) {
+        return new SurveyProject(null, authorId, name, startedOn, endedOn, note);
     }
 
     /** DB 데이터를 도메인 객체로 복원한다. */

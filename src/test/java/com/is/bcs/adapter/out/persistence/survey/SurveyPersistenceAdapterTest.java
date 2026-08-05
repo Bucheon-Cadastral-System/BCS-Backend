@@ -48,7 +48,7 @@ class SurveyPersistenceAdapterTest {
     private EntityManager entityManager;
 
     private SurveyProject savedProject() {
-        return adapter.save(SurveyProject.create("2026 일제조사", STARTED, null, "정기 조사"));
+        return adapter.save(SurveyProject.create(null, "2026 일제조사", STARTED, null, "정기 조사"));
     }
 
     @Test
@@ -108,7 +108,7 @@ class SurveyPersistenceAdapterTest {
     @DisplayName("결과별 개수는 해당 프로젝트의 대상 점 기록만 결과별로 센다")
     void countByResult_groupsOwnProjectRecords() {
         SurveyProject project = savedProject();
-        SurveyProject other = adapter.save(SurveyProject.create("다른 조사", STARTED, null, null));
+        SurveyProject other = adapter.save(SurveyProject.create(null, "다른 조사", STARTED, null, null));
         for (long pointId : new long[]{10L, 11L, 12L}) {
             targetAdapter.save(SurveyTarget.create(project.getId(), pointId));
         }

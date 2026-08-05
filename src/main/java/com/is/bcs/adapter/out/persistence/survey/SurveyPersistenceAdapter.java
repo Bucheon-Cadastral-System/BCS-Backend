@@ -10,6 +10,7 @@ import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -33,7 +34,9 @@ public class SurveyPersistenceAdapter
 
     @Override
     public List<SurveyProject> findAllProjects() {
-        return projectRepository.findAll().stream().map(SurveyProjectJpaEntity::toDomain).toList();
+        // 최근 시작한 조사가 위 — 화면 정렬(월별·최신순)과 같은 축이고, 무정렬이면 UPDATE 뒤 행 순서가 널뛴다
+        return projectRepository.findAll(Sort.by(Sort.Order.desc("startedOn"), Sort.Order.desc("id")))
+                .stream().map(SurveyProjectJpaEntity::toDomain).toList();
     }
 
     @Override
@@ -81,6 +84,14 @@ public class SurveyPersistenceAdapter
     }
 
     @Override
+    public Map<Long, Long> countSurveyedByProject() {
+        return recordRepository.countSurveyedByProject().stream()
+                .collect(Collectors.toMap(
+                        SurveyRecordJpaRepository.ProjectCount::getProjectId,
+                        SurveyRecordJpaRepository.ProjectCount::getCnt));
+    }
+
+    @Override
     public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
         recordRepository.deleteByProjectIdAndPointId(projectId, pointId);
     }
@@ -89,4 +100,15 @@ public class SurveyPersistenceAdapter
     public void deleteByProjectId(Long projectId) {
         recordRepository.deleteByProjectId(projectId);
     }
+
+    @Override
+    public void deleteByProjectIdAndPointIds(Long projectId, List<Long> pointIds) {
+        // PostgreSQL 바인드 변수 상한(65,535)에 여유를 두고 나눈다 — 점 조회 어댑터와 같은 규칙
+        for (int from = 0; from < pointIds.size(); from += CHUNK_SIZE) {
+            recordRepository.deleteByProjectIdAndPointIdIn(
+                    projectId, pointIds.subList(from, Math.min(from + CHUNK_SIZE, pointIds.size())));
+        }
+    }
+
+    private static final int CHUNK_SIZE = 1_000;
 }

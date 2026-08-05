@@ -120,6 +120,10 @@ class SurveyApiTest {
                 .andReturn();
         assertTrue(bodyOf(list).contains("\"content\":["));
         assertTrue(bodyOf(list).contains("\"name\":\"2026 일제조사\""));
+        // 목록은 요약이다 — 행별 완료 표시·작성자 표기가 여기 실려 온다(작성자는 인증 전이라 null)
+        assertTrue(bodyOf(list).contains("\"targetCount\":1"));
+        assertTrue(bodyOf(list).contains("\"surveyedCount\":0"));
+        assertTrue(bodyOf(list).contains("\"authorName\":null"));
 
         MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
                 .andExpect(status().isOk())
@@ -183,16 +187,31 @@ class SurveyApiTest {
     }
 
     @Test
-    @DisplayName("프로젝트 수정 — 이름·기간·비고가 바뀌고, 없는 프로젝트는 404")
-    void updateProject() throws Exception {
+    @DisplayName("프로젝트 수정 — 이름·기간·비고·대상이 바뀌고, 대상에서 빠진 점의 기록은 함께 지워진다")
+    void updateProject_reassignsTargets() throws Exception {
         long pointId = registerPoint();
         long id = createProject(pointId);
+        MvcResult other = mockMvc.perform(post("/api/control-points")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000009997", "type": "DOGEUN", "name": "9997공",
+                                 "crs": "GRS80_CENTRAL", "northing": 545100.00, "easting": 181100.00}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long otherPointId = extractId(bodyOf(other));
+        // 빠질 점에 기록을 남겨 둔다 — 재지정이 이 기록을 함께 지우는지 본다
+        mockMvc.perform(put("/api/survey-projects/" + id + "/records/" + pointId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"result\": \"INTACT\"}"))
+                .andExpect(status().isOk());
 
         MvcResult result = mockMvc.perform(put("/api/survey-projects/" + id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name": "하반기 조사", "startedOn": "2026-08-01", "endedOn": "2026-08-31"}
-                                """))
+                                {"name": "하반기 조사", "startedOn": "2026-08-01", "endedOn": "2026-08-31",
+                                 "targetPointIds": [%d]}
+                                """.formatted(otherPointId)))
                 .andExpect(status().isOk())
                 .andReturn();
         String body = bodyOf(result);
@@ -201,10 +220,49 @@ class SurveyApiTest {
         assertTrue(body.contains("\"endedOn\":\"2026-08-31\""));
         assertTrue(body.contains("\"note\":null")); // 보낸 대로 — 비고를 비웠다
 
+        // 대상은 재지정한 점만 남는다
+        MvcResult targets = mockMvc.perform(get("/api/survey-projects/" + id + "/targets"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(targets).contains("\"content\":[" + otherPointId + "]"));
+
+        // 빠진 점의 기록도 지워졌다 — 남기면 어느 화면에도 닿지 않으면서 그 점의 삭제만 막는다
+        MvcResult records = mockMvc.perform(get("/api/survey-projects/" + id + "/records"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(records).contains("\"content\":[]"));
+        mockMvc.perform(delete("/api/control-points/" + pointId)).andExpect(status().isNoContent());
+
         mockMvc.perform(put("/api/survey-projects/999999")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-08-01\"}"))
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-08-01\", \"targetPointIds\": [%d]}"
+                                .formatted(otherPointId)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("대상 없는 수정은 400 — 생성과 같은 규칙(최소 1점, null 요소 거부)")
+    void updateProject_withoutTargets_400() throws Exception {
+        long pointId = registerPoint();
+        long id = createProject(pointId);
+
+        MvcResult missing = mockMvc.perform(put("/api/survey-projects/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-08-01\"}"))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertTrue(bodyOf(missing).contains("\"code\":\"COMMON_INVALID_INPUT\""));
+
+        mockMvc.perform(put("/api/survey-projects/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"이름\", \"startedOn\": \"2026-08-01\", \"targetPointIds\": [null]}"))
+                .andExpect(status().isBadRequest());
+
+        // 거부된 수정은 아무것도 남기지 않는다 — 대상 그대로
+        MvcResult targets = mockMvc.perform(get("/api/survey-projects/" + id + "/targets"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(targets).contains("\"content\":[" + pointId + "]"));
     }
 
     @Test

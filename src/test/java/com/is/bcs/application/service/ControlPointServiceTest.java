@@ -243,6 +243,20 @@ class ControlPointServiceTest {
     }
 
     @Test
+    @DisplayName("참조 여부 — 대상이나 기록 어느 쪽이 참조해도 참, 없는 점은 거부한다")
+    void isReferenced_reflectsSurveyUsage() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        assertFalse(service.isReferenced(id));
+        surveyUsage.targetUsed = true;
+        assertTrue(service.isReferenced(id));
+        surveyUsage.targetUsed = false;
+        surveyUsage.recordUsed = true;
+        assertTrue(service.isReferenced(id));
+        assertThrows(ControlPointNotFoundException.class, () -> service.isReferenced(999L));
+    }
+
+    @Test
     @DisplayName("부천 범위 밖 좌표도 등록은 되고, 확인하라는 경고가 함께 온다")
     void register_outsideServiceArea_registersWithWarning() {
         // 위도가 부천 남쪽으로 크게 벗어나는 성과 — 좌표계를 잘못 고른 상황과 같은 모양
@@ -327,6 +341,16 @@ class ControlPointServiceTest {
         @Override
         public long countByProjectId(Long projectId) {
             return 0;
+        }
+
+        @Override
+        public java.util.Map<Long, Long> countTargetsByProject() {
+            return java.util.Map.of();
+        }
+
+        @Override
+        public java.util.Map<Long, Long> countSurveyedByProject() {
+            return java.util.Map.of();
         }
 
         @Override

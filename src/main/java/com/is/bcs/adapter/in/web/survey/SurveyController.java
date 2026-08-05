@@ -1,6 +1,7 @@
 package com.is.bcs.adapter.in.web.survey;
 
 import com.is.bcs.adapter.in.web.common.ContentResponse;
+import com.is.bcs.adapter.in.web.common.OptionalMemberId;
 import com.is.bcs.application.port.in.survey.CancelSurveyUseCase;
 import com.is.bcs.application.port.in.survey.CreateSurveyProjectUseCase;
 import com.is.bcs.application.port.in.survey.DeleteSurveyProjectUseCase;
@@ -12,6 +13,7 @@ import com.is.bcs.domain.survey.SurveyProject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,19 +37,25 @@ public class SurveyController {
     private final RecordSurveyUseCase recordSurveyUseCase;
     private final CancelSurveyUseCase cancelSurveyUseCase;
     private final GetSurveyRecordsUseCase getSurveyRecordsUseCase;
+    private final OptionalMemberId optionalMemberId;
 
     @PostMapping
-    public ResponseEntity<SurveyProjectResponse> create(@Valid @RequestBody CreateSurveyProjectRequest request) {
-        SurveyProject project = createSurveyProjectUseCase.create(request.toCommand());
+    public ResponseEntity<SurveyProjectResponse> create(
+            @Valid @RequestBody CreateSurveyProjectRequest request,
+            Authentication authentication
+    ) {
+        SurveyProject project = createSurveyProjectUseCase.create(
+                request.toCommand(optionalMemberId.of(authentication)));
         return ResponseEntity
                 .created(URI.create("/api/survey-projects/" + project.getId()))
                 .body(SurveyProjectResponse.from(project));
     }
 
+    /** 목록은 요약으로 내린다 — 행마다 완료 표시·작성자를 그리는 화면이 진행률을 건별로 다시 묻지 않게. */
     @GetMapping
-    public ContentResponse<SurveyProjectResponse> list() {
-        return new ContentResponse<>(getSurveyProjectsUseCase.getAll().stream()
-                .map(SurveyProjectResponse::from)
+    public ContentResponse<SurveyProjectSummaryResponse> list() {
+        return new ContentResponse<>(getSurveyProjectsUseCase.getSummaries().stream()
+                .map(SurveyProjectSummaryResponse::from)
                 .toList());
     }
 
@@ -92,9 +100,11 @@ public class SurveyController {
     public SurveyRecordResponse record(
             @PathVariable("projectId") Long projectId,
             @PathVariable("pointId") Long pointId,
-            @Valid @RequestBody RecordSurveyRequest request
+            @Valid @RequestBody RecordSurveyRequest request,
+            Authentication authentication
     ) {
-        return SurveyRecordResponse.from(recordSurveyUseCase.record(request.toCommand(projectId, pointId)));
+        return SurveyRecordResponse.from(recordSurveyUseCase.record(
+                request.toCommand(projectId, pointId, optionalMemberId.of(authentication))));
     }
 
     @DeleteMapping("/{projectId}/records/{pointId}")

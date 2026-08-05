@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record CreateSurveyProjectCommand(
+        /** 작성자(인증 주체) — 요청 본문이 아니라 인증에서 온다. 인증 없는 호출이면 null. */
+        Long authorId,
         String name,
         LocalDate startedOn,
         LocalDate endedOn,

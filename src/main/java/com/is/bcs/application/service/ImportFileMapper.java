@@ -288,10 +288,10 @@ public abstract class ImportFileMapper {
         String pointKey = row.type() + "|" + row.name();
         // 판정을 먼저 하고 통과한 행만 등록한다 — 거부한 행의 값을 남기면 뒤 행이 그 값 때문에 잘못 걸린다
         if (pointNos.contains(row.pointNo())) {
-            return "같은 관리번호가 앞 행에 이미 있습니다: " + row.pointNo();
+            return "관리번호가 앞 행과 중복됩니다: " + row.pointNo();
         }
         if (points.contains(pointKey)) {
-            return "같은 기준점이 앞 행에 이미 있습니다: " + row.name();
+            return "기준점(이름·종류)이 앞 행과 중복됩니다: " + row.name();
         }
         pointNos.add(row.pointNo());
         points.add(pointKey);
@@ -424,7 +424,7 @@ public abstract class ImportFileMapper {
             return Optional.empty();
         }
         return Optional.of(String.format(Locale.ROOT,
-                "%s(이)가 %s 범위 밖입니다(위도 %.5f, 경도 %.5f) — 좌표계구분을 확인해 주세요.",
+                "%s(이)가 %s 범위 밖입니다(위도 %.5f, 경도 %.5f). 좌표계구분을 확인해 주세요.",
                 row.name(), ServiceArea.BUCHEON.name(), row.geo().latitude(), row.geo().longitude()));
     }
 

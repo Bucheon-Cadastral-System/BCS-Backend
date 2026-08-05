@@ -193,8 +193,18 @@ class ControlPointApiTest {
                 .andReturn();
         assertTrue(bodyOf(blocked).contains("\"code\":\"CONTROL_POINT_IN_USE\""));
 
+        // 참조 여부 조회 — 화면이 삭제 확인 창을 물음/불가로 갈라 여는 근거
+        MvcResult used = mockMvc.perform(get("/api/control-points/" + id + "/usage"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(used).contains("\"referenced\":true"));
+
         // 프로젝트를 지워 참조가 사라지면 삭제된다
         mockMvc.perform(delete("/api/survey-projects/" + projectId)).andExpect(status().isNoContent());
+        MvcResult free = mockMvc.perform(get("/api/control-points/" + id + "/usage"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(bodyOf(free).contains("\"referenced\":false"));
         mockMvc.perform(delete("/api/control-points/" + id)).andExpect(status().isNoContent());
         mockMvc.perform(get("/api/control-points/41192D000001265")).andExpect(status().isNotFound());
         mockMvc.perform(delete("/api/control-points/" + id)).andExpect(status().isNotFound());

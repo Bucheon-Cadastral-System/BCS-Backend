@@ -1,10 +1,10 @@
 package com.is.bcs.adapter.in.ai;
 
 import com.is.bcs.application.dto.SurveyProgress;
+import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.application.port.in.survey.GetSurveyProjectsUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import java.time.LocalDate;
@@ -93,6 +93,11 @@ class SurveyChatToolsTest {
         }
 
         @Override
+        public List<com.is.bcs.application.dto.SurveyProjectSummary> getSummaries() {
+            throw new UnsupportedOperationException("챗봇 도구는 목록 요약을 쓰지 않는다");
+        }
+
+        @Override
         public SurveyProject getById(Long id) {
             SurveyProject project = projects.get(id);
             if (project == null) {
@@ -102,7 +107,7 @@ class SurveyChatToolsTest {
         }
 
         @Override
-        public List<SurveyRecord> getByProjectId(Long projectId) {
+        public List<SurveyRecordSummary> getByProjectId(Long projectId) {
             return List.of();
         }
 
