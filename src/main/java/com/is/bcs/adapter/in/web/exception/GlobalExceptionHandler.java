@@ -4,6 +4,7 @@ import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.controlpointimage.exception.InvalidControlPointImageException;
 import com.is.bcs.domain.member.exception.*;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
@@ -297,6 +298,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
     }
 
+    @ExceptionHandler(InvalidControlPointImageException.class)
+    public ProblemDetail handleInvalidControlPointImage(InvalidControlPointImageException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_INVALID, e.getMessage());
+    }
+
     /** 도메인 예외 핸들러 공통 보강 — ErrorCode 한 상수로 status·code를 지정하고 timestamp를 더한다. */
     private ProblemDetail problem(ErrorCode errorCode, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(errorCode.status(), detail);
@@ -311,6 +317,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ? CommonErrorCode.COMMON_INTERNAL_ERROR.code()
                 : CommonErrorCode.COMMON_BAD_REQUEST.code();
     }
+
 
 
 }
