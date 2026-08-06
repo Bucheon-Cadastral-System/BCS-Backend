@@ -2,12 +2,15 @@ package com.is.bcs.application.port.out.controlpointimage;
 
 import com.is.bcs.application.dto.StoredControlPointImageFile;
 
+import java.time.OffsetDateTime;
+
 public interface ControlPointImageFileStoragePort {
 
     StoredControlPointImageFile store(
             Long projectId,
             Long pointId,
             String pointName,
+            OffsetDateTime capturedAt,
             String originalFileName,
             String contentType,
             long declaredFileSize,

@@ -4,9 +4,10 @@ import com.is.bcs.domain.controlpointimage.exception.InvalidControlPointImageExc
 import org.springframework.stereotype.Component;
 
 import java.text.Normalizer;
-import java.time.Clock;
-import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -23,11 +24,7 @@ public class ControlPointImageFileNameGenerator {
 
     private static final int MAX_POINT_NAME_LENGTH = 50;
 
-    private final Clock clock;
-
-    public ControlPointImageFileNameGenerator(Clock clock) {
-        this.clock = clock;
-    }
+    private static final ZoneId FILE_NAME_ZONE = ZoneId.of("Asia/Seoul");
 
     /**
      * 서버가 기준점명과 현재 날짜를 사용해 안전한 WebP 저장 파일명을 만든다.
@@ -35,9 +32,12 @@ public class ControlPointImageFileNameGenerator {
      * 예:
      * 2026_08_05_1465공_550e8400-e29b-41d4-a716-446655440000.webp
      */
-    public String generate(String pointName) {
+    public String generate(String pointName, OffsetDateTime capturedAt) {
         String safePointName = sanitizePointName(pointName);
-        String date = LocalDate.now(clock).format(DATE_FORMAT);
+        String date = Objects.requireNonNull(capturedAt, "사진 촬영시각은 필수입니다.")
+                .atZoneSameInstant(FILE_NAME_ZONE)
+                .toLocalDate()
+                .format(DATE_FORMAT);
 
         return "%s_%s_%s.webp".formatted(
                 date,

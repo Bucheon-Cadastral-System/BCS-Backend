@@ -7,6 +7,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.OffsetDateTime;
+
 @Getter
 @Entity
 @Table(
@@ -59,6 +61,9 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
     @Column(name = "height", nullable = false)
     private int height;
 
+    @Column(name = "captured_at", nullable = false)
+    private OffsetDateTime capturedAt;
+
     @Column(name = "created_by")
     private Long createdById;
 
@@ -73,6 +78,7 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
             long fileSize,
             int width,
             int height,
+            OffsetDateTime capturedAt,
             Long createdById
     ) {
         this.id = id;
@@ -85,6 +91,7 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
         this.fileSize = fileSize;
         this.width = width;
         this.height = height;
+        this.capturedAt = capturedAt;
         this.createdById = createdById;
     }
 
@@ -102,6 +109,7 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
                 image.getFileSize(),
                 image.getWidth(),
                 image.getHeight(),
+                image.getCapturedAt(),
                 image.getCreatedById()
         );
     }
@@ -119,6 +127,7 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
                 width,
                 height,
                 createdById,
+                capturedAt,
                 getCreatedAt()
         );
     }

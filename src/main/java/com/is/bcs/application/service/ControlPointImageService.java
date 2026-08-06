@@ -32,8 +32,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ControlPointImageService
-        implements UploadControlPointImageUseCase {
+public class ControlPointImageService implements UploadControlPointImageUseCase {
 
     private final LoadSurveyProjectPort loadSurveyProjectPort;
     private final LoadControlPointPort loadControlPointPort;
@@ -52,10 +51,7 @@ public class ControlPointImageService
 
         ControlPoint point = requirePoint(command.pointId());
 
-        requireTarget(
-                command.projectId(),
-                command.pointId()
-        );
+        requireTarget(command.projectId(), command.pointId());
 
         requireActiveUploader(command.uploaderId());
 
@@ -77,6 +73,7 @@ public class ControlPointImageService
                         command.projectId(),
                         command.pointId(),
                         point.getName(),
+                        command.capturedAt(),
                         command.originalFileName(),
                         command.contentType(),
                         command.fileSize(),
@@ -90,9 +87,7 @@ public class ControlPointImageService
              * INSERT가 DELETE보다 먼저 실행될 수 있다.
              */
             if (existing != null) {
-                deleteControlPointImagePort.deleteByIdAndFlush(
-                        existing.getId()
-                );
+                deleteControlPointImagePort.deleteByIdAndFlush(existing.getId());
             }
 
             ControlPointImage newImage =
@@ -106,11 +101,11 @@ public class ControlPointImageService
                             storedFile.fileSize(),
                             storedFile.width(),
                             storedFile.height(),
+                            command.capturedAt(),
                             command.uploaderId()
                     );
 
-            ControlPointImage saved =
-                    saveControlPointImagePort.save(newImage);
+            ControlPointImage saved = saveControlPointImagePort.save(newImage);
 
             registerFileCleanup(
                     storedFile.storagePath(),

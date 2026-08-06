@@ -14,6 +14,7 @@ public record ControlPointImageResponse(
         int width,
         int height,
         Long createdById,
+        OffsetDateTime capturedAt,
         OffsetDateTime createdAt
 ) {
 
@@ -28,6 +29,7 @@ public record ControlPointImageResponse(
                 image.getWidth(),
                 image.getHeight(),
                 image.getCreatedById(),
+                image.getCapturedAt(),
                 image.getCreatedAt()
         );
     }

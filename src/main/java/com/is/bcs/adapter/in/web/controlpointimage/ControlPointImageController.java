@@ -5,18 +5,16 @@ import com.is.bcs.application.dto.UploadControlPointImageCommand;
 import com.is.bcs.application.dto.UploadControlPointImageResult;
 import com.is.bcs.application.port.in.controlpointimage.UploadControlPointImageUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.OffsetDateTime;
 
 @RestController
 @RequiredArgsConstructor
@@ -34,6 +32,9 @@ public class ControlPointImageController {
             @PathVariable("projectId") Long projectId,
             @PathVariable("pointId") Long pointId,
             @RequestPart("image") MultipartFile image,
+            @RequestParam("capturedAt")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            OffsetDateTime capturedAt,
             Authentication authentication
     ) throws IOException {
 
@@ -47,6 +48,7 @@ public class ControlPointImageController {
                         image.getContentType(),
                         image.getSize(),
                         image.getBytes(),
+                        capturedAt,
                         uploaderId
                 );
 

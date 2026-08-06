@@ -33,6 +33,7 @@ public class ControlPointImage {
     private final int height;
 
     private final Long createdById;
+    private final OffsetDateTime capturedAt;
     private final OffsetDateTime createdAt;
 
     private ControlPointImage(
@@ -47,6 +48,7 @@ public class ControlPointImage {
             int width,
             int height,
             Long createdById,
+            OffsetDateTime capturedAt,
             OffsetDateTime createdAt
     ) {
         this.id = id;
@@ -60,6 +62,7 @@ public class ControlPointImage {
         this.width = requirePositive(width, "이미지 가로 크기");
         this.height = requirePositive(height, "이미지 세로 크기");
         this.createdById = createdById;
+        this.capturedAt = Objects.requireNonNull(capturedAt, "이미지 촬영 시각은 필수입니다.");
         this.createdAt = createdAt;
     }
 
@@ -78,6 +81,7 @@ public class ControlPointImage {
             long fileSize,
             int width,
             int height,
+            OffsetDateTime capturedAt,
             Long createdById
     ) {
         return new ControlPointImage(
@@ -92,6 +96,7 @@ public class ControlPointImage {
                 width,
                 height,
                 createdById,
+                capturedAt,
                 null
         );
     }
@@ -109,6 +114,7 @@ public class ControlPointImage {
             int width,
             int height,
             Long createdById,
+            OffsetDateTime capturedAt,
             OffsetDateTime createdAt
     ) {
         return new ControlPointImage(
@@ -123,6 +129,7 @@ public class ControlPointImage {
                 width,
                 height,
                 createdById,
+                Objects.requireNonNull(capturedAt, "이미지 촬영 시각은 필수입니다."),
                 Objects.requireNonNull(createdAt, "이미지 생성 시각은 필수입니다.")
         );
     }
@@ -161,4 +168,6 @@ public class ControlPointImage {
         }
         return value;
     }
+
+
 }

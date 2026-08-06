@@ -18,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.text.Normalizer;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +56,7 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
             Long projectId,
             Long pointId,
             String pointName,
+            OffsetDateTime capturedAt,
             String originalFileName,
             String contentType,
             long declaredFileSize,
@@ -64,7 +66,7 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
 
         String safeOriginalFileName = sanitizeOriginalFileName(originalFileName);
 
-        String storedFileName = fileNameGenerator.generate(pointName);
+        String storedFileName = fileNameGenerator.generate(pointName, capturedAt);
 
         Path relativePath = Path.of(
                 "control-points",

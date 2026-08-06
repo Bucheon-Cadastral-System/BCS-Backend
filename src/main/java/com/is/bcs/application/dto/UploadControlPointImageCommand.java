@@ -1,5 +1,7 @@
 package com.is.bcs.application.dto;
 
+import java.time.OffsetDateTime;
+
 /**
  * 기준점 현장 이미지 업로드 명령.
  *
@@ -13,6 +15,7 @@ public record UploadControlPointImageCommand(
         String contentType,
         long fileSize,
         byte[] content,
+        OffsetDateTime capturedAt,
         Long uploaderId
 ) {
 }
