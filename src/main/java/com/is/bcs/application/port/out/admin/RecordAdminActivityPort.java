@@ -8,6 +8,8 @@ public interface RecordAdminActivityPort {
             Long actorAdminId,
             Long targetMemberId,
             AdminActivityType activityType,
-            String message
+            String message,
+            String actorName,
+            String targetName
     );
 }

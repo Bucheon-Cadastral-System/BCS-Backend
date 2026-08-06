@@ -28,7 +28,7 @@ public class DemoteMemberAdminService implements DemoteMemberAdminUseCase {
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + actorAdminId));
 
         Member targetMember = loadMemberPort.findById(targetMemberId)
-                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + actorAdminId));
+                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + targetMemberId));
 
         recordAdminActivityPort.record(
                 actorAdminId,
@@ -40,7 +40,9 @@ public class DemoteMemberAdminService implements DemoteMemberAdminUseCase {
                                 actorAdminId,
                                 targetMember.getName(),
                                 targetMemberId
-                        )
+                        ),
+                actorAdmin.getName(),
+                targetMember.getName()
         );
     }
 }
