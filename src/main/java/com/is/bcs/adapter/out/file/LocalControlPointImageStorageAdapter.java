@@ -31,8 +31,7 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
 
     private static final String WEBP_CONTENT_TYPE = "image/webp";
 
-    private static final Duration WEBP_INFO_TIMEOUT =
-            Duration.ofSeconds(10);
+    private static final Duration WEBP_INFO_TIMEOUT = Duration.ofSeconds(10);
 
     private static final Pattern CANVAS_SIZE_PATTERN =
             Pattern.compile("Canvas size\\s+(\\d+)\\s*x\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
@@ -180,8 +179,7 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
             throw new InvalidControlPointImageException("빈 이미지 파일은 등록할 수 없습니다.");
         }
 
-        long maxFileSize =
-                properties.maxFileSize().toBytes();
+        long maxFileSize = properties.maxFileSize().toBytes();
 
         if (content.length > maxFileSize) {
             throw new InvalidControlPointImageException("이미지는 한 장당 최대 %s까지 등록할 수 있습니다.".formatted(properties.maxFileSize()));
@@ -219,46 +217,84 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
         }
     }
 
-    private ImageDimensions validateWithWebpInfo(Path temporaryPath) {
-        Process process;
+    private ImageDimensions validateWithWebpInfo(Path temporaryImagePath) {
+        Path outputPath = null;
+        Process process = null;
 
         try {
-            process = new ProcessBuilder(properties.webpInfoCommand(), temporaryPath.toString())
+            outputPath = Files.createTempFile(
+                    temporaryImagePath.getParent(),
+                    ".webpinfo-",
+                    ".log"
+            );
+
+            process = new ProcessBuilder(
+                    properties.webpInfoCommand(),
+                    temporaryImagePath.toString()
+            )
                     .redirectErrorStream(true)
+                    .redirectOutput(outputPath.toFile())
                     .start();
-        } catch (IOException exception) {
-            throw new ControlPointImageStorageException("WebP 검사 도구를 실행할 수 없습니다.", exception);
-        }
 
-        boolean finished;
+            boolean finished = process.waitFor(WEBP_INFO_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
 
-        try {
-            finished = process.waitFor(WEBP_INFO_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+            if (!finished) {
+                terminateAndWait(process);
+                throw new ControlPointImageStorageException("WebP 파일 검사 시간이 초과되었습니다.");
+            }
+
+            String output = Files.readString(outputPath, StandardCharsets.UTF_8);
+
+            if (process.exitValue() != 0) {
+                throw new InvalidControlPointImageException("손상되었거나 올바르지 않은 WebP 파일입니다.");
+            }
+
+            return parseDimensions(output);
         } catch (InterruptedException exception) {
+            if (process != null && process.isAlive()) {
+                terminateAndWait(process);
+            }
+
             Thread.currentThread().interrupt();
-            process.destroyForcibly();
 
             throw new ControlPointImageStorageException("WebP 파일 검사가 중단되었습니다.", exception);
-        }
 
-        if (!finished) {
-            process.destroyForcibly();
-            throw new ControlPointImageStorageException("WebP 파일 검사 시간이 초과되었습니다.");
-        }
+        } catch (IOException exception) {
+            if (process != null && process.isAlive()) {
+                terminateAndWait(process);
+            }
 
-        String output;
+            throw new ControlPointImageStorageException("WebP 검사 도구를 실행하거나 결과를 읽을 수 없습니다.", exception);
+
+        } finally {
+            deleteTemporaryFileQuietly(outputPath);
+        }
+    }
+
+    private static void terminateAndWait(Process process) {
+        process.destroyForcibly();
+
+        boolean interrupted = false;
 
         try {
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            throw new ControlPointImageStorageException("WebP 검사 결과를 읽을 수 없습니다.", exception);
+            while (process.isAlive()) {
+                try {
+                    if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                        throw new ControlPointImageStorageException("WebP 검사 프로세스를 종료할 수 없습니다.");
+                    }
+                } catch (InterruptedException exception) {
+                    /*
+                     * 프로세스 정리를 끝낸 후 현재 스레드의 인터럽트 상태를
+                     * 복원하기 위해 우선 종료 대기를 계속한다.
+                     */
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
-
-        if (process.exitValue() != 0) {
-            throw new InvalidControlPointImageException("손상되었거나 올바르지 않은 WebP 파일입니다.");
-        }
-
-        return parseDimensions(output);
     }
 
     private static ImageDimensions parseDimensions(String output) {

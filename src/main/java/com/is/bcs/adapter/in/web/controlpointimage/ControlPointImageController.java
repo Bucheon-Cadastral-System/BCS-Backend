@@ -62,8 +62,6 @@ public class ControlPointImageController {
 
         URI location = URI.create("/api/control-point-images/%d/file".formatted(result.image().getId()));
 
-        return ResponseEntity
-                .created(location)
-                .body(body);
+        return ResponseEntity.created(location).body(body);
     }
 }

@@ -77,10 +77,7 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
         requireActiveMember(command.uploaderId());
 
         ControlPointImage existing = loadControlPointImagePort
-                .findByProjectIdAndPointId(
-                        command.projectId(),
-                        command.pointId()
-                )
+                .findByProjectIdAndPointId(command.projectId(), command.pointId())
                 .orElse(null);
 
         boolean created = existing == null;
@@ -130,9 +127,7 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
 
             registerFileCleanup(
                     storedFile.storagePath(),
-                    existing == null
-                            ? null
-                            : existing.getStoragePath()
+                    existing == null ? null : existing.getStoragePath()
             );
 
             return new UploadControlPointImageResult(
@@ -194,9 +189,6 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
         requireActiveMember(requesterId);
         return loadControlPointImagePort.findAll(pageable);
     }
-
-
-
 
 
     private static String toDownloadFileName(String storedFileName) {
