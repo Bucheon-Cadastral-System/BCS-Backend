@@ -185,8 +185,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * 저장 제약 위반 — 중복만 409 로 알린다.
-     * 외래키·필수값·CHECK 위반까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
+     * 저장 제약 위반 — 중복과 참조(외래키)만 409 로 알린다.
+     * 중복은 같은 값을 두 곳에서 넣은 것이고, 참조 위반은 사전 검증을 통과한 뒤 그 사이에 다른 작업이
+     * 참조 대상을 바꾼 경합의 정상 결말이라 재시도로 풀린다. 필수값·CHECK 위반은 여전히 500 —
+     * 그것까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
      * 제약 이름·SQL 은 사용자에게 뜻이 없고 노출하면 스키마가 드러나므로 어느 쪽이든 로그로만 남긴다.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -195,22 +197,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             log.warn("중복 저장 시도", e);
             return problem(CommonErrorCode.COMMON_CONFLICT, "이미 등록된 값이라 저장할 수 없습니다.");
         }
+        if (hasSqlState(e, FOREIGN_KEY_VIOLATION)) {
+            log.warn("참조 제약과 겹친 저장 시도", e);
+            return problem(CommonErrorCode.COMMON_CONFLICT, "다른 작업과 겹쳐 처리하지 못했습니다. 다시 시도해 주세요.");
+        }
         log.error("저장 제약 위반", e);
         return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
     }
 
-    /** SQL 표준의 unique_violation. 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
+    /** SQL 표준의 unique_violation / foreign_key_violation. 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
     private static final String UNIQUE_VIOLATION = "23505";
+    private static final String FOREIGN_KEY_VIOLATION = "23503";
 
     /**
      * 중복 저장으로 실패한 것인지.
      * 원인 예외가 없는 DuplicateKeyException 은 상태 코드를 볼 수 없으므로 타입으로 먼저 가른다.
-     * 배치로 묶어 저장하면 진짜 원인이 cause 가 아니라 SQLException 의 다음 예외 사슬에 담기므로 둘 다 훑는다.
      */
     private static boolean isUniqueViolation(DataIntegrityViolationException e) {
-        if (e instanceof DuplicateKeyException) {
-            return true;
-        }
+        return e instanceof DuplicateKeyException || hasSqlState(e, UNIQUE_VIOLATION);
+    }
+
+    /** 배치로 묶어 저장하면 진짜 원인이 cause 가 아니라 SQLException 의 다음 예외 사슬에 담기므로 둘 다 훑는다. */
+    private static boolean hasSqlState(DataIntegrityViolationException e, String sqlState) {
         Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         Deque<Throwable> pending = new ArrayDeque<>(List.of(e));
         while (!pending.isEmpty()) {
@@ -219,7 +227,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 continue; // 예외가 서로를 가리켜도 멈춘다
             }
             if (current instanceof SQLException sql) {
-                if (UNIQUE_VIOLATION.equals(sql.getSQLState())) {
+                if (sqlState.equals(sql.getSQLState())) {
                     return true;
                 }
                 pushIfPresent(pending, sql.getNextException());
