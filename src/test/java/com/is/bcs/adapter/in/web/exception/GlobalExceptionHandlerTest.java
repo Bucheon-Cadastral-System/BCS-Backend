@@ -116,11 +116,22 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("중복이 아닌 제약 위반은 500 이다 — 도메인 검증이 빠진 자리를 정상 응답으로 감추지 않는다")
-    void otherIntegrityViolation() {
+    @DisplayName("참조 제약 위반은 409 다 — 사전 검증 뒤 참조 대상이 바뀐 경합이라 다시 시도하면 풀린다")
+    void foreignKeyViolation() {
         // 23503 = foreign_key_violation
         ProblemDetail problem = handler.handleDataIntegrityViolation(new DataIntegrityViolationException(
                 "fk_survey_targets_project 위반", new SQLException("no referenced row", "23503")));
+
+        assertMapped(problem, HttpStatus.CONFLICT, CommonErrorCode.COMMON_CONFLICT,
+                "다른 작업과 겹쳐 처리하지 못했습니다. 다시 시도해 주세요.");
+    }
+
+    @Test
+    @DisplayName("중복·참조가 아닌 제약 위반은 500 이다 — 도메인 검증이 빠진 자리를 정상 응답으로 감추지 않는다")
+    void otherIntegrityViolation() {
+        // 23502 = not_null_violation — 필수값이 비었다는 건 경합이 아니라 검증 누락이다
+        ProblemDetail problem = handler.handleDataIntegrityViolation(new DataIntegrityViolationException(
+                "not-null 위반", new SQLException("null value in column", "23502")));
 
         assertMapped(problem, HttpStatus.INTERNAL_SERVER_ERROR, CommonErrorCode.COMMON_INTERNAL_ERROR,
                 "서버 내부 오류가 발생했습니다");

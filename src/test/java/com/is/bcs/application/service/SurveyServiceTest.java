@@ -528,6 +528,27 @@ class SurveyServiceTest {
         }
 
         @Override
+        public Optional<SurveyRecord> upsertForTarget(SurveyRecord record) {
+            // 실제 문장과 같은 규칙: 대상 검사 → 있으면 전 필드 교체(id 유지), 없으면 새 행
+            boolean target = targetStore.targets.stream().anyMatch(
+                    t -> t.getProjectId().equals(record.getProjectId()) && t.getPointId().equals(record.getPointId()));
+            if (!target) {
+                return Optional.empty();
+            }
+            Long existingId = records.values().stream()
+                    .filter(r -> r.getProjectId().equals(record.getProjectId())
+                            && r.getPointId().equals(record.getPointId()))
+                    .map(SurveyRecord::getId)
+                    .findFirst().orElse(null);
+            long id = existingId != null ? existingId : ++recordSeq;
+            SurveyRecord saved = SurveyRecord.restore(
+                    id, record.getProjectId(), record.getPointId(),
+                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
+            records.put(id, saved);
+            return Optional.of(saved);
+        }
+
+        @Override
         public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
             records.values().removeIf(
                     r -> r.getProjectId().equals(projectId) && r.getPointId().equals(pointId));
@@ -578,12 +599,6 @@ class SurveyServiceTest {
             Map<Long, Long> counts = new HashMap<>();
             targets.forEach(t -> counts.merge(t.getProjectId(), 1L, Long::sum));
             return counts;
-        }
-
-        @Override
-        public boolean existsByProjectIdAndPointId(Long projectId, Long pointId) {
-            return targets.stream()
-                    .anyMatch(t -> t.getProjectId().equals(projectId) && t.getPointId().equals(pointId));
         }
 
         @Override
