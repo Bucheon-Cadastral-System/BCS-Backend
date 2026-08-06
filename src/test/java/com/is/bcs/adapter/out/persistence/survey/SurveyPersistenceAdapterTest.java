@@ -67,6 +67,9 @@ class SurveyPersistenceAdapterTest {
 
     private int pointSeq = 0;
 
+    // 회원은 기준점과 따로 센다 — 순번을 나눠 쓰면 점 없이 회원만 두 번 만들 때 같은 카카오 id 가 겹친다
+    private int memberSeq = 0;
+
     private SurveyProject savedProject() {
         return adapter.save(SurveyProject.create(null, "2026 일제조사", STARTED, null, "정기 조사"));
     }
@@ -95,7 +98,8 @@ class SurveyPersistenceAdapterTest {
     }
 
     private long savedMemberId() {
-        return memberPort.save(Member.registerWithKakao("kakao-" + pointSeq, SURVEYED_AT)).getId();
+        memberSeq++;
+        return memberPort.save(Member.registerWithKakao("kakao-" + memberSeq, SURVEYED_AT)).getId();
     }
 
     @Test
@@ -227,6 +231,31 @@ class SurveyPersistenceAdapterTest {
         assertTrue(adapter.upsertForTarget(SurveyRecord.create(
                 project.getId(), outsider, SurveyResult.INTACT, SURVEYED_AT, null, null)).isEmpty());
         assertEquals(1, adapter.findRecordsByProjectId(project.getId()).size());
+    }
+
+    @Test
+    @DisplayName("정정은 최초 기록 시각을 지킨다 — 갱신이지 재생성이 아니다")
+    void upsertForTarget_keepsCreatedAt() {
+        SurveyProject project = savedProject();
+        long pointId = targetPointId(project);
+
+        adapter.upsertForTarget(SurveyRecord.create(
+                project.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        OffsetDateTime createdAt = auditOf(project.getId(), pointId).getCreatedAt();
+
+        adapter.upsertForTarget(SurveyRecord.create(
+                project.getId(), pointId, SurveyResult.LOST, SURVEYED_AT.plusDays(1), null, null));
+
+        SurveyRecordJpaEntity revised = auditOf(project.getId(), pointId);
+        // 도메인 객체는 감사 시각을 들고 다니지 않으므로 저장된 행을 직접 읽는다
+        assertTrue(createdAt.isEqual(revised.getCreatedAt()));
+        assertTrue(!revised.getUpdatedAt().isBefore(revised.getCreatedAt()));
+    }
+
+    /** 감사 시각까지 보려면 도메인이 아니라 저장된 행을 읽어야 한다 — 1차 캐시가 아니라 DB 에서. */
+    private SurveyRecordJpaEntity auditOf(Long projectId, Long pointId) {
+        entityManager.clear();
+        return recordRepository.findByProjectIdAndPointId(projectId, pointId).orElseThrow();
     }
 
     @Test

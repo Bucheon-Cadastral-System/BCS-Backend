@@ -90,9 +90,15 @@ public class SurveyPersistenceAdapter
         if (applied == 0) {
             return Optional.empty(); // 대상이 아니라서 문장이 아무것도 쓰지 않았다
         }
-        // 문장은 반영 행 수만 돌려준다 — id·created_at 은 같은 트랜잭션에서 되읽는다
-        return recordRepository.findByProjectIdAndPointId(record.getProjectId(), record.getPointId())
-                .map(SurveyRecordJpaEntity::toDomain);
+        // 문장은 반영 행 수만 돌려준다 — id·created_at 은 같은 트랜잭션에서 되읽는다.
+        // 여기서 비었다는 것은 방금 쓴 행이 사라졌다는 뜻이라 '대상 아님'과 같은 결과로 뭉치지 않는다
+        // (뭉치면 쓰기는 커밋된 채 응답만 404 가 된다).
+        return Optional.of(recordRepository
+                .findByProjectIdAndPointId(record.getProjectId(), record.getPointId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "기록을 쓴 뒤 되읽지 못했습니다: 프로젝트 " + record.getProjectId()
+                                + ", 기준점 " + record.getPointId()))
+                .toDomain());
     }
 
     @Override
