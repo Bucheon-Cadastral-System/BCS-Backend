@@ -48,3 +48,6 @@ src/main/resources/application.yaml
 ### AGENT.md ###
 AGENTS.md
 
+### Local uploads ###
+/var/uploads/
+

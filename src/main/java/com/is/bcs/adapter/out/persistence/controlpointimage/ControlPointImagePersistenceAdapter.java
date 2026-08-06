@@ -53,8 +53,9 @@ public class ControlPointImagePersistenceAdapter
     }
 
     @Override
-    public void deleteById(Long imageId) {
+    public void deleteByIdAndFlush(Long imageId) {
         repository.deleteById(imageId);
+        repository.flush();
     }
 
 }
