@@ -23,23 +23,42 @@ import java.nio.charset.StandardCharsets;
 public class ControlPointImageFileController {
 
     private final GetControlPointImageFileUseCase getControlPointImageFileUseCase;
-
     private final CurrentMemberIdResolver currentMemberIdResolver;
 
     @GetMapping("/{imageId}/file")
-    public ResponseEntity<byte[]> download(@PathVariable("imageId") Long imageId, Authentication authentication) {
-        Long requesterId = currentMemberIdResolver.resolve(authentication);
-
-        ControlPointImageFileResult result = getControlPointImageFileUseCase.getFile(imageId, requesterId);
+    public ResponseEntity<byte[]> view(@PathVariable("imageId") Long imageId, Authentication authentication) {
+        ControlPointImageFileResult result = getFile(imageId, authentication);
 
         ContentDisposition contentDisposition =
-                ContentDisposition.attachment()
+                ContentDisposition.inline()
                         .filename(
                                 result.downloadFileName(),
                                 StandardCharsets.UTF_8
                         )
                         .build();
 
+        return fileResponse(result, contentDisposition);
+    }
+
+    @GetMapping("/{imageId}/download")
+    public ResponseEntity<byte[]> download(@PathVariable("imageId") Long imageId, Authentication authentication) {
+        ControlPointImageFileResult result = getFile(imageId, authentication);
+
+        ContentDisposition contentDisposition =
+                ContentDisposition.attachment()
+                        .filename(result.downloadFileName(), StandardCharsets.UTF_8)
+                        .build();
+
+        return fileResponse(result, contentDisposition);
+    }
+
+    private ControlPointImageFileResult getFile(Long imageId, Authentication authentication) {
+        Long requesterId = currentMemberIdResolver.resolve(authentication);
+
+        return getControlPointImageFileUseCase.getFile(imageId, requesterId);
+    }
+
+    private static ResponseEntity<byte[]> fileResponse(ControlPointImageFileResult result, ContentDisposition contentDisposition) {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(result.contentType()))
                 .contentLength(result.fileSize())
@@ -50,5 +69,4 @@ public class ControlPointImageFileController {
                 )
                 .body(result.content());
     }
-
 }
