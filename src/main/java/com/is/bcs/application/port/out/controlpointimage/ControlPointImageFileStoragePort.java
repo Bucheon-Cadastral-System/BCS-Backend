@@ -22,4 +22,7 @@ public interface ControlPointImageFileStoragePort {
      * DB 롤백 정리와 커밋 후 이전 파일 정리에 사용한다.
      */
     void deleteIfExists(String storagePath);
+
+    byte[] read(String storagePath);
+
 }

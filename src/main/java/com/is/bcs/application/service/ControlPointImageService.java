@@ -1,8 +1,10 @@
 package com.is.bcs.application.service;
 
+import com.is.bcs.application.dto.ControlPointImageFileResult;
 import com.is.bcs.application.dto.StoredControlPointImageFile;
 import com.is.bcs.application.dto.UploadControlPointImageCommand;
 import com.is.bcs.application.dto.UploadControlPointImageResult;
+import com.is.bcs.application.port.in.controlpointimage.GetControlPointImageFileUseCase;
 import com.is.bcs.application.port.in.controlpointimage.UploadControlPointImageUseCase;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpointimage.ControlPointImageFileStoragePort;
@@ -15,6 +17,8 @@ import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpointimage.ControlPointImage;
+import com.is.bcs.domain.controlpointimage.exception.ControlPointImageNotFoundException;
+import com.is.bcs.domain.controlpointimage.exception.ControlPointImageStorageException;
 import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.MemberStatus;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
@@ -28,11 +32,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ControlPointImageService implements UploadControlPointImageUseCase {
+public class ControlPointImageService implements UploadControlPointImageUseCase, GetControlPointImageFileUseCase {
 
     private final LoadSurveyProjectPort loadSurveyProjectPort;
     private final LoadControlPointPort loadControlPointPort;
@@ -45,6 +52,16 @@ public class ControlPointImageService implements UploadControlPointImageUseCase 
 
     private final ControlPointImageFileStoragePort fileStoragePort;
 
+    private static final Pattern STORED_FILE_NAME_PATTERN =
+            Pattern.compile(
+                    "^(.+)_"
+                            + "[0-9a-fA-F]{8}-"
+                            + "[0-9a-fA-F]{4}-"
+                            + "[0-9a-fA-F]{4}-"
+                            + "[0-9a-fA-F]{4}-"
+                            + "[0-9a-fA-F]{12}"
+                            + "\\.webp$");
+
     @Override
     public UploadControlPointImageResult uploadOrReplace(UploadControlPointImageCommand command) {
         requireProject(command.projectId());
@@ -53,7 +70,7 @@ public class ControlPointImageService implements UploadControlPointImageUseCase 
 
         requireTarget(command.projectId(), command.pointId());
 
-        requireActiveUploader(command.uploaderId());
+        requireActiveMember(command.uploaderId());
 
         ControlPointImage existing = loadControlPointImagePort
                 .findByProjectIdAndPointId(
@@ -128,6 +145,39 @@ public class ControlPointImageService implements UploadControlPointImageUseCase 
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ControlPointImageFileResult getFile(Long imageId, Long requesterId) {
+        requireActiveMember(requesterId);
+
+        ControlPointImage image = loadControlPointImagePort
+                .findById(imageId)
+                .orElseThrow(() -> new ControlPointImageNotFoundException("현장 이미지를 찾을 수 없습니다: " + imageId));
+
+        byte[] content = fileStoragePort.read(image.getStoragePath());
+
+        if (content.length != image.getFileSize()) {
+            throw new ControlPointImageStorageException("저장된 이미지 파일 크기가 DB 정보와 일치하지 않습니다.");
+        }
+
+        return new ControlPointImageFileResult(
+                content,
+                image.getContentType(),
+                image.getFileSize(),
+                toDownloadFileName(image.getStoredFileName())
+        );
+    }
+
+    private static String toDownloadFileName(String storedFileName) {
+        Matcher matcher = STORED_FILE_NAME_PATTERN.matcher(storedFileName);
+
+        if (!matcher.matches()) {
+            return "control-point-image.webp";
+        }
+
+        return matcher.group(1) + ".webp";
+    }
+
     private void requireProject(Long projectId) {
         loadSurveyProjectPort.findProjectById(projectId)
                 .orElseThrow(() -> new SurveyProjectNotFoundException("조사 프로젝트를 찾을 수 없습니다: " + projectId));
@@ -146,7 +196,7 @@ public class ControlPointImageService implements UploadControlPointImageUseCase 
         }
     }
 
-    private void requireActiveUploader(Long uploaderId) {
+    private void requireActiveMember(Long uploaderId) {
         Member member = loadMemberPort.findById(uploaderId)
                 .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다: " + uploaderId));
 

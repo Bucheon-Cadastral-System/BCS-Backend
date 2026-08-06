@@ -4,6 +4,7 @@ import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.controlpointimage.exception.ControlPointImageNotFoundException;
 import com.is.bcs.domain.controlpointimage.exception.InvalidControlPointImageException;
 import com.is.bcs.domain.member.exception.*;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
@@ -291,16 +292,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(SecurityErrorCode.AUTHENTICATION_REQUIRED, e.getMessage());
     }
 
-    /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
-    @ExceptionHandler(Exception.class)
-    public ProblemDetail handleUnexpected(Exception e) {
-        log.error("처리되지 않은 예외 발생", e);
-        return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
+    @ExceptionHandler(ControlPointImageNotFoundException.class)
+    public ProblemDetail handleControlPointImageNotFound(ControlPointImageNotFoundException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(InvalidControlPointImageException.class)
     public ProblemDetail handleInvalidControlPointImage(InvalidControlPointImageException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_INVALID, e.getMessage());
+    }
+
+    /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception e) {
+        log.error("처리되지 않은 예외 발생", e);
+        return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
     }
 
     /** 도메인 예외 핸들러 공통 보강 — ErrorCode 한 상수로 status·code를 지정하고 timestamp를 더한다. */

@@ -148,6 +148,33 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
         }
     }
 
+    @Override
+    public byte[] read(String storagePath) {
+        if (storagePath == null || storagePath.isBlank()) {
+            throw new ControlPointImageStorageException("저장된 이미지 경로가 없습니다.");
+        }
+
+        Path relativePath;
+
+        try {
+            relativePath = Path.of(storagePath);
+        } catch (InvalidPathException exception) {
+            throw new ControlPointImageStorageException("저장된 이미지 경로가 올바르지 않습니다.", exception);
+        }
+
+        Path targetPath = resolveSafely(properties.rootPath(), relativePath);
+
+        if (!Files.isRegularFile(targetPath)) {
+            throw new ControlPointImageStorageException("저장된 이미지 파일을 찾을 수 없습니다.");
+        }
+
+        try {
+            return Files.readAllBytes(targetPath);
+        } catch (IOException exception) {
+            throw new ControlPointImageStorageException("이미지 파일을 읽을 수 없습니다.", exception);
+        }
+    }
+
     private void validateBasicFile(String contentType, long declaredFileSize, byte[] content) {
         if (content == null || content.length == 0) {
             throw new InvalidControlPointImageException("빈 이미지 파일은 등록할 수 없습니다.");
