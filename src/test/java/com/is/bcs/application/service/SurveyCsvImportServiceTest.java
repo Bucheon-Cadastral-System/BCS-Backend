@@ -331,6 +331,11 @@ class SurveyCsvImportServiceTest {
         public List<SurveyRecord> saveAll(List<SurveyRecord> list) {
             return list.stream().map(this::save).toList();
         }
+
+        @Override
+        public java.util.Optional<SurveyRecord> upsertForTarget(SurveyRecord record) {
+            throw new UnsupportedOperationException("파일 임포트는 일괄 생성만 한다");
+        }
     }
 
     /** 조사 대상 포트 페이크. */

@@ -9,6 +9,9 @@ import java.util.Objects;
  * 조사기록 — 조사 프로젝트 × 기준점의 조인. 이 레코드의 존재가 '그 프로젝트에서 그 점을 조사했다'는 사실이고,
  * 결과(완전/망실/기타)와 조사 시각을 갖는다. 같은 (프로젝트, 기준점) 쌍은 하나만 존재한다(영속 계층 유니크).
  * 반복조사는 프로젝트가 달라지는 것으로 표현되므로 이 애그리거트에 이력 축을 두지 않는다.
+ *
+ * 판정 정정은 도메인 메서드가 아니라 영속 계층의 원자 upsert(전 필드 교체, 마지막 판정의 주체가 남는다)다 —
+ * 읽고 고쳐 쓰는 두 단계로 두면 동시 기록이 그 틈에 끼므로, 정정 규칙은 한 문장(ON CONFLICT)에 산다.
  */
 @Getter
 public class SurveyRecord {
@@ -17,10 +20,10 @@ public class SurveyRecord {
     private final Long projectId;
     private final Long pointId;
 
-    private SurveyResult result;
-    private OffsetDateTime surveyedAt;
-    private String note;
-    private Long surveyedById; // 조사원(회원 id) — 서버가 인증 주체로 채운다(인증 전·파일 임포트는 null)
+    private final SurveyResult result;
+    private final OffsetDateTime surveyedAt;
+    private final String note;
+    private final Long surveyedById; // 조사원(회원 id) — 서버가 인증 주체로 채운다(인증 전·파일 임포트는 null)
 
     private SurveyRecord(
             Long id, Long projectId, Long pointId,
@@ -49,14 +52,6 @@ public class SurveyRecord {
             SurveyResult result, OffsetDateTime surveyedAt, String note, Long surveyedById
     ) {
         return new SurveyRecord(id, projectId, pointId, result, surveyedAt, note, surveyedById);
-    }
-
-    /** 판정 정정 — 결과·비고를 새 내용으로 교체하고 정정 시각·정정한 조사원을 기록한다(마지막 판정의 주체가 남는다). */
-    public void revise(SurveyResult result, OffsetDateTime surveyedAt, String note, Long surveyedById) {
-        this.result = Objects.requireNonNull(result, "조사 결과는 필수입니다.");
-        this.surveyedAt = Objects.requireNonNull(surveyedAt, "조사 시각은 필수입니다.");
-        this.note = note;
-        this.surveyedById = surveyedById;
     }
 
     public boolean isLost() {

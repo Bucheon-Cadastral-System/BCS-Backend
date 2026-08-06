@@ -18,8 +18,6 @@ public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpa
 
     boolean existsByPointId(Long pointId);
 
-    boolean existsByProjectIdAndPointId(Long projectId, Long pointId);
-
     /** 점 상세는 화면이 이미 들고 있으므로 id 만 뽑는다. */
     @Query("select t.pointId from SurveyTargetJpaEntity t where t.projectId = :projectId order by t.pointId")
     List<Long> findPointIdsByProjectId(@Param("projectId") Long projectId);
