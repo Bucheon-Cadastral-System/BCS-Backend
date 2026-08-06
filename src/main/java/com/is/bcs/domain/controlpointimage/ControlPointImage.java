@@ -144,27 +144,21 @@ public class ControlPointImage {
     private static String requireWebpContentType(String contentType) {
         String value = requireText(contentType, "콘텐츠 타입");
         if (!"image/webp".equalsIgnoreCase(value)) {
-            throw new InvalidControlPointImageException(
-                    "WebP 이미지만 등록할 수 있습니다."
-            );
+            throw new InvalidControlPointImageException("WebP 이미지만 등록할 수 있습니다.");
         }
         return "image/webp";
     }
 
     private static long requirePositive(long value, String fieldName) {
         if (value <= 0) {
-            throw new InvalidControlPointImageException(
-                    fieldName + "은(는) 0보다 커야 합니다."
-            );
+            throw new InvalidControlPointImageException(fieldName + "은(는) 0보다 커야 합니다.");
         }
         return value;
     }
 
     private static int requirePositive(int value, String fieldName) {
         if (value <= 0) {
-            throw new InvalidControlPointImageException(
-                    fieldName + "은(는) 0보다 커야 합니다."
-            );
+            throw new InvalidControlPointImageException(fieldName + "은(는) 0보다 커야 합니다.");
         }
         return value;
     }

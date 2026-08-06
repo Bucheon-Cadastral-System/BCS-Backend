@@ -5,9 +5,10 @@ import com.is.bcs.application.port.out.controlpointimage.LoadControlPointImagePo
 import com.is.bcs.application.port.out.controlpointimage.SaveControlPointImagePort;
 import com.is.bcs.domain.controlpointimage.ControlPointImage;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -32,10 +33,24 @@ public class ControlPointImagePersistenceAdapter
     }
 
     @Override
-    public List<ControlPointImage> findAllByPointId(Long pointId) {
-        return repository.findAllByPointIdOrderByCreatedAtDesc(pointId).stream()
-                .map(controlPointImageJpaEntity -> controlPointImageJpaEntity.toDomain())
-                .toList();
+    public Page<ControlPointImage> findAllByPointId(Long pointId, Pageable pageable) {
+        return repository
+                .findAllByPointId(pointId, pageable)
+                .map(controlPointImageJpaEntity -> controlPointImageJpaEntity.toDomain());
+    }
+
+    @Override
+    public Page<ControlPointImage> findAllByProjectId(Long projectId, Pageable pageable) {
+        return repository
+                .findAllByProjectId(projectId, pageable)
+                .map(controlPointImageJpaEntity -> controlPointImageJpaEntity.toDomain());
+    }
+
+    @Override
+    public Page<ControlPointImage> findAll(Pageable pageable) {
+        return repository
+                .findAll(pageable)
+                .map(controlPointImageJpaEntity -> controlPointImageJpaEntity.toDomain());
     }
 
     @Override

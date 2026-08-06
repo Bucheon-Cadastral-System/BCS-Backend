@@ -1,5 +1,7 @@
 package com.is.bcs.adapter.out.persistence.controlpointimage;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,8 +13,11 @@ public interface ControlPointImageJpaRepository extends JpaRepository<ControlPoi
 
     Optional<ControlPointImageJpaEntity> findByProjectIdAndPointId(Long projectId, Long pointId);
 
-    List<ControlPointImageJpaEntity> findAllByPointIdOrderByCreatedAtDesc(Long pointId);
-
     boolean existsByProjectIdAndPointId(Long projectId, Long pointId);
+
+    Page<ControlPointImageJpaEntity> findAllByPointId(Long pointId, Pageable pageable);
+
+    Page<ControlPointImageJpaEntity> findAllByProjectId(Long projectId, Pageable pageable);
+
 
 }

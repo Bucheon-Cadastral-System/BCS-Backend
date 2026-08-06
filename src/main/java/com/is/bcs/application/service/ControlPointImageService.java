@@ -5,6 +5,7 @@ import com.is.bcs.application.dto.StoredControlPointImageFile;
 import com.is.bcs.application.dto.UploadControlPointImageCommand;
 import com.is.bcs.application.dto.UploadControlPointImageResult;
 import com.is.bcs.application.port.in.controlpointimage.GetControlPointImageFileUseCase;
+import com.is.bcs.application.port.in.controlpointimage.GetControlPointImagesUseCase;
 import com.is.bcs.application.port.in.controlpointimage.UploadControlPointImageUseCase;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpointimage.ControlPointImageFileStoragePort;
@@ -27,6 +28,8 @@ import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -39,7 +42,8 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ControlPointImageService implements UploadControlPointImageUseCase, GetControlPointImageFileUseCase {
+public class ControlPointImageService implements UploadControlPointImageUseCase, GetControlPointImageFileUseCase
+                                                , GetControlPointImagesUseCase {
 
     private final LoadSurveyProjectPort loadSurveyProjectPort;
     private final LoadControlPointPort loadControlPointPort;
@@ -168,6 +172,33 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ControlPointImage> getByPointId(Long pointId, Long requesterId, Pageable pageable) {
+        requireActiveMember(requesterId);
+        requirePoint(pointId);
+        return loadControlPointImagePort.findAllByPointId(pointId, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ControlPointImage> getByProjectId(Long projectId, Long requesterId, Pageable pageable) {
+        requireActiveMember(requesterId);
+        requireProject(projectId);
+        return loadControlPointImagePort.findAllByProjectId(projectId, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ControlPointImage> getAll(Long requesterId, Pageable pageable) {
+        requireActiveMember(requesterId);
+        return loadControlPointImagePort.findAll(pageable);
+    }
+
+
+
+
+
     private static String toDownloadFileName(String storedFileName) {
         Matcher matcher = STORED_FILE_NAME_PATTERN.matcher(storedFileName);
 
@@ -196,12 +227,12 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
         }
     }
 
-    private void requireActiveMember(Long uploaderId) {
-        Member member = loadMemberPort.findById(uploaderId)
-                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다: " + uploaderId));
+    private void requireActiveMember(Long memberId) {
+        Member member = loadMemberPort.findById(memberId)
+                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다: " + memberId));
 
         if (member.getStatus() != MemberStatus.ACTIVE) {
-            throw new InvalidMemberStateException("활성 회원만 현장 이미지를 등록할 수 있습니다.");
+            throw new InvalidMemberStateException("활성 회원만 현장 이미지에 접근할 수 있습니다.");
         }
     }
 
