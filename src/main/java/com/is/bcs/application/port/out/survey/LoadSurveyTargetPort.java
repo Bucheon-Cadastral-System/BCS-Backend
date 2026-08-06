@@ -18,4 +18,6 @@ public interface LoadSurveyTargetPort {
 
     /** 이 점이 그 프로젝트의 대상인지 — 조사 기록은 대상으로 지정한 점에만 남길 수 있다. */
     boolean existsByProjectIdAndPointId(Long projectId, Long pointId);
+
+    boolean lockByProjectIdAndPointId(Long projectId, Long pointId);
 }

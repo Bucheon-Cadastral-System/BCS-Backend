@@ -72,7 +72,7 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
 
         ControlPoint point = requirePoint(command.pointId());
 
-        requireTarget(command.projectId(), command.pointId());
+        lockTarget(command.projectId(), command.pointId());
 
         requireActiveMember(command.uploaderId());
 
@@ -211,10 +211,10 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
                 .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
     }
 
-    private void requireTarget(Long projectId, Long pointId) {
-        boolean target = loadSurveyTargetPort.existsByProjectIdAndPointId(projectId, pointId);
+    private void lockTarget(Long projectId, Long pointId) {
+        boolean lock = loadSurveyTargetPort.lockByProjectIdAndPointId(projectId, pointId);
 
-        if (!target) {
+        if (!lock) {
             throw new SurveyTargetNotFoundException("프로젝트의 조사 대상이 아닌 기준점입니다: " + pointId);
         }
     }

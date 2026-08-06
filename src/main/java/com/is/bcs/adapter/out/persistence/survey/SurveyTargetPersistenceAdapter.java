@@ -75,5 +75,12 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
         }
     }
 
+    @Override
+    public boolean lockByProjectIdAndPointId(Long projectId, Long pointId) {
+        return targetRepository
+                .findByProjectIdAndPointIdForUpdate(projectId, pointId)
+                .isPresent();
+    }
+
     private static final int CHUNK_SIZE = 1_000;
 }

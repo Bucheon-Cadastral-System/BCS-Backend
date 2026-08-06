@@ -1,12 +1,15 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpaEntity, Long> {
@@ -37,4 +40,15 @@ public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpa
 
     /** 대상 재지정에서 빠진 점들 — 같은 이유로 파생 삭제(엔티티 단위)를 쓴다. */
     void deleteByProjectIdAndPointIdIn(Long projectId, Collection<Long> pointIds);
+
+    /** 파일 업로드 시 비관적 락 활용하여 조회  */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select target
+        from SurveyTargetJpaEntity target
+        where target.projectId = :projectId
+          and target.pointId = :pointId
+        """)
+    Optional<SurveyTargetJpaEntity> findByProjectIdAndPointIdForUpdate(@Param("projectId") Long projectId, @Param("pointId") Long pointId);
+
 }
