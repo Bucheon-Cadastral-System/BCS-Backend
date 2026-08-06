@@ -48,7 +48,7 @@ public class ControlPointImageFileNameGenerator {
 
     private static String sanitizePointName(String pointName) {
         if (pointName == null || pointName.isBlank()) {
-            throw new IllegalArgumentException("기준점명은 필수입니다.");
+            throw new InvalidControlPointImageException("기준점명은 필수입니다.");
         }
 
         // macOS 자모 분리형 문자열도 서버에서 동일한 파일명 형태가 되도록 NFC로 정규화한다.
