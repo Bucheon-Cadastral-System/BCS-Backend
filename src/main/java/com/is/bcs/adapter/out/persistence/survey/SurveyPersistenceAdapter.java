@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -26,6 +28,7 @@ public class SurveyPersistenceAdapter
 
     private final SurveyProjectJpaRepository projectRepository;
     private final SurveyRecordJpaRepository recordRepository;
+    private final Clock clock; // 감사 시각(created_at·updated_at)용 — 원자 upsert 는 JPA 감사를 거치지 않아 직접 찍는다
 
     @Override
     public Optional<SurveyProject> findProjectById(Long id) {
@@ -76,6 +79,20 @@ public class SurveyPersistenceAdapter
     public List<SurveyRecord> saveAll(List<SurveyRecord> records) {
         List<SurveyRecordJpaEntity> entities = records.stream().map(SurveyRecordJpaEntity::fromDomain).toList();
         return recordRepository.saveAll(entities).stream().map(SurveyRecordJpaEntity::toDomain).toList();
+    }
+
+    @Override
+    public Optional<SurveyRecord> upsertForTarget(SurveyRecord record) {
+        int applied = recordRepository.upsertForTarget(
+                record.getProjectId(), record.getPointId(), record.getResult().name(),
+                record.getSurveyedAt(), record.getNote(), record.getSurveyedById(),
+                OffsetDateTime.now(clock));
+        if (applied == 0) {
+            return Optional.empty(); // 대상이 아니라서 문장이 아무것도 쓰지 않았다
+        }
+        // 문장은 반영 행 수만 돌려준다 — id·created_at 은 같은 트랜잭션에서 되읽는다
+        return recordRepository.findByProjectIdAndPointId(record.getProjectId(), record.getPointId())
+                .map(SurveyRecordJpaEntity::toDomain);
     }
 
     @Override

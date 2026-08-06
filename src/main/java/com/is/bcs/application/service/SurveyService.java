@@ -171,26 +171,24 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         return requireProject(id);
     }
 
-    /** 조사 수행 기록 — 이미 조사한 점이면 새 레코드가 아니라 판정 정정(revise)으로 처리한다. */
+    /**
+     * 조사 수행 기록 — 이미 조사한 점이면 새 레코드가 아니라 판정 정정으로 처리한다.
+     * 대상 확인·삽입·정정은 영속 계층의 원자 한 문장이다 — 확인과 쓰기를 가르면
+     * 동시 기록이 중복 행을, 동시 대상 재지정이 대상 아닌 기록을 그 틈에 남긴다.
+     * 프로젝트·기준점 사전 확인은 실패 사유를 404 로 정확히 가르는 안내용으로 남긴다.
+     */
     @Override
     public SurveyRecordSummary record(RecordSurveyCommand command) {
         requireProject(command.projectId());
         requirePoint(command.pointId());
-        // 기록은 대상으로 지정한 점에만 — 비대상 기록을 허용하면 화면 밖 경로(직접 호출)로 진행률의 전제가 깨진다
-        requireTarget(command.projectId(), command.pointId());
 
-        OffsetDateTime now = OffsetDateTime.now(clock);
-        SurveyRecord record = loadSurveyRecordPort
-                .findRecordByProjectIdAndPointId(command.projectId(), command.pointId())
-                .map(existing -> {
-                    existing.revise(command.result(), now, command.note(), command.surveyorId());
-                    return existing;
-                })
-                .orElseGet(() -> SurveyRecord.create(
-                        command.projectId(), command.pointId(), command.result(), now, command.note(),
-                        command.surveyorId()));
-
-        return withSurveyorName(saveSurveyRecordPort.save(record));
+        SurveyRecord written = saveSurveyRecordPort.upsertForTarget(SurveyRecord.create(
+                        command.projectId(), command.pointId(), command.result(),
+                        OffsetDateTime.now(clock), command.note(), command.surveyorId()))
+                // 기록은 대상으로 지정한 점에만 — 비대상 기록을 허용하면 화면 밖 경로(직접 호출)로 진행률의 전제가 깨진다
+                .orElseThrow(() -> new SurveyTargetNotFoundException(
+                        "프로젝트의 조사 대상이 아닌 기준점입니다: " + command.pointId()));
+        return withSurveyorName(written);
     }
 
     @Override
@@ -251,12 +249,6 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         boolean complete = totalPoints > 0 && notSurveyedPoints == 0;
         return new SurveyProgress(
                 project.getName(), totalPoints, surveyed, notSurveyedPoints, complete, countByResult);
-    }
-
-    private void requireTarget(Long projectId, Long pointId) {
-        if (!loadSurveyTargetPort.existsByProjectIdAndPointId(projectId, pointId)) {
-            throw new SurveyTargetNotFoundException("프로젝트의 조사 대상이 아닌 기준점입니다: " + pointId);
-        }
     }
 
     private SurveyProject requireProject(Long id) {
