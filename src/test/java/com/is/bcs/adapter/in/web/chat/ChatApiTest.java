@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.in.web.chat;
 
+import com.is.bcs.adapter.in.security.jwt.AccessTokenAuthenticationFilter;
 import com.is.bcs.adapter.in.web.exception.ErrorDetailResolver;
 import com.is.bcs.application.port.in.chat.AskChatBotUseCase;
 import com.is.bcs.config.TimeConfig;
@@ -9,6 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
+import org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,7 +28,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /** 챗봇 API 계약 검증 — 모델 없이 유스케이스 페이크로 컨트롤러·검증만 본다. */
-@WebMvcTest(ChatController.class)
+// 인증은 이 조각의 관심사가 아니다 — 컨트롤러 조각은 서블릿 필터·보안 설정을 함께 세우는데,
+// 그 판이 서려면 토큰 검증기부터 OAuth 클라이언트까지 딸려 와야 해서 컨트롤러를 보기도 전에 무너진다.
+// 인증이 붙은 실제 사슬은 전체를 띄우는 API 시험(SurveyApiTest 등)이 본다.
+@WebMvcTest(controllers = ChatController.class, excludeAutoConfiguration = {
+        SecurityAutoConfiguration.class,
+        ServletWebSecurityAutoConfiguration.class,
+        OAuth2ClientAutoConfiguration.class,
+        OAuth2ClientWebSecurityAutoConfiguration.class
+}, excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE, classes = AccessTokenAuthenticationFilter.class))
 @Import({ChatApiTest.FakeChatBot.class, ErrorDetailResolver.class, TimeConfig.class})
 class ChatApiTest {
 
