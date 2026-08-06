@@ -219,10 +219,12 @@ class SurveyPersistenceAdapterTest {
                 project.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, "최초", null)).orElseThrow();
         assertEquals(SurveyResult.INTACT, written.getResult());
 
+        OffsetDateTime revisedAt = SURVEYED_AT.plusDays(1);
         SurveyRecord revised = adapter.upsertForTarget(SurveyRecord.create(
-                project.getId(), pointId, SurveyResult.LOST, SURVEYED_AT, null, memberId)).orElseThrow();
+                project.getId(), pointId, SurveyResult.LOST, revisedAt, null, memberId)).orElseThrow();
         assertEquals(written.getId(), revised.getId()); // 정정은 새 행이 아니라 같은 행이다
         assertEquals(SurveyResult.LOST, revised.getResult());
+        assertTrue(revised.getSurveyedAt().isEqual(revisedAt)); // 조사 시각도 정정한 시각으로 바뀐다
         assertEquals(memberId, revised.getSurveyedById()); // 마지막 판정의 주체가 남는다
         assertEquals(null, revised.getNote()); // 전 필드 교체 — 비고 없는 정정은 비고를 지운다
         assertEquals(1, adapter.findRecordsByProjectId(project.getId()).size());
