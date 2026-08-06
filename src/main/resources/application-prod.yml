@@ -120,6 +120,14 @@ app:
   frontend-base-url: ${FRONTEND_BASE_URL:https://bcs.inwoohub.com}
   backend-base-url: ${BACKEND_BASE_URL:https://bcs.inwoohub.com}
 
+  image-upload:
+    # 컨테이너 내부 경로다. Ubuntu 호스트 경로는 Docker 볼륨으로 연결한다.
+    root-directory: ${BCS_UPLOAD_DIR:/app/uploads}
+    max-file-size: ${BCS_IMAGE_MAX_SIZE:5MB}
+    max-width: ${BCS_IMAGE_MAX_WIDTH:12000}
+    max-height: ${BCS_IMAGE_MAX_HEIGHT:12000}
+    webp-info-command: ${BCS_WEBPINFO_COMMAND:webpinfo}
+
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiration: 15m
