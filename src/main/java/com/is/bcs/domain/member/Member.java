@@ -2,10 +2,12 @@ package com.is.bcs.domain.member;
 
 import com.is.bcs.domain.member.exception.InvalidMemberInvariantException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
+import com.is.bcs.domain.member.exception.InvalidMemberRoleException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import lombok.Getter;
 
 import java.time.OffsetDateTime;
+import java.util.Locale;
 
 @Getter
 public class Member {
@@ -179,6 +181,41 @@ public class Member {
         this.position = validPosition;
     }
 
+    /**
+     * 관리자가 회원 정보를 수정한다. 넘어온 값 중 null이 아닌 항목만 반영한다.
+     */
+    public void updateProfileByAdmin(
+            String name,
+            String phone,
+            String email,
+            District district,
+            String department,
+            Team team,
+            Position position
+    ) {
+        if (name != null) {
+            this.name = name.trim();
+        }
+        if (phone != null) {
+            this.phone = phone.trim();
+        }
+        if (email != null) {
+            this.email = email.trim().toLowerCase(Locale.ROOT);
+        }
+        if (district != null) {
+            this.district = district;
+        }
+        if (department != null) {
+            this.department = department.trim();
+        }
+        if (team != null) {
+            this.team = team;
+        }
+        if (position != null) {
+            this.position = position;
+        }
+    }
+
 
     public void approve(OffsetDateTime approvedAt) {
         validatePendingStatus();
@@ -191,6 +228,14 @@ public class Member {
         this.deactivatedAt = null;
     }
 
+    public void reject(OffsetDateTime rejectedAt) {
+        validatePendingStatus();
+        OffsetDateTime validRejectedAt = requireInvariant(rejectedAt, "거절 시각");
+        this.status = MemberStatus.INACTIVE;
+        this.deactivatedAt = validRejectedAt;
+        this.approvedAt = null;
+    }
+
     public void deactivate(OffsetDateTime deactivatedAt) {
         if (status != MemberStatus.ACTIVE) {
             throw new InvalidMemberStateException("활성 회원만 비활성화할 수 있습니다.");
@@ -201,13 +246,34 @@ public class Member {
         this.deactivatedAt = validApprovedAt;
     }
 
-    public void reactivate() {
-        if (status != MemberStatus.INACTIVE) {
-            throw new InvalidMemberStateException("비활성 회원만 다시 활성화할 수 있습니다.");
-        }
+    public void activate(OffsetDateTime activatedAt) {
+        validateInactiveStatus();
+        OffsetDateTime validActivatedAt = requireInvariant(activatedAt, "활성화 시각");
 
         this.status = MemberStatus.ACTIVE;
         this.deactivatedAt = null;
+
+        // 거절 이력이 있어 승인 시각이 비어 있던 회원은 활성화 시각으로 채운다.
+        if (this.approvedAt == null) {
+            this.approvedAt = validActivatedAt;
+        }
+    }
+
+    public void promoteToAdmin() {
+        if (role != MemberRole.USER) {
+            throw new InvalidMemberRoleException("USER 권한의 회원만 관리자로 승격할 수 있습니다.");
+        }
+        validateActiveStatus();
+
+        this.role = MemberRole.ADMIN;
+    }
+
+    public void demoteToUser() {
+        if (role != MemberRole.ADMIN) {
+            throw new InvalidMemberRoleException("ADMIN 권한의 회원만 사용자로 강등할 수 있습니다.");
+        }
+
+        this.role = MemberRole.USER;
     }
 
     private void validatePendingStatus() {
@@ -219,6 +285,12 @@ public class Member {
     private void validateActiveStatus() {
         if (status != MemberStatus.ACTIVE) {
             throw new InvalidMemberStateException("활성화된 상태에서만 처리할 수 있습니다.");
+        }
+    }
+
+    private void validateInactiveStatus() {
+        if (status != MemberStatus.INACTIVE) {
+            throw new InvalidMemberStateException("비활성 회원만 다시 활성화할 수 있습니다.");
         }
     }
 

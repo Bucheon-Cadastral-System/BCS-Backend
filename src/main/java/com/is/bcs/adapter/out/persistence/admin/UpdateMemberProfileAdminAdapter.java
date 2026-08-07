@@ -4,6 +4,7 @@ import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.adapter.out.persistence.member.MemberJpaRepository;
 import com.is.bcs.application.port.in.admin.UpdateMemberProfileAdminUseCase;
 import com.is.bcs.application.port.out.admin.UpdateMemberProfileAdminPort;
+import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.exception.DuplicateMemberEmailException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
@@ -22,22 +23,24 @@ public class UpdateMemberProfileAdminAdapter
 
     @Override
     public void updateProfile(Long memberId, UpdateMemberProfileAdminUseCase.Command command) {
-        MemberJpaEntity member = memberJpaRepository.findById(memberId)
+        MemberJpaEntity entity = memberJpaRepository.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + memberId));
 
-        validateEmail(member, command.email());
+        validateEmail(entity, command.email());
+
+        Member member = entity.toDomain();
+        member.updateProfileByAdmin(
+                command.name(),
+                command.phone(),
+                command.email(),
+                command.district(),
+                command.department(),
+                command.team(),
+                command.position()
+        );
 
         try {
-            member.updateProfileByAdmin(
-                    command.name(),
-                    command.phone(),
-                    command.email(),
-                    command.district(),
-                    command.department(),
-                    command.team(),
-                    command.position()
-            );
-
+            memberJpaRepository.save(MemberJpaEntity.fromDomain(member));
             memberJpaRepository.flush();
         } catch (DataIntegrityViolationException exception) {
             throw new DuplicateMemberEmailException("이미 다른 회원이 사용 중인 이메일입니다.", exception);

@@ -3,10 +3,12 @@ package com.is.bcs.adapter.out.persistence.admin;
 import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.adapter.out.persistence.member.MemberJpaRepository;
 import com.is.bcs.application.port.out.admin.DeactivateMemberAdminPort;
+import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
 
 @Repository
@@ -14,13 +16,17 @@ import java.time.OffsetDateTime;
 public class DeactivateMemberAdminAdapter implements DeactivateMemberAdminPort {
 
     private final MemberJpaRepository memberJpaRepository;
+    private final Clock clock;
 
     @Override
     public void deactivate(Long memberId) {
-        MemberJpaEntity member = memberJpaRepository.findById(memberId)
+        MemberJpaEntity entity = memberJpaRepository.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + memberId));
 
-        member.deactivate();
+        Member member = entity.toDomain();
+        member.deactivate(OffsetDateTime.now(clock));
+
+        memberJpaRepository.save(MemberJpaEntity.fromDomain(member));
     }
 
 }
