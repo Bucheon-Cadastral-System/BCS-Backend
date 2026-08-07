@@ -23,7 +23,7 @@ public class UpdateMemberProfileAdminAdapter
 
     @Override
     public void updateProfile(Long memberId, UpdateMemberProfileAdminUseCase.Command command) {
-        MemberJpaEntity entity = memberJpaRepository.findById(memberId)
+        MemberJpaEntity entity = memberJpaRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + memberId));
 
         validateEmail(entity, command.email());

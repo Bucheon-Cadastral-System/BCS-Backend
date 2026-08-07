@@ -20,7 +20,7 @@ public class DeactivateMemberAdminAdapter implements DeactivateMemberAdminPort {
 
     @Override
     public void deactivate(Long memberId) {
-        MemberJpaEntity entity = memberJpaRepository.findById(memberId)
+        MemberJpaEntity entity = memberJpaRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + memberId));
 
         Member member = entity.toDomain();
