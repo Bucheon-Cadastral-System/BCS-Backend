@@ -182,7 +182,10 @@ public class Member {
     }
 
     /**
-     * 관리자가 회원 정보를 수정한다. 넘어온 값 중 null이 아닌 항목만 반영한다.
+     * 관리자가 회원 정보를 수정한다. 넘어온 값 중 null 이 아닌 항목만 반영한다.
+     *
+     * <p>null 은 고치지 않겠다는 뜻이고 공백 문자열은 값이 아니다. 공백을 그대로 받으면 활성 회원인데
+     * 프로필은 미완성인 상태가 만들어진다.
      */
     public void updateProfileByAdmin(
             String name,
@@ -194,19 +197,19 @@ public class Member {
             Position position
     ) {
         if (name != null) {
-            this.name = name.trim();
+            this.name = requireText(name, "이름");
         }
         if (phone != null) {
-            this.phone = phone.trim();
+            this.phone = requireText(phone, "전화번호");
         }
         if (email != null) {
-            this.email = email.trim().toLowerCase(Locale.ROOT);
+            this.email = requireText(email, "이메일").toLowerCase(Locale.ROOT);
         }
         if (district != null) {
             this.district = district;
         }
         if (department != null) {
-            this.department = department.trim();
+            this.department = requireText(department, "부서");
         }
         if (team != null) {
             this.team = team;
@@ -246,8 +249,17 @@ public class Member {
         this.deactivatedAt = validApprovedAt;
     }
 
+    /**
+     * 비활성 회원을 다시 활성화한다.
+     *
+     * <p>승인과 같은 프로필 조건을 건다. 거절은 프로필이 덜 찬 가입 요청도 비활성으로 보내므로,
+     * 상태만 보고 활성화하면 승인이 막았을 회원이 이 길로 들어온다.
+     */
     public void activate(OffsetDateTime activatedAt) {
         validateInactiveStatus();
+        if (!isProfileCompleted()) {
+            throw new InvalidMemberStateException("프로필이 완성되지 않아 활성화할 수 없습니다.");
+        }
         OffsetDateTime validActivatedAt = requireInvariant(activatedAt, "활성화 시각");
 
         this.status = MemberStatus.ACTIVE;

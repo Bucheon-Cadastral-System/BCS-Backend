@@ -288,4 +288,32 @@ class MemberTest {
         assertEquals("hong@example.com", member.getEmail());
         assertEquals("010-1234-5678", member.getPhone());
     }
+
+    @Test
+    @DisplayName("관리자 수정에 공백 문자열이 오면 거부한다 — null 은 미변경, 공백은 값이 아니다")
+    void updateProfileByAdmin_blankValue_throws() {
+        Member member = activeMember();
+
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                "  ", null, null, null, null, null, null));
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                null, "  ", null, null, null, null, null));
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                null, null, "  ", null, null, null, null));
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                null, null, null, null, "  ", null, null));
+
+        assertEquals("홍길동", member.getName());
+        assertTrue(member.isProfileCompleted());
+    }
+
+    @Test
+    @DisplayName("프로필이 미완성인 채 거절된 회원은 활성화할 수 없다 — 승인과 같은 조건을 건다")
+    void activate_incompleteProfile_throws() {
+        Member member = pendingMember();
+        member.reject(NOW.plusDays(1));
+
+        assertThrows(InvalidMemberStateException.class, () -> member.activate(NOW.plusDays(2)));
+        assertEquals(MemberStatus.INACTIVE, member.getStatus());
+    }
 }
