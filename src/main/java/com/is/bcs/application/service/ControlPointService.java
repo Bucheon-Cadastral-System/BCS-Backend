@@ -1,6 +1,7 @@
 package com.is.bcs.application.service;
 
 import com.is.bcs.application.dto.ControlPointCountSummary;
+import com.is.bcs.application.dto.LastSurveySummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
 import com.is.bcs.application.dto.UpdateControlPointCommand;
@@ -171,13 +172,14 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
 
     @Override
     @Transactional(readOnly = true)
-    public String getLastSurveyorName(Long pointId) {
+    public LastSurveySummary getLastSurvey(Long pointId) {
         ControlPoint point = loadControlPointPort.findById(pointId)
                 .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
         Long surveyorId = point.getLastSurveyedById();
-        if (surveyorId == null) {
-            return null;
-        }
-        return loadMemberNamesPort.findNamesByIds(Set.of(surveyorId)).get(surveyorId);
+        // 이름은 조사원이 있을 때만 찾는다 — 파일로 들어온 기록은 이 칸이 비어 있어 조회할 것이 없다
+        String surveyorName = surveyorId == null
+                ? null
+                : loadMemberNamesPort.findNamesByIds(Set.of(surveyorId)).get(surveyorId);
+        return new LastSurveySummary(point.getLastSurveyResult(), point.getLastSurveyedOn(), surveyorName);
     }
 }

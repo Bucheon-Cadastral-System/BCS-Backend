@@ -2,12 +2,14 @@ package com.is.bcs.application.service;
 
 import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.ControlPointCountSummary;
+import com.is.bcs.application.dto.LastSurveySummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
 import com.is.bcs.application.dto.UpdateControlPointCommand;
 import com.is.bcs.application.dto.UpdateControlPointResult;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
+import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.InstallType;
 import com.is.bcs.domain.controlpoint.MarkerMaterial;
@@ -53,6 +55,62 @@ class ControlPointServiceTest {
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", null, null, false)
         );
+    }
+
+    /** 이름 표를 든 서비스 — 기본 서비스는 빈 표라 조사원 이름이 붙는지 볼 수 없다. */
+    private ControlPointService serviceWithNames(Map<Long, String> names) {
+        return new ControlPointService(
+                store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
+                surveyUsage, surveyUsage, ids -> names);
+    }
+
+    private ControlPoint pointWithLastSurvey(String result, LocalDate surveyedOn, Long surveyorId) {
+        Long id = service.register(csvRow1Command()).point().getId();
+        ControlPoint point = store.findById(id).orElseThrow();
+        point.updateLastSurvey(result, surveyedOn, surveyorId);
+        return store.save(point);
+    }
+
+    @Test
+    @DisplayName("최종조사 요약은 결과·조사일·조사원 이름을 함께 돌려준다")
+    void getLastSurvey_carriesResultDateAndSurveyorName() {
+        ControlPoint point = pointWithLastSurvey("정상", LocalDate.of(2026, 7, 22), 7L);
+
+        LastSurveySummary summary = serviceWithNames(Map.of(7L, "김측량")).getLastSurvey(point.getId());
+
+        assertEquals("정상", summary.result());
+        assertEquals(LocalDate.of(2026, 7, 22), summary.surveyedOn());
+        assertEquals("김측량", summary.surveyorName());
+    }
+
+    @Test
+    @DisplayName("조사원이 없는 기록은 이름 칸만 비워 돌려준다 — 파일로 들어온 기록이 그렇다")
+    void getLastSurvey_withoutSurveyor_leavesNameEmpty() {
+        ControlPoint point = pointWithLastSurvey("망실", LocalDate.of(2025, 9, 8), null);
+
+        LastSurveySummary summary = service.getLastSurvey(point.getId());
+
+        assertEquals("망실", summary.result());
+        assertEquals(LocalDate.of(2025, 9, 8), summary.surveyedOn());
+        assertNull(summary.surveyorName());
+    }
+
+    @Test
+    @DisplayName("조사한 적 없는 점은 세 칸이 모두 비어 있다")
+    void getLastSurvey_neverSurveyed_isEmpty() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        LastSurveySummary summary = service.getLastSurvey(id);
+
+        assertNull(summary.result());
+        assertNull(summary.surveyedOn());
+        assertNull(summary.surveyorName());
+    }
+
+    @Test
+    @DisplayName("없는 점의 최종조사를 물으면 찾을 수 없다고 답한다")
+    void getLastSurvey_unknownPoint_throws() {
+        assertThrows(ControlPointNotFoundException.class, () -> service.getLastSurvey(9999L));
     }
 
     @Test
