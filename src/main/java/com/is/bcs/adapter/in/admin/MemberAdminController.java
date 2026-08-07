@@ -49,8 +49,8 @@ public class MemberAdminController {
             @RequestParam(required = false) District district,
             @RequestParam(required = false) Team team,
             @RequestParam(required = false) Position position,
-            @RequestParam(required = false) MemberStatus memberStatus,
-            @RequestParam(required = false) MemberRole memberRole
+            @RequestParam(required = false) MemberStatus status,
+            @RequestParam(required = false) MemberRole role
     ) {
         validatePageRequest(page, size);
 
@@ -64,8 +64,8 @@ public class MemberAdminController {
                         district,
                         team,
                         position,
-                        memberStatus,
-                        memberRole
+                        status,
+                        role
                 );
 
         Page<MemberAdminResponse> response = getMemberAdminUseCase
@@ -160,11 +160,12 @@ public class MemberAdminController {
                  "district",
                  "team",
                  "position",
-                 "memberStatus",
-                 "memberRole",
+                 "status",
+                 "role",
                  "createdAt" -> sortBy;
 
-            default -> throw new IllegalArgumentException(
+            // 같은 성격의 잘못된 요청은 같은 예외로 던진다 — IllegalArgumentException 은 받는 핸들러가 없어 500 으로 샌다
+            default -> throw new InvalidPageRequestException(
                     "지원하지 않는 정렬 기준입니다: " + sortBy
             );
         };

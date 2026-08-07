@@ -325,6 +325,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_INVALID, e.getMessage());
     }
 
+    /**
+     * 페이지·커서 요청 오류 — 잘못 보낸 요청이라 400 이다.
+     *
+     * <p>핸들러가 없으면 아래 미처리 예외가 받아 500 으로 나간다. 그러면 클라이언트가 서버 장애로 보고
+     * 같은 값으로 한 번 더 두드리고, 서버 로그에도 평범한 입력 검증이 처리되지 않은 예외로 남는다.
+     *
+     * <p>detail 은 그대로 내보내지 않는다. "page는 0 이상이어야 합니다. 입력값=-1" 은 코드를 부르는
+     * 쪽에게 하는 말이지 사람에게 보일 문장이 아니다. 원문은 로그로 남긴다.
+     */
+    @ExceptionHandler(InvalidPageRequestException.class)
+    public ProblemDetail handleInvalidPageRequest(InvalidPageRequestException e) {
+        log.warn("잘못된 페이지 요청", e);
+        return problem(CommonErrorCode.PAGE_REQUEST_INVALID, "목록을 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
+    @ExceptionHandler(InvalidCursorException.class)
+    public ProblemDetail handleInvalidCursor(InvalidCursorException e) {
+        log.warn("잘못된 커서 요청", e);
+        return problem(CommonErrorCode.CURSOR_INVALID, "목록을 이어 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception e) {
