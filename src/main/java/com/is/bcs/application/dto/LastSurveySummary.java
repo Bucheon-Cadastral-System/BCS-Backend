@@ -10,7 +10,8 @@ import java.time.LocalDate;
  *
  * @param result      최종조사내용. 파일로 들어온 값도 화면 어휘로 맞춰 둔다
  * @param surveyedOn  최종조사일
- * @param surveyorName 최종조사원 표시명. 파일로 들어온 기록과 인증 전에 남긴 기록은 비어 있다
+ * @param surveyorName 최종조사원 표시명. 시드 조사와 인증 전에 남긴 기록은 비어 있다
+ * @param note        판정에 딸린 비고. 기타가 아니거나 시드 조사면 비어 있다
  */
-public record LastSurveySummary(String result, LocalDate surveyedOn, String surveyorName) {
+public record LastSurveySummary(String result, LocalDate surveyedOn, String surveyorName, String note) {
 }

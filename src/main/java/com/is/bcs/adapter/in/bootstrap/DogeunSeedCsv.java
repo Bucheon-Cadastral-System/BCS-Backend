@@ -50,7 +50,7 @@ public final class DogeunSeedCsv {
                         new BigDecimal(cells[5]), new BigDecimal(cells[4])), // northing, easting
                 new GeoCoordinate(Double.parseDouble(cells[2]), Double.parseDouble(cells[3])),
                 null, null, null, null, null, null, null,
-                null, null, null
+                null, null
         );
     }
 }

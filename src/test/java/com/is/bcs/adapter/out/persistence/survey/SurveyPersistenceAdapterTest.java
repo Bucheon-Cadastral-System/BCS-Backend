@@ -35,6 +35,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,7 +91,7 @@ class SurveyPersistenceAdapterTest {
                 new GeoCoordinate(126.794623, 37.506423),
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
-                new TraverseInfo("1", null, null, false), null, null, null)).getId();
+                new TraverseInfo("1", null, null, false), null, null)).getId();
     }
 
     /** 대상으로 지정된 점 — 기록은 대상에만 남길 수 있으므로 기록 시험은 이 자리를 먼저 만든다. */

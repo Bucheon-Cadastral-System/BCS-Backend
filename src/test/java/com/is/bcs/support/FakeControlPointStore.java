@@ -83,7 +83,7 @@ public class FakeControlPointStore implements LoadControlPointPort, SaveControlP
                 point.getRegionCode(), point.getRegionName(), point.getAddress(),
                 point.getMarkerMaterial(), point.getInstallType(), point.getInstalledDate(),
                 point.getTraverse(),
-                point.getLastSurveyResult(), point.getLastSurveyedOn(), point.getLastSurveyedById());
+                point.getLastSurveyResult(), point.getLastSurveyedOn());
         points.put(id, saved);
         return saved;
     }

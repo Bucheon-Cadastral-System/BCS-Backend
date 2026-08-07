@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 조사기록 저장소.
@@ -23,6 +24,14 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
     List<SurveyRecordJpaEntity> findByIdProjectId(Long projectId);
 
     List<SurveyRecordJpaEntity> findByIdPointId(Long pointId);
+
+    /**
+     * 그 점의 최신 기록 한 줄. 기본키가 (point_id, project_id) 라 앞자리로 바로 들어간다.
+     * 한 점의 기록 수는 그 점을 대상으로 삼은 회차 수뿐이라 정렬 대상도 몇 줄이다.
+     */
+    @Query("select r from SurveyRecordJpaEntity r where r.id.pointId = :pointId"
+            + " order by r.surveyedAt desc, r.id.projectId desc limit 1")
+    Optional<SurveyRecordJpaEntity> findLatestByPointId(@Param("pointId") Long pointId);
 
     /**
      * 목록에 조사원 이름을 함께 그리는 경로 전용 — 조사원을 조인으로 함께 실어 온다.

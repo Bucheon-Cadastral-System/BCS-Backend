@@ -34,9 +34,15 @@ public class ControlPoint {
     private LocalDate installedDate; // 설치일자(원천이 날짜라 LocalDate — 시각으로 바꾸면 UTC 정규화 때 날짜가 밀린다)
     private TraverseInfo traverse; // 도선 정보 — 도근점 외에는 null
 
+    /**
+     * 시드 조사 — 기준점 파일이 들고 온, 이 시스템에 올라오기 전까지의 조사 총정리다.
+     *
+     * <p>회차 하나가 아니라 여러 회차를 눌러 담은 값이라 조사기록으로 풀 수 없다. 조사원도 없다.
+     * 임포트만 이 칸에 쓴다. 앱이 남기는 판정은 조사기록에 있고, 기준점의 최종조사는 이 값과 기록을
+     * 같은 축에 놓고 날짜가 늦은 쪽을 고른 결과다(ControlPointService.getLastSurvey).
+     */
     private String lastSurveyResult; // 최종조사내용 — 파일 문구 그대로("망실,안보임" 같은 자유 표기가 실재해 어휘를 강제하지 않는다)
     private LocalDate lastSurveyedOn; // 최종조사일
-    private Long lastSurveyedById; // 최종조사원(회원 id) — 파일에는 없는 값이라 앱 내 조사 기록이 채운다(인증 전 null)
 
     private ControlPoint(
             Long id,
@@ -53,8 +59,7 @@ public class ControlPoint {
             LocalDate installedDate,
             TraverseInfo traverse,
             String lastSurveyResult,
-            LocalDate lastSurveyedOn,
-            Long lastSurveyedById
+            LocalDate lastSurveyedOn
     ) {
         this.id = id;
         this.pointNo = requireText(pointNo, "관리번호");
@@ -71,7 +76,6 @@ public class ControlPoint {
         this.traverse = traverse;
         this.lastSurveyResult = lastSurveyResult;
         this.lastSurveyedOn = lastSurveyedOn;
-        this.lastSurveyedById = lastSurveyedById;
     }
 
     /** 신규 등록(데이터 임포트 포함). */
@@ -89,13 +93,12 @@ public class ControlPoint {
             LocalDate installedDate,
             TraverseInfo traverse,
             String lastSurveyResult,
-            LocalDate lastSurveyedOn,
-            Long lastSurveyedById
+            LocalDate lastSurveyedOn
     ) {
         return new ControlPoint(
                 null, pointNo, type, name, tm, geo,
                 regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
-                lastSurveyResult, lastSurveyedOn, lastSurveyedById
+                lastSurveyResult, lastSurveyedOn
         );
     }
 
@@ -115,13 +118,12 @@ public class ControlPoint {
             LocalDate installedDate,
             TraverseInfo traverse,
             String lastSurveyResult,
-            LocalDate lastSurveyedOn,
-            Long lastSurveyedById
+            LocalDate lastSurveyedOn
     ) {
         return new ControlPoint(
                 id, pointNo, type, name, tm, geo,
                 regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
-                lastSurveyResult, lastSurveyedOn, lastSurveyedById
+                lastSurveyResult, lastSurveyedOn
         );
     }
 
@@ -131,11 +133,6 @@ public class ControlPoint {
      * <p>파일 임포트가 채우던 자리를 앱에서 남긴 판정이 이어받는다.
      * 기록을 지워 남은 것이 없으면 세 칸을 함께 비운다.
      */
-    public void updateLastSurvey(String result, LocalDate surveyedOn, Long surveyedById) {
-        this.lastSurveyResult = result;
-        this.lastSurveyedOn = surveyedOn;
-        this.lastSurveyedById = surveyedById;
-    }
 
     private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {

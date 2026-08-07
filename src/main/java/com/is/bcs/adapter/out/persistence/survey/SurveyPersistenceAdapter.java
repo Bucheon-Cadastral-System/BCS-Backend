@@ -71,6 +71,11 @@ public class SurveyPersistenceAdapter
     }
 
     @Override
+    public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
+        return recordRepository.findLatestByPointId(pointId).map(SurveyRecordJpaEntity::toDomain);
+    }
+
+    @Override
     public List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
         // 조사원을 조인으로 함께 실어 오므로 이름을 따로 모아 조회하지 않는다
         return recordRepository.findByProjectIdWithSurveyor(projectId).stream()

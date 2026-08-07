@@ -24,7 +24,7 @@ class ControlPointTest {
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", "가", "3", false)
-        , null, null, null);
+        , null, null);
     }
 
     @Test
@@ -52,7 +52,7 @@ class ControlPointTest {
         ControlPoint point = ControlPoint.register(
                 "41192A000000001", PointType.TRIANGULATION_AUX, "부천25", TM, GEO,
                 null, null, null, null, null, null, null
-        , null, null, null);
+        , null, null);
 
         assertNull(point.getTraverse());
         assertNull(point.getMarkerMaterial());
@@ -64,10 +64,10 @@ class ControlPointTest {
     void register_blankIdentity_throws() {
         assertThrows(InvalidControlPointException.class, () -> ControlPoint.register(
                 " ", PointType.DOGEUN, "1465공", TM, GEO,
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
         assertThrows(InvalidControlPointException.class, () -> ControlPoint.register(
                 "41192D000001265", PointType.DOGEUN, " ", TM, GEO,
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
     }
 
     @Test

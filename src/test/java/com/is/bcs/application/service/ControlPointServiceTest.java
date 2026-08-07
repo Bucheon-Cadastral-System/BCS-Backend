@@ -24,8 +24,15 @@ import com.is.bcs.support.FakeControlPointStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.is.bcs.config.TimeConfig;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,11 +47,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** 수동 한 점 등록 — 파일 임포트와 같은 규칙(이름·종류 매칭, 있으면 갱신)을 따르는지 검증한다. */
 class ControlPointServiceTest {
 
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST);
+
     private final FakeControlPointStore store = new FakeControlPointStore();
     private final FakeSurveyUsage surveyUsage = new FakeSurveyUsage();
     private final ControlPointService service = new ControlPointService(
             store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
-            surveyUsage, surveyUsage, ids -> Map.of());
+            surveyUsage, surveyUsage, ids -> Map.of(), FIXED_CLOCK);
 
     private static RegisterControlPointCommand csvRow1Command() {
         return new RegisterControlPointCommand(
@@ -61,42 +70,109 @@ class ControlPointServiceTest {
     private ControlPointService serviceWithNames(Map<Long, String> names) {
         return new ControlPointService(
                 store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
-                surveyUsage, surveyUsage, ids -> names);
+                surveyUsage, surveyUsage, ids -> names, FIXED_CLOCK);
     }
 
-    private ControlPoint pointWithLastSurvey(String result, LocalDate surveyedOn, Long surveyorId) {
-        Long id = service.register(csvRow1Command()).point().getId();
-        ControlPoint point = store.findById(id).orElseThrow();
-        point.updateLastSurvey(result, surveyedOn, surveyorId);
-        return store.save(point);
+    /** 파일이 적어 온 최종조사를 든 점 — 이 세 칸은 임포트만 쓴다. */
+    private ControlPoint pointWithFileSurvey(String result, LocalDate surveyedOn) {
+        ControlPoint registered = service.register(csvRow1Command()).point();
+        return store.save(ControlPoint.restore(
+                registered.getId(), registered.getPointNo(), registered.getType(), registered.getName(),
+                registered.getTm(), registered.getGeo(), registered.getRegionCode(), registered.getRegionName(),
+                registered.getAddress(), registered.getMarkerMaterial(), registered.getInstallType(),
+                registered.getInstalledDate(), registered.getTraverse(), result, surveyedOn));
     }
 
     @Test
-    @DisplayName("최종조사 요약은 결과·조사일·조사원 이름을 함께 돌려준다")
-    void getLastSurvey_carriesResultDateAndSurveyorName() {
-        ControlPoint point = pointWithLastSurvey("정상", LocalDate.of(2026, 7, 22), 7L);
+    @DisplayName("앱이 남긴 기록이 있으면 그 판정을 따르고 조사원 이름을 붙인다")
+    void getLastSurvey_prefersRecordOverFileValue() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.LOST, OffsetDateTime.parse("2026-07-22T10:00:00+09:00"), null, 7L));
 
         LastSurveySummary summary = serviceWithNames(Map.of(7L, "김측량")).getLastSurvey(point.getId());
 
-        assertEquals("정상", summary.result());
+        assertEquals("망실", summary.result());
         assertEquals(LocalDate.of(2026, 7, 22), summary.surveyedOn());
         assertEquals("김측량", summary.surveyorName());
     }
 
     @Test
-    @DisplayName("조사원이 없는 기록은 이름 칸만 비워 돌려준다 — 파일로 들어온 기록이 그렇다")
-    void getLastSurvey_withoutSurveyor_leavesNameEmpty() {
-        ControlPoint point = pointWithLastSurvey("망실", LocalDate.of(2025, 9, 8), null);
+    @DisplayName("기록이 없으면 시드 조사를 보인다 — 올라오기 전까지의 총정리가 유일한 정보다")
+    void getLastSurvey_withoutRecord_fallsBackToFileValue() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+
+        LastSurveySummary summary = service.getLastSurvey(point.getId());
+
+        assertEquals("정상", summary.result());
+        assertEquals(LocalDate.of(2025, 9, 8), summary.surveyedOn());
+        assertNull(summary.surveyorName()); // 파일에는 조사원이 없다
+    }
+
+    @Test
+    @DisplayName("여러 회차의 기록 중 조사 시각이 가장 늦은 판정을 따른다")
+    void getLastSurvey_takesLatestRecordAcrossProjects() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.LOST, OffsetDateTime.parse("2026-07-22T10:00:00+09:00"), null, null));
+        surveyUsage.records.add(SurveyRecord.restore(
+                2L, point.getId(), SurveyResult.UNAVAILABLE, OffsetDateTime.parse("2026-08-01T10:00:00+09:00"), null, null));
+
+        assertEquals("조사불가", service.getLastSurvey(point.getId()).result());
+    }
+
+    @Test
+    @DisplayName("조사 시각이 같으면 나중에 만든 조사의 판정을 따른다")
+    void getLastSurvey_sameInstant_prefersLaterProject() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+        OffsetDateTime same = OffsetDateTime.parse("2026-07-22T10:00:00+09:00");
+        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 서로 다른 회차가 같은 날짜를 적으면 시각이 완전히 겹친다
+        surveyUsage.records.add(SurveyRecord.restore(2L, point.getId(), SurveyResult.LOST, same, null, null));
+        surveyUsage.records.add(SurveyRecord.restore(1L, point.getId(), SurveyResult.INTACT, same, null, null));
+
+        assertEquals("망실", service.getLastSurvey(point.getId()).result());
+    }
+
+    @Test
+    @DisplayName("최종조사일은 KST 날짜다 — 같은 순간이라도 지역에 따라 날짜가 갈린다")
+    void getLastSurvey_derivesDateInKst() {
+        ControlPoint point = pointWithFileSurvey(null, null);
+        // UTC 20시는 KST 로 다음 날 05시다. 날짜를 UTC 로 뽑으면 하루 앞선 날이 적힌다
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.INTACT, OffsetDateTime.parse("2026-07-22T20:00:00Z"), null, null));
+
+        assertEquals(LocalDate.of(2026, 7, 23), service.getLastSurvey(point.getId()).surveyedOn());
+    }
+
+    @Test
+    @DisplayName("시드보다 오래된 기록이 있으면 시드를 따른다 — 임포트가 기존조사일로 과거 기록을 만든다")
+    void getLastSurvey_seedNewerThanRecord_prefersSeed() {
+        ControlPoint point = pointWithFileSurvey("망실", LocalDate.of(2026, 6, 23));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.INTACT, OffsetDateTime.parse("2025-09-08T10:00:00+09:00"), null, null));
 
         LastSurveySummary summary = service.getLastSurvey(point.getId());
 
         assertEquals("망실", summary.result());
-        assertEquals(LocalDate.of(2025, 9, 8), summary.surveyedOn());
-        assertNull(summary.surveyorName());
+        assertEquals(LocalDate.of(2026, 6, 23), summary.surveyedOn());
     }
 
     @Test
-    @DisplayName("조사한 적 없는 점은 세 칸이 모두 비어 있다")
+    @DisplayName("기타 판정이면 비고도 함께 실린다 — 결과만으로는 무엇이었는지 알 수 없다")
+    void getLastSurvey_etc_carriesNote() {
+        ControlPoint point = pointWithFileSurvey(null, null);
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.ETC, OffsetDateTime.parse("2026-07-22T10:00:00+09:00"),
+                "포장 공사로 덮여 있음", null));
+
+        LastSurveySummary summary = service.getLastSurvey(point.getId());
+
+        assertEquals("기타", summary.result());
+        assertEquals("포장 공사로 덮여 있음", summary.note());
+    }
+
+    @Test
+    @DisplayName("파일 값도 기록도 없으면 세 칸이 모두 비어 있다")
     void getLastSurvey_neverSurveyed_isEmpty() {
         Long id = service.register(csvRow1Command()).point().getId();
 
@@ -380,6 +456,7 @@ class ControlPointServiceTest {
 
         boolean targetUsed = false;
         boolean recordUsed = false;
+        final List<SurveyRecord> records = new ArrayList<>();
 
         @Override
         public boolean existsByPointId(Long pointId) {
@@ -422,8 +499,18 @@ class ControlPointServiceTest {
         }
 
         @Override
+
         public List<SurveyRecord> findRecordsByPointId(Long pointId) {
-            return List.of();
+
+            return records.stream().filter(r -> r.getPointId().equals(pointId)).toList();
+
+        }
+
+        @Override
+        public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
+            return findRecordsByPointId(pointId).stream()
+                    .max(Comparator.comparing(SurveyRecord::getSurveyedAt)
+                            .thenComparing(SurveyRecord::getProjectId));
         }
 
         @Override

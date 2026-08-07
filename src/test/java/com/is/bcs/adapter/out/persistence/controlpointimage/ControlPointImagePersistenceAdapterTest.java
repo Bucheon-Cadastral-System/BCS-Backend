@@ -85,7 +85,7 @@ class ControlPointImagePersistenceAdapterTest {
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                         new BigDecimal("545236.77"), new BigDecimal("181840.96")),
                 new GeoCoordinate(126.794623, 37.506423),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
         entityManager.flush();
         return saved.getId();
     }

@@ -92,7 +92,7 @@ class SurveyCsvPreviewServiceTest {
                 "41192D000001265", PointType.DOGEUN, "1465공",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.790000, 37.500000),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         ControlPointPreviewResult result = service.previewControlPoints(sampleCsv());
 
@@ -113,7 +113,7 @@ class SurveyCsvPreviewServiceTest {
                 "41192D000000001", PointType.DOGEUN, "선점",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.790000, 37.500000),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         String csv = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
@@ -152,7 +152,7 @@ class SurveyCsvPreviewServiceTest {
                 "41192D000000003", PointType.DOGEUN, "그대로", tm,
                 transformer.toWgs84(tm),
                 null, null, null, null, null, null, null,
-                "망실", LocalDate.of(2025, 9, 8), null));
+                "망실", LocalDate.of(2025, 9, 8)));
 
         String withoutColumn = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표

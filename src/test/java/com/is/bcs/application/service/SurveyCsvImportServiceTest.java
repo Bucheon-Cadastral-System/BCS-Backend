@@ -156,7 +156,7 @@ class SurveyCsvImportServiceTest {
                 new GeoCoordinate(126.744200, 37.511900),
                 "10900", "상동", "부천시 상동 529-2",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
-                new TraverseInfo("2", "ㅁ", "78", false), null, null, null));
+                new TraverseInfo("2", "ㅁ", "78", false), null, null));
 
         SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
         assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
@@ -190,7 +190,7 @@ class SurveyCsvImportServiceTest {
                 new GeoCoordinate(126.744000, 37.511000),
                 "10900", "상동", "부천시 상동 529-2",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
-                new TraverseInfo("2", "ㅁ", "78", false), null, null, null));
+                new TraverseInfo("2", "ㅁ", "78", false), null, null));
 
         SurveyCsvImportResult result = service.importCsv(
                 new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
@@ -276,7 +276,7 @@ class SurveyCsvImportServiceTest {
                 "41192D000000001", PointType.DOGEUN, "다른이름",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         byte[] csv = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부

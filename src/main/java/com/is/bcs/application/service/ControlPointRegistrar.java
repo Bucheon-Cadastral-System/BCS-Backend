@@ -143,7 +143,7 @@ public class ControlPointRegistrar {
      * 기존 점이 있으면 그 점을 파일 값으로 되살리고(갱신, id 보존), 없으면 새 점으로 만든다.
      * 선택 항목은 값이 있을 때만 반영한다 — 열 없는 파일(최소 6열)과 입력 칸 없는 수동 등록이
      * 기존 값을 지우지 않게. 빈 칸은 '모른다'이고, 지우기는 화면의 몫이다.
-     * 최종조사원은 파일·입력에 없는 값이라 언제나 기존 값을 지킨다.
+     * 시드 조사(최종조사내용·일)는 두 칸이 한 쌍이라 따로 고르지 않는다. 날짜가 늦은 쪽을 통째로 남긴다.
      */
     private static ControlPoint toPoint(ControlPoint found, Row row) {
         return found == null
@@ -151,7 +151,7 @@ public class ControlPointRegistrar {
                         row.pointNo(), row.type(), row.name(), row.tm(), row.geo(),
                         row.regionCode(), row.regionName(), row.address(),
                         row.markerMaterial(), row.installType(), row.installedDate(), row.traverse(),
-                        row.lastResult(), row.lastSurveyDate(), null)
+                        row.lastResult(), row.lastSurveyDate())
                 : ControlPoint.restore(
                         found.getId(), row.pointNo(), row.type(), row.name(), row.tm(), row.geo(),
                         orKept(row.regionCode(), found, ControlPoint::getRegionCode),
@@ -161,9 +161,35 @@ public class ControlPointRegistrar {
                         orKept(row.installType(), found, ControlPoint::getInstallType),
                         orKept(row.installedDate(), found, ControlPoint::getInstalledDate),
                         orKept(row.traverse(), found, ControlPoint::getTraverse),
-                        orKept(row.lastResult(), found, ControlPoint::getLastSurveyResult),
-                        orKept(row.lastSurveyDate(), found, ControlPoint::getLastSurveyedOn),
-                        found.getLastSurveyedById());
+                        seedSurvey(found, row).result(),
+                        seedSurvey(found, row).surveyedOn());
+    }
+
+    /** 기준점이 든 시드 조사 한 쌍. */
+    private record SeedSurvey(String result, LocalDate surveyedOn) {
+    }
+
+    /**
+     * 시드 조사를 고른다 — 조사일이 늦은 쪽이 이긴다.
+     *
+     * <p>시드는 이 시스템에 올라오기 전까지의 총정리라 새 파일이 늘 최신인 것이 아니다.
+     * 옛 자료로 만든 파일을 나중에 올리면 최신 시드가 옛 값으로 덮인다.
+     *
+     * <p>두 칸을 함께 정한다. 칸마다 따로 고르면 내용은 새 파일, 날짜는 옛 파일 같은 섞인 값이 남는다.
+     * 새 파일의 조사일을 알 수 없으면 늦다는 것을 증명할 수 없으므로 기존 값을 지킨다.
+     */
+    private static SeedSurvey seedSurvey(ControlPoint found, Row row) {
+        SeedSurvey kept = new SeedSurvey(found.getLastSurveyResult(), found.getLastSurveyedOn());
+        if (row.lastResult() == null && row.lastSurveyDate() == null) {
+            return kept; // 열 없는 파일 — 손대지 않는다
+        }
+        if (kept.surveyedOn() == null) {
+            return new SeedSurvey(row.lastResult(), row.lastSurveyDate());
+        }
+        if (row.lastSurveyDate() == null || row.lastSurveyDate().isBefore(kept.surveyedOn())) {
+            return kept;
+        }
+        return new SeedSurvey(row.lastResult(), row.lastSurveyDate());
     }
 
     private static <T> T orKept(T fromRow, ControlPoint found, Function<ControlPoint, T> kept) {
@@ -210,12 +236,10 @@ public class ControlPointRegistrar {
         if (row.traverse() != null) {
             addIfDiffers(changes, "도선정보", p.getTraverse(), row.traverse());
         }
-        if (row.lastResult() != null) {
-            addIfDiffers(changes, "최종조사내용", p.getLastSurveyResult(), row.lastResult());
-        }
-        if (row.lastSurveyDate() != null) {
-            addIfDiffers(changes, "최종조사일", p.getLastSurveyedOn(), row.lastSurveyDate());
-        }
+        // 시드 조사는 등록과 같은 규칙으로 고른 뒤에 견준다 — 보여 준 것과 실제로 벌어지는 일이 어긋나지 않게
+        SeedSurvey seed = seedSurvey(p, row);
+        addIfDiffers(changes, "최종조사내용", p.getLastSurveyResult(), seed.result());
+        addIfDiffers(changes, "최종조사일", p.getLastSurveyedOn(), seed.surveyedOn());
         return List.copyOf(changes);
     }
 

@@ -16,6 +16,7 @@ import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.geo.CoordinateTransformer;
 import com.is.bcs.application.port.out.member.LoadMemberNamesPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
+import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.service.ImportFileMapper.Row;
 import com.is.bcs.domain.controlpoint.ControlPoint;
@@ -30,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
@@ -50,6 +53,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
     private final LoadSurveyTargetPort loadSurveyTargetPort;
     private final LoadSurveyRecordPort loadSurveyRecordPort;
     private final LoadMemberNamesPort loadMemberNamesPort;
+    private final Clock clock; // 조사 시각은 순간이고 조사일은 지역의 날짜라 어디 기준인지 알아야 한다
 
     /**
      * 한 점 등록도 파일 임포트와 같은 규칙을 쓴다 — 같은 이름·종류의 점이 있으면 새 점을 만들지 않고 그 점을 입력 값으로
@@ -102,7 +106,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
                 existing.getRegionCode(), existing.getRegionName(), existing.getAddress(),
                 existing.getMarkerMaterial(), existing.getInstallType(), existing.getInstalledDate(),
                 existing.getTraverse(),
-                existing.getLastSurveyResult(), existing.getLastSurveyedOn(), existing.getLastSurveyedById());
+                existing.getLastSurveyResult(), existing.getLastSurveyedOn());
 
         return new UpdateControlPointResult(saveControlPointPort.save(updated), warningFor(geo));
     }
@@ -170,16 +174,49 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
         return new ControlPointCountSummary(total, countByType);
     }
 
+    /**
+     * 기준점의 최종조사 — 가장 최근에 확인된 상태.
+     *
+     * <p>저장해 두지 않고 볼 때 계산한다. 후보가 둘이다. 기준점이 든 시드 조사(이 시스템에 올라오기 전까지의
+     * 총정리)와 앱이 남긴 조사기록이다. 둘을 같은 축에 놓고 날짜가 늦은 쪽을 고른다.
+     * 기록이 있다고 무조건 택하면 안 된다. 대상지 파일 임포트가 기존조사일로 과거 날짜 기록을 만들기 때문에
+     * 시드보다 오래된 기록이 실재한다.
+     *
+     * <p>쓰기가 없으므로 기록을 남기거나 지울 때 기준점을 건드릴 일이 없고, 그래서 잠금도 갱신 경로도 없다.
+     * 점 하나짜리 경로이고 그 점의 기록은 조사기록 기본키 앞자리(point_id)로 바로 찾는다.
+     */
     @Override
     @Transactional(readOnly = true)
     public LastSurveySummary getLastSurvey(Long pointId) {
         ControlPoint point = loadControlPointPort.findById(pointId)
                 .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
-        Long surveyorId = point.getLastSurveyedById();
-        // 이름은 조사원이 있을 때만 찾는다 — 파일로 들어온 기록은 이 칸이 비어 있어 조회할 것이 없다
+        // 시드에는 조사원도 비고도 없다. 파일이 그 두 가지를 적어 오지 않는다
+        LastSurveySummary seed = new LastSurveySummary(
+                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null);
+        return loadSurveyRecordPort.findLatestRecordByPointId(pointId)
+                .map(this::toLastSurvey)
+                .filter(record -> isNotBefore(record.surveyedOn(), seed.surveyedOn()))
+                .orElse(seed);
+    }
+
+    /** 날짜가 같으면 기록을 택한다 — 조사원까지 아는 쪽이 더 자세하다. 한쪽 날짜가 비면 있는 쪽이 이긴다. */
+    private static boolean isNotBefore(LocalDate recordDate, LocalDate seedDate) {
+        if (seedDate == null) {
+            return true;
+        }
+        return recordDate != null && !recordDate.isBefore(seedDate);
+    }
+
+    private LastSurveySummary toLastSurvey(SurveyRecord latest) {
+        Long surveyorId = latest.getSurveyedById();
+        // 이름은 조사원이 있을 때만 찾는다 — 파일로 들어온 기록과 인증 전에 남긴 기록은 이 칸이 비어 있다
         String surveyorName = surveyorId == null
                 ? null
                 : loadMemberNamesPort.findNamesByIds(Set.of(surveyorId)).get(surveyorId);
-        return new LastSurveySummary(point.getLastSurveyResult(), point.getLastSurveyedOn(), surveyorName);
+        return new LastSurveySummary(
+                latest.getResult().getDisplayName(),
+                latest.getSurveyedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+                surveyorName,
+                latest.getNote());
     }
 }

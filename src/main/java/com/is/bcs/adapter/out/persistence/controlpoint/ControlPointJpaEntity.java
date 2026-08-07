@@ -119,6 +119,7 @@ public class ControlPointJpaEntity extends BaseTime {
     @Column(name = "traverse_intersection")
     private Boolean traverseIntersection;
 
+    // 시드 조사 — 이 시스템에 올라오기 전까지의 총정리라 임포트만 쓴다. 조사원은 파일에 없다.
     // 파일 문구 그대로 — 어휘를 강제하면 "망실,안보임" 같은 실제 값이 거부되고, 길이를 자르면 보존이 깨진다
     @Column(name = "last_survey_result", columnDefinition = "text")
     private String lastSurveyResult;
@@ -126,19 +127,13 @@ public class ControlPointJpaEntity extends BaseTime {
     @Column(name = "last_surveyed_on")
     private LocalDate lastSurveyedOn;
 
-    /** 마지막으로 조사한 사람 — 회원이 지워져도 기준점은 남고 이 칸만 비운다. */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "last_surveyed_by", foreignKey = @ForeignKey(name = "fk_control_points_last_surveyed_by"))
-    @OnDelete(action = OnDeleteAction.SET_NULL)
-    private MemberJpaEntity lastSurveyor;
-
     private ControlPointJpaEntity(
             Long id, String pointNo, PointType type, String name,
             CoordinateSystem crs, BigDecimal tmNorthing, BigDecimal tmEasting, double lng, double lat,
             String regionCode, String regionName, String address,
             MarkerMaterial markerMaterial, InstallType installType, LocalDate installedDate,
             String traverseGrade, String traverseLineName, String traverseLineNo, Boolean traverseIntersection,
-            String lastSurveyResult, LocalDate lastSurveyedOn, MemberJpaEntity lastSurveyor
+            String lastSurveyResult, LocalDate lastSurveyedOn
     ) {
         this.id = id;
         this.pointNo = pointNo;
@@ -161,7 +156,6 @@ public class ControlPointJpaEntity extends BaseTime {
         this.traverseIntersection = traverseIntersection;
         this.lastSurveyResult = lastSurveyResult;
         this.lastSurveyedOn = lastSurveyedOn;
-        this.lastSurveyor = lastSurveyor;
     }
 
     public static ControlPointJpaEntity fromDomain(ControlPoint point, EntityManager entityManager) {
@@ -176,8 +170,7 @@ public class ControlPointJpaEntity extends BaseTime {
                 traverse != null ? traverse.lineName() : null,
                 traverse != null ? traverse.lineNo() : null,
                 traverse != null ? traverse.intersection() : null,
-                point.getLastSurveyResult(), point.getLastSurveyedOn(),
-                EntityReferences.of(entityManager, MemberJpaEntity.class, point.getLastSurveyedById())
+                point.getLastSurveyResult(), point.getLastSurveyedOn()
         );
     }
 
@@ -189,7 +182,7 @@ public class ControlPointJpaEntity extends BaseTime {
                 regionCode, regionName, address,
                 markerMaterial, installType, installedDate,
                 toTraverse(),
-                lastSurveyResult, lastSurveyedOn, lastSurveyor == null ? null : lastSurveyor.getId()
+                lastSurveyResult, lastSurveyedOn
         );
     }
 

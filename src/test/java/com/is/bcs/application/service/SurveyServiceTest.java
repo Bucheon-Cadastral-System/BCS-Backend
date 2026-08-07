@@ -41,9 +41,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,66 +73,10 @@ class SurveyServiceTest {
     private final FakeMemberNames memberNames = new FakeMemberNames();
     private final SurveyService service = new SurveyService(
             store, store, store, store, store, store, targetStore, targetStore, targetStore,
-            pointStore, pointStore, memberNames, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
+            pointStore, memberNames, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
 
     {
         store.surveyorNames = memberNames.names;
-    }
-
-    @Test
-    @DisplayName("대상에서 뺀 점은 기록과 함께 기준점의 최종조사 요약도 지워진다")
-    void update_removedTarget_clearsLastSurvey() {
-        SurveyProject project = sampleProject(10L, 11L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, null, null));
-        assertEquals("정상", pointStore.findById(10L).orElseThrow().getLastSurveyResult());
-
-        service.update(new UpdateSurveyProjectCommand(
-                project.getId(), "2026 일제조사", STARTED, null, null, List.of(11L)));
-
-        ControlPoint point = pointStore.findById(10L).orElseThrow();
-        assertNull(point.getLastSurveyResult()); // 사라진 기록의 판정이 기준점에 남지 않는다
-        assertNull(point.getLastSurveyedOn());
-        assertNull(point.getLastSurveyedById());
-    }
-
-    @Test
-    @DisplayName("프로젝트를 지우면 그 조사가 남긴 기준점 최종조사 요약도 지워진다")
-    void delete_clearsLastSurveyOfRecordedPoints() {
-        SurveyProject project = sampleProject(10L, 11L);
-        service.record(new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, null, null));
-
-        service.delete(project.getId());
-
-        ControlPoint point = pointStore.findById(10L).orElseThrow();
-        assertNull(point.getLastSurveyResult());
-        assertNull(point.getLastSurveyedOn());
-    }
-
-    @Test
-    @DisplayName("다른 조사가 같은 점을 아직 들고 있으면 프로젝트를 지워도 그 판정이 남는다")
-    void delete_keepsLastSurveyFromOtherProject() {
-        SurveyProject first = sampleProject(10L);
-        service.record(new RecordSurveyCommand(first.getId(), 10L, SurveyResult.INTACT, null, null));
-        SurveyProject second = service.create(
-                new CreateSurveyProjectCommand(null, "다른 조사", STARTED, null, null, List.of(10L)));
-        service.record(new RecordSurveyCommand(second.getId(), 10L, SurveyResult.LOST, null, null));
-
-        service.delete(second.getId());
-
-        assertEquals("정상", pointStore.findById(10L).orElseThrow().getLastSurveyResult());
-    }
-
-    @Test
-    @DisplayName("조사 시각이 같으면 나중에 만든 조사의 판정을 최종조사로 삼는다")
-    void refreshLastSurvey_sameSurveyedAt_prefersLaterProject() {
-        SurveyProject first = sampleProject(10L);
-        SurveyProject second = service.create(
-                new CreateSurveyProjectCommand(null, "다른 조사", STARTED, null, null, List.of(10L)));
-        // 두 기록 모두 고정 시계에서 시각을 받아 완전히 겹친다
-        service.record(new RecordSurveyCommand(second.getId(), 10L, SurveyResult.LOST, null, null));
-        service.record(new RecordSurveyCommand(first.getId(), 10L, SurveyResult.INTACT, null, null));
-
-        assertEquals("망실", pointStore.findById(10L).orElseThrow().getLastSurveyResult());
     }
 
     /** 대상 점을 등록소에 넣고 그 점들을 대상으로 프로젝트를 만든다 — 대상 없는 프로젝트는 만들 수 없다. */
@@ -548,6 +494,13 @@ class SurveyServiceTest {
         }
 
         @Override
+        public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
+            return findRecordsByPointId(pointId).stream()
+                    .max(Comparator.comparing(SurveyRecord::getSurveyedAt)
+                            .thenComparing(SurveyRecord::getProjectId));
+        }
+
+        @Override
         public List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
             // 실제 어댑터는 조인으로 이름을 함께 실어 온다 — 페이크는 이름 없이 같은 목록을 돌려준다
             return findRecordsByProjectId(projectId).stream()
@@ -734,7 +687,7 @@ class SurveyServiceTest {
                     new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                             new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                     new GeoCoordinate(126.79, 37.50),
-                    null, null, null, null, null, null, null, null, null, null));
+                    null, null, null, null, null, null, null, null, null));
         }
 
         @Override

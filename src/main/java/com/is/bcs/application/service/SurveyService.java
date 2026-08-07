@@ -15,7 +15,6 @@ import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
 import com.is.bcs.application.port.in.survey.RecordSurveyUseCase;
 import com.is.bcs.application.port.in.survey.UpdateSurveyProjectUseCase;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
-import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyTargetPort;
@@ -41,8 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -66,7 +65,6 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     private final SaveSurveyTargetPort saveSurveyTargetPort;
     private final DeleteSurveyTargetPort deleteSurveyTargetPort;
     private final LoadControlPointPort loadControlPointPort;
-    private final SaveControlPointPort saveControlPointPort;
     private final LoadMemberNamesPort loadMemberNamesPort;
     private final Clock clock;
 
@@ -105,8 +103,6 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
             // 프로젝트 삭제와 같은 순서(기록→대상) — 대상이 먼저 사라지면 기록이 잠깐 비대상 상태로 남는다
             deleteSurveyRecordPort.deleteByProjectIdAndPointIds(saved.getId(), removed);
             deleteSurveyTargetPort.deleteByProjectIdAndPointIds(saved.getId(), removed);
-            // 지운 기록이 그 점의 최종조사였을 수 있다 — 남은 기록으로 다시 맞추지 않으면 사라진 판정이 계속 보인다
-            removed.forEach(this::refreshLastSurvey);
         }
         List<SurveyTarget> added = pointIds.stream()
                 .filter(id -> !current.contains(id))
@@ -122,15 +118,9 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     @Override
     public void delete(Long projectId) {
         requireProject(projectId);
-        // 지우기 전에 어느 점의 요약을 다시 맞춰야 하는지 모아 둔다 — 지운 뒤에는 그 점들을 찾을 길이 없다
-        List<Long> surveyedPointIds = loadSurveyRecordPort.findRecordsByProjectId(projectId).stream()
-                .map(SurveyRecord::getPointId)
-                .distinct()
-                .toList();
         deleteSurveyRecordPort.deleteByProjectId(projectId);
         deleteSurveyTargetPort.deleteByProjectId(projectId);
         deleteSurveyProjectPort.deleteProjectById(projectId);
-        surveyedPointIds.forEach(this::refreshLastSurvey);
     }
 
     /** 대상 점 검증 — 같은 점을 두 번 적어도 대상은 한 번만 지정되고, 없는 점이 섞여 있으면 전체를 거부한다. */
@@ -199,7 +189,6 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
                 // 기록은 대상으로 지정한 점에만 — 비대상 기록을 허용하면 화면 밖 경로(직접 호출)로 진행률의 전제가 깨진다
                 .orElseThrow(() -> new SurveyTargetNotFoundException(
                         "프로젝트의 조사 대상이 아닌 기준점입니다: " + command.pointId()));
-        refreshLastSurvey(command.pointId());
         return withSurveyorName(written);
     }
 
@@ -210,7 +199,6 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
                         "조사기록을 찾을 수 없습니다: 프로젝트 " + projectId + ", 기준점 " + pointId));
 
         deleteSurveyRecordPort.deleteByProjectIdAndPointId(projectId, pointId);
-        refreshLastSurvey(pointId);
     }
 
     @Override
@@ -219,34 +207,6 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
         requireProject(projectId);
         // 기록과 조사원 이름을 한 문장으로 받는다 — 이름을 모아 다시 조회하던 두 번째 문장이 사라졌다
         return loadSurveyRecordPort.findRecordSummariesByProjectId(projectId);
-    }
-
-    /**
-     * 기준점 마스터의 최종조사 요약을 다시 맞춘다.
-     *
-     * <p>이 점의 기록 중 가장 최근 것을 따른다. 조사 회차가 여럿이라 프로젝트 하나만 보고 정하면
-     * 지난 회차의 판정이 최근 것을 덮는다. 남은 기록이 없으면 세 칸을 비운다.
-     *
-     * <p>조사 시각이 같으면 나중에 만든 조사의 판정을 따른다. 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로
-     * 서로 다른 회차가 같은 점을 같은 날짜로 적으면 시각이 완전히 겹친다. 이때 기준을 두지 않으면
-     * 조회 순서가 바뀔 때마다 기준점의 최종조사가 달라진다.
-     */
-    private void refreshLastSurvey(Long pointId) {
-        loadControlPointPort.findById(pointId).ifPresent(point -> {
-            SurveyRecord latest = loadSurveyRecordPort.findRecordsByPointId(pointId).stream()
-                    .max(Comparator.comparing(SurveyRecord::getSurveyedAt)
-                            .thenComparing(SurveyRecord::getProjectId))
-                    .orElse(null);
-            if (latest == null) {
-                point.updateLastSurvey(null, null, null);
-            } else {
-                point.updateLastSurvey(
-                        latest.getResult().getDisplayName(),
-                        latest.getSurveyedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
-                        latest.getSurveyedById());
-            }
-            saveControlPointPort.save(point);
-        });
     }
 
     /** 한 건에 조사원 이름을 붙인다 — 기록 응답만으로 화면이 이름을 그릴 수 있게. */
