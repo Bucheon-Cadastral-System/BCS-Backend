@@ -11,11 +11,14 @@ import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
+import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.InstallType;
 import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
+import com.is.bcs.domain.controlpoint.exception.ControlPointModifiedException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.survey.SurveyRecord;
@@ -155,6 +158,25 @@ class ControlPointServiceTest {
 
         assertEquals("망실", summary.result());
         assertEquals(LocalDate.of(2026, 6, 23), summary.surveyedOn());
+    }
+
+    @Test
+    @DisplayName("수정 창을 열어 둔 사이 다른 사람이 먼저 고쳤으면 덮지 않고 거절한다")
+    void update_staleVersion_rejected() {
+        ControlPoint saved = store.save(ControlPoint.restore(
+                1L, "41192D000001265", PointType.DOGEUN, "1465공",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545236.77"), new BigDecimal("181840.96")),
+                new GeoCoordinate(126.794623, 37.506423),
+                null, null, null, null, null, null, null, null, null, 3L));
+
+        // 화면이 2판을 보고 있는 사이 저장된 것은 3판이다
+        assertThrows(ControlPointModifiedException.class, () -> service.update(new UpdateControlPointCommand(
+                saved.getId(), "41192D000009999", PointType.DOGEUN, "1465공",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545240.00"), new BigDecimal("181845.00"), 2L)));
+
+        assertEquals("41192D000001265", store.findById(saved.getId()).orElseThrow().getPointNo());
     }
 
     @Test
@@ -301,7 +323,7 @@ class ControlPointServiceTest {
         UpdateControlPointResult result = service.update(new UpdateControlPointCommand(
                 id, " 41192D000012345 ", PointType.DOGEUN, " 1465공(이설) ",
                 CoordinateSystem.GRS80_CENTRAL,
-                new BigDecimal("545240.00"), new BigDecimal("181845.00")));
+                new BigDecimal("545240.00"), new BigDecimal("181845.00"), 0L));
 
         assertEquals(id, result.point().getId());
         assertEquals("41192D000012345", result.point().getPointNo()); // 다듬어(trim) 저장
@@ -322,12 +344,12 @@ class ControlPointServiceTest {
         UpdateControlPointResult result = service.update(new UpdateControlPointCommand(
                 id, "41192D000001265", PointType.DOGEUN, "1465공",
                 CoordinateSystem.GRS80_CENTRAL,
-                new BigDecimal("545300.00"), new BigDecimal("181900.00")));
+                new BigDecimal("545300.00"), new BigDecimal("181900.00"), 0L));
 
         assertEquals(id, result.point().getId());
         assertThrows(ControlPointNotFoundException.class, () -> service.update(new UpdateControlPointCommand(
                 999L, "41192D000000001", PointType.DOGEUN, "이름",
-                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00"))));
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00"), 0L)));
     }
 
     @Test
@@ -343,10 +365,10 @@ class ControlPointServiceTest {
 
         assertThrows(DuplicateControlPointException.class, () -> service.update(new UpdateControlPointCommand(
                 otherId, "41192D000001265", PointType.DOGEUN, "9999공",
-                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"))));
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"), 0L)));
         assertThrows(DuplicateControlPointException.class, () -> service.update(new UpdateControlPointCommand(
                 otherId, "41192D000009999", PointType.DOGEUN, "1465공",
-                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"))));
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"), 0L)));
         assertEquals("9999공", service.getByPointNo("41192D000009999").getName()); // 거부된 수정은 남지 않는다
     }
 

@@ -1,6 +1,7 @@
 package com.is.bcs.adapter.in.web.exception;
 
 import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
+import com.is.bcs.domain.controlpoint.exception.ControlPointModifiedException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
@@ -21,6 +22,7 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.*;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -179,6 +181,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(DuplicateControlPointException.class)
     public ProblemDetail handleDuplicateControlPoint(DuplicateControlPointException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
+    }
+
+    @ExceptionHandler(ControlPointModifiedException.class)
+    public ProblemDetail handleControlPointModified(ControlPointModifiedException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_MODIFIED, e.getMessage());
+    }
+
+    /** 하이버네이트가 판 번호로 거절한 경우 — 사전 확인과 저장 사이에 끼어든 수정이다. 같은 답을 준다. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLocking(ObjectOptimisticLockingFailureException e) {
+        log.warn("낙관적 잠금 충돌", e);
+        return problem(ControlPointErrorCode.CONTROL_POINT_MODIFIED,
+                "다른 사람이 먼저 수정했습니다. 최신 내용을 다시 불러와 주세요.");
     }
 
     @ExceptionHandler(ControlPointInUseException.class)

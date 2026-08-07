@@ -155,7 +155,7 @@ class ControlPointApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"pointNo": "41192D000012345", "type": "DOGEUN", "name": "1465공(이설)",
-                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00}
+                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00, "version": 0}
                                 """))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -168,9 +168,34 @@ class ControlPointApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"pointNo": "41192D000000001", "type": "DOGEUN", "name": "이름",
-                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00}
+                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00, "version": 0}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("수정 — 창을 열어 둔 사이 다른 사람이 먼저 고쳤으면 409 CONTROL_POINT_MODIFIED")
+    void updatePoint_staleVersion() throws Exception {
+        long id = extractId(bodyOf(register()));
+        // 한 번 저장해 판 번호를 올린다
+        mockMvc.perform(put("/api/control-points/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000012345", "type": "DOGEUN", "name": "1465공",
+                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00, "version": 0}
+                                """))
+                .andExpect(status().isOk());
+
+        // 옛 판을 든 두 번째 사람의 저장은 거절된다
+        MvcResult stale = mockMvc.perform(put("/api/control-points/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000099999", "type": "DOGEUN", "name": "다른이름",
+                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00, "version": 0}
+                                """))
+                .andExpect(status().isConflict())
+                .andReturn();
+        assertTrue(bodyOf(stale).contains("\"code\":\"CONTROL_POINT_MODIFIED\""));
     }
 
     @Test

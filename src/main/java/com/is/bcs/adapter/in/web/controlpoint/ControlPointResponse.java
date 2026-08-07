@@ -26,9 +26,11 @@ public record ControlPointResponse(
         MarkerMaterial markerMaterial,
         InstallType installType,
         LocalDate installedDate,
-        TraverseResponse traverse
+        TraverseResponse traverse,
         // 최종조사 요약(결과·조사일·조사원)은 여기 싣지 않는다.
         // 점 하나를 고른 뒤에만 보이는 값이라 목록에 실으면 화면이 쓰지 않는 값을 수천 행만큼 나른다.
+        /** 판 번호 — 수정 요청이 그대로 돌려보내 그사이 다른 사람이 먼저 고쳤는지 가린다 */
+        long version
 ) {
 
     public record TraverseResponse(String grade, String lineName, String lineNo, Boolean intersection) {
@@ -49,7 +51,7 @@ public record ControlPointResponse(
                 point.getGeo().longitude(), point.getGeo().latitude(),
                 point.getRegionCode(), point.getRegionName(), point.getAddress(),
                 point.getMarkerMaterial(), point.getInstallType(), point.getInstalledDate(),
-                TraverseResponse.from(point.getTraverse())
+                TraverseResponse.from(point.getTraverse()), point.getVersion()
         );
     }
 }

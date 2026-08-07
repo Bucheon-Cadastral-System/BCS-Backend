@@ -162,7 +162,8 @@ public class ControlPointRegistrar {
                         orKept(row.installedDate(), found, ControlPoint::getInstalledDate),
                         orKept(row.traverse(), found, ControlPoint::getTraverse),
                         seedSurvey(found, row).result(),
-                        seedSurvey(found, row).surveyedOn());
+                        seedSurvey(found, row).surveyedOn(),
+                        found.getVersion()); // 방금 읽은 판을 그대로 이어 쓴다 — 그사이 누가 고쳤으면 저장이 거절된다
     }
 
     /** 기준점이 든 시드 조사 한 쌍. */

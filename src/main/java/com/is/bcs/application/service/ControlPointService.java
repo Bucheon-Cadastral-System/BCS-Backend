@@ -25,6 +25,7 @@ import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.ServiceArea;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
+import com.is.bcs.domain.controlpoint.exception.ControlPointModifiedException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import lombok.RequiredArgsConstructor;
@@ -83,6 +84,11 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
     @Override
     public UpdateControlPointResult update(UpdateControlPointCommand command) {
         ControlPoint existing = requirePoint(command.pointId());
+        // 화면이 본 판과 지금 판이 다르면 그사이 누가 먼저 고친 것이다. 덮지 않고 거절한다
+        if (command.version() != existing.getVersion()) {
+            throw new ControlPointModifiedException(
+                    "다른 사람이 먼저 이 기준점을 수정했습니다. 최신 내용을 다시 불러와 주세요.");
+        }
 
         String pointNo = command.pointNo().trim();
         String name = command.name().trim();
@@ -106,7 +112,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
                 existing.getRegionCode(), existing.getRegionName(), existing.getAddress(),
                 existing.getMarkerMaterial(), existing.getInstallType(), existing.getInstalledDate(),
                 existing.getTraverse(),
-                existing.getLastSurveyResult(), existing.getLastSurveyedOn());
+                existing.getLastSurveyResult(), existing.getLastSurveyedOn(), existing.getVersion());
 
         return new UpdateControlPointResult(saveControlPointPort.save(updated), warningFor(geo));
     }

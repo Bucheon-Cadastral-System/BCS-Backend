@@ -17,6 +17,8 @@ public record UpdateControlPointCommand(
         String name,
         CoordinateSystem crs,
         BigDecimal northing,
-        BigDecimal easting
+        BigDecimal easting,
+        /** 화면이 읽을 때 함께 받은 판 번호 — 그사이 누가 먼저 고쳤는지 가린다 */
+        Long version
 ) {
 }

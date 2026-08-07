@@ -17,6 +17,9 @@ public enum ControlPointErrorCode implements ErrorCode {
     /** 조사 프로젝트가 대상·기록으로 참조 중 — 삭제 불가 */
     CONTROL_POINT_IN_USE(HttpStatus.CONFLICT),
 
+    /** 수정 창을 열어 둔 사이 다른 사람이 먼저 고침 — 덮어쓰지 않고 거절 */
+    CONTROL_POINT_MODIFIED(HttpStatus.CONFLICT),
+
      /** 현장 이미지 메타데이터를 찾을 수 없음 */
     CONTROL_POINT_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND),
 
