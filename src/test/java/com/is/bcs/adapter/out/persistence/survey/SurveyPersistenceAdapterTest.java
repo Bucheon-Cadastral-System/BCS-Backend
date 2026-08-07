@@ -223,11 +223,11 @@ class SurveyPersistenceAdapterTest {
         OffsetDateTime revisedAt = SURVEYED_AT.plusDays(1);
         SurveyRecord revised = adapter.upsertForTarget(SurveyRecord.create(
                 project.getId(), pointId, SurveyResult.LOST, revisedAt, null, memberId)).orElseThrow();
-        assertEquals(written.getId(), revised.getId()); // 정정은 새 행이 아니라 같은 행이다
         assertEquals(SurveyResult.LOST, revised.getResult());
         assertTrue(revised.getSurveyedAt().isEqual(revisedAt)); // 조사 시각도 정정한 시각으로 바뀐다
         assertEquals(memberId, revised.getSurveyedById()); // 마지막 판정의 주체가 남는다
         assertEquals(null, revised.getNote()); // 전 필드 교체 — 비고 없는 정정은 비고를 지운다
+        // 정정은 새 행이 아니라 같은 행이다 — 식별자가 (프로젝트, 기준점)이라 정정해도 행 수가 늘지 않는다
         assertEquals(1, adapter.findRecordsByProjectId(project.getId()).size());
 
         long outsider = savedPointId();
@@ -258,7 +258,7 @@ class SurveyPersistenceAdapterTest {
     /** 감사 시각까지 보려면 도메인이 아니라 저장된 행을 읽어야 한다 — 1차 캐시가 아니라 DB 에서. */
     private SurveyRecordJpaEntity auditOf(Long projectId, Long pointId) {
         entityManager.clear();
-        return recordRepository.findByProjectIdAndPointId(projectId, pointId).orElseThrow();
+        return recordRepository.findById(new ProjectPointId(projectId, pointId)).orElseThrow();
     }
 
     @Test
@@ -273,7 +273,9 @@ class SurveyPersistenceAdapterTest {
         targetRepository.flush();
         entityManager.clear(); // 1차 캐시가 아니라 DB에서 다시 읽는다
 
-        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        SurveyTarget found = targetRepository
+                .findById(new ProjectPointId(saved.getProjectId(), saved.getPointId()))
+                .orElseThrow().toDomain();
         assertEquals(List.of(
                 new ExtraColumn("순번", "131"),
                 new ExtraColumn("점검자", "김주무관"),
@@ -291,7 +293,9 @@ class SurveyPersistenceAdapterTest {
         targetRepository.flush();
         entityManager.clear();
 
-        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        SurveyTarget found = targetRepository
+                .findById(new ProjectPointId(saved.getProjectId(), saved.getPointId()))
+                .orElseThrow().toDomain();
         assertEquals(longValue, found.getExtras().getFirst().value());
     }
 }

@@ -306,9 +306,9 @@ class SurveyCsvImportServiceTest {
     private static class FakeSurveyStore implements SaveSurveyProjectPort, SaveSurveyRecordPort {
 
         final Map<Long, SurveyProject> projects = new HashMap<>();
-        final Map<Long, SurveyRecord> records = new HashMap<>();
+        // 기록의 식별자는 (프로젝트, 기준점)이다 — 저장소도 같은 열쇠로 잡는다
+        final Map<List<Long>, SurveyRecord> records = new HashMap<>();
         private long projectSeq = 0;
-        private long recordSeq = 0;
 
         @Override
         public SurveyProject save(SurveyProject project) {
@@ -320,12 +320,8 @@ class SurveyCsvImportServiceTest {
 
         @Override
         public SurveyRecord save(SurveyRecord record) {
-            long id = record.getId() != null ? record.getId() : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
-            records.put(id, saved);
-            return saved;
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return record;
         }
 
         @Override
@@ -343,14 +339,11 @@ class SurveyCsvImportServiceTest {
     private static class FakeTargetStore implements SaveSurveyTargetPort {
 
         final List<SurveyTarget> targets = new ArrayList<>();
-        private long sequence = 0;
 
         @Override
         public SurveyTarget save(SurveyTarget target) {
-            SurveyTarget saved = SurveyTarget.restore(
-                    ++sequence, target.getProjectId(), target.getPointId(), target.getExtras());
-            targets.add(saved);
-            return saved;
+            targets.add(target);
+            return target;
         }
 
         @Override

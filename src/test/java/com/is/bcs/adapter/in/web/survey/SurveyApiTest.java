@@ -45,6 +45,15 @@ class SurveyApiTest {
         return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
+    /** 본문에 그 조각이 몇 번 나오는지 — 목록에 같은 점의 기록이 하나뿐인지 볼 때 쓴다. */
+    private int countOf(String body, String piece) {
+        int count = 0;
+        for (int at = body.indexOf(piece); at >= 0; at = body.indexOf(piece, at + piece.length())) {
+            count++;
+        }
+        return count;
+    }
+
     private long extractId(String body) {
         Matcher m = Pattern.compile("\"id\":(\\d+)").matcher(body);
         assertTrue(m.find());
@@ -317,13 +326,16 @@ class SurveyApiTest {
                 .andExpect(status().isOk())
                 .andReturn();
         assertTrue(bodyOf(revised).contains("\"result\":\"LOST\""));
-        assertEquals(extractId(firstBody), extractId(bodyOf(revised))); // 새 레코드가 아니라 정정
 
         MvcResult list = mockMvc.perform(get("/api/survey-projects/" + projectId + "/records"))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(list).contains("\"content\":["));
-        assertTrue(bodyOf(list).contains("\"pointId\":" + pointId));
+        String listBody = bodyOf(list);
+        assertTrue(listBody.contains("\"content\":["));
+        assertTrue(listBody.contains("\"pointId\":" + pointId));
+        // 새 레코드가 아니라 정정 — 두 번 기록해도 그 점의 기록은 목록에 하나다
+        assertEquals(1, countOf(listBody, "\"pointId\":" + pointId));
+        assertTrue(listBody.contains("\"result\":\"LOST\""));
     }
 
     @Test

@@ -14,7 +14,8 @@ public final class EntityReferences {
     private EntityReferences() {
     }
 
-    public static <T> T of(EntityManager entityManager, Class<T> type, Long id) {
+    /** id 는 복합키일 수도 있어 타입을 좁히지 않는다(예: 조사 대상의 (프로젝트, 기준점)). */
+    public static <T> T of(EntityManager entityManager, Class<T> type, Object id) {
         return id == null ? null : entityManager.getReference(type, id);
     }
 }

@@ -62,12 +62,12 @@ public class SurveyPersistenceAdapter
 
     @Override
     public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
-        return recordRepository.findByProjectId(projectId).stream().map(SurveyRecordJpaEntity::toDomain).toList();
+        return recordRepository.findByIdProjectId(projectId).stream().map(SurveyRecordJpaEntity::toDomain).toList();
     }
 
     @Override
     public List<SurveyRecord> findRecordsByPointId(Long pointId) {
-        return recordRepository.findByPointId(pointId).stream().map(SurveyRecordJpaEntity::toDomain).toList();
+        return recordRepository.findByIdPointId(pointId).stream().map(SurveyRecordJpaEntity::toDomain).toList();
     }
 
     @Override
@@ -82,7 +82,7 @@ public class SurveyPersistenceAdapter
 
     @Override
     public Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId) {
-        return recordRepository.findByProjectIdAndPointId(projectId, pointId).map(SurveyRecordJpaEntity::toDomain);
+        return recordRepository.findById(new ProjectPointId(projectId, pointId)).map(SurveyRecordJpaEntity::toDomain);
     }
 
     @Override
@@ -113,11 +113,11 @@ public class SurveyPersistenceAdapter
         if (applied == 0) {
             return Optional.empty(); // 대상이 아니라서 문장이 아무것도 쓰지 않았다
         }
-        // 문장은 반영 행 수만 돌려준다 — id·created_at 은 같은 트랜잭션에서 되읽는다.
+        // 문장은 반영 행 수만 돌려준다 — 확정된 값은 같은 트랜잭션에서 되읽는다.
         // 여기서 비었다는 것은 방금 쓴 행이 사라졌다는 뜻이라 '대상 아님'과 같은 결과로 뭉치지 않는다
         // (뭉치면 쓰기는 커밋된 채 응답만 404 가 된다).
         return Optional.of(recordRepository
-                .findByProjectIdAndPointId(record.getProjectId(), record.getPointId())
+                .findById(new ProjectPointId(record.getProjectId(), record.getPointId()))
                 .orElseThrow(() -> new IllegalStateException(
                         "기록을 쓴 뒤 되읽지 못했습니다: 프로젝트 " + record.getProjectId()
                                 + ", 기준점 " + record.getPointId()))
@@ -126,7 +126,7 @@ public class SurveyPersistenceAdapter
 
     @Override
     public boolean existsRecordByPointId(Long pointId) {
-        return recordRepository.existsByPointId(pointId);
+        return recordRepository.existsByIdPointId(pointId);
     }
 
     @Override
@@ -139,19 +139,19 @@ public class SurveyPersistenceAdapter
 
     @Override
     public void deleteByProjectIdAndPointId(Long projectId, Long pointId) {
-        recordRepository.deleteByProjectIdAndPointId(projectId, pointId);
+        recordRepository.deleteByIdProjectIdAndIdPointId(projectId, pointId);
     }
 
     @Override
     public void deleteByProjectId(Long projectId) {
-        recordRepository.deleteByProjectId(projectId);
+        recordRepository.deleteByIdProjectId(projectId);
     }
 
     @Override
     public void deleteByProjectIdAndPointIds(Long projectId, List<Long> pointIds) {
         // PostgreSQL 바인드 변수 상한(65,535)에 여유를 두고 나눈다 — 점 조회 어댑터와 같은 규칙
         for (int from = 0; from < pointIds.size(); from += CHUNK_SIZE) {
-            recordRepository.deleteByProjectIdAndPointIdIn(
+            recordRepository.deleteByIdProjectIdAndIdPointIdIn(
                     projectId, pointIds.subList(from, Math.min(from + CHUNK_SIZE, pointIds.size())));
         }
     }

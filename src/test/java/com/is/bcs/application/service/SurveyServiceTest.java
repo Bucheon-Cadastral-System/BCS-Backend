@@ -288,7 +288,7 @@ class SurveyServiceTest {
         SurveyRecord record = service.record(
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, "대상(2건)", null)).record();
 
-        assertNotNull(record.getId());
+        assertEquals(10L, record.getPointId());
         assertEquals(FIXED_KST, record.getSurveyedAt());
         assertEquals(SurveyResult.INTACT, record.getResult());
         assertEquals(1, service.getByProjectId(project.getId()).size());
@@ -305,11 +305,11 @@ class SurveyServiceTest {
         SurveyRecordSummary revised = service.record(
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, "정정 비고", 7L));
 
-        assertEquals(first.getId(), revised.record().getId()); // 레코드는 하나 — id 유지
         assertTrue(revised.record().isLost());
         assertEquals("정정 비고", revised.record().getNote()); // 정정 시 비고도 교체된다
         assertEquals("김측량", revised.surveyorName()); // 마지막 판정의 주체가 남는다
-        assertEquals(1, service.getByProjectId(project.getId()).size());
+        assertEquals(1, service.getByProjectId(project.getId()).size()); // 새 레코드가 아니라 같은 행의 교체다
+        assertEquals(SurveyResult.INTACT, first.getResult()); // 처음 판정은 그대로 두고 저장된 값만 바뀐다
     }
 
     @Test
@@ -453,11 +453,11 @@ class SurveyServiceTest {
 
 
         private final Map<Long, SurveyProject> projects = new HashMap<>();
-        private final Map<Long, SurveyRecord> records = new HashMap<>();
+        // 기록의 식별자는 (프로젝트, 기준점)이다 — 저장소도 같은 열쇠로 잡는다
+        private final Map<List<Long>, SurveyRecord> records = new HashMap<>();
         // 진행률 집계가 대상 여부로 거른다 — 실제 쿼리의 exists 필터에 해당하는 참조
         private final FakeTargetStore targetStore;
         private long projectSeq = 0;
-        private long recordSeq = 0;
 
         FakeSurveyStore(FakeTargetStore targetStore) {
             this.targetStore = targetStore;
@@ -536,12 +536,8 @@ class SurveyServiceTest {
 
         @Override
         public SurveyRecord save(SurveyRecord record) {
-            long id = record.getId() != null ? record.getId() : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
-            records.put(id, saved);
-            return saved;
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return record;
         }
 
         @Override
@@ -551,23 +547,14 @@ class SurveyServiceTest {
 
         @Override
         public Optional<SurveyRecord> upsertForTarget(SurveyRecord record) {
-            // 실제 문장과 같은 규칙: 대상 검사 → 있으면 전 필드 교체(id 유지), 없으면 새 행
+            // 실제 문장과 같은 규칙: 대상 검사 → 있으면 전 필드 교체, 없으면 새 행
             boolean target = targetStore.targets.stream().anyMatch(
                     t -> t.getProjectId().equals(record.getProjectId()) && t.getPointId().equals(record.getPointId()));
             if (!target) {
                 return Optional.empty();
             }
-            Long existingId = records.values().stream()
-                    .filter(r -> r.getProjectId().equals(record.getProjectId())
-                            && r.getPointId().equals(record.getPointId()))
-                    .map(SurveyRecord::getId)
-                    .findFirst().orElse(null);
-            long id = existingId != null ? existingId : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
-            records.put(id, saved);
-            return Optional.of(saved);
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return Optional.of(record);
         }
 
         @Override

@@ -7,7 +7,6 @@ import com.is.bcs.domain.survey.SurveyResult;
 import java.time.OffsetDateTime;
 
 public record SurveyRecordResponse(
-        Long id,
         Long projectId,
         Long pointId,
         SurveyResult result,
@@ -20,7 +19,7 @@ public record SurveyRecordResponse(
     public static SurveyRecordResponse from(SurveyRecordSummary summary) {
         SurveyRecord record = summary.record();
         return new SurveyRecordResponse(
-                record.getId(), record.getProjectId(), record.getPointId(),
+                record.getProjectId(), record.getPointId(),
                 record.getResult(), record.getSurveyedAt(), record.getNote(), summary.surveyorName());
     }
 }

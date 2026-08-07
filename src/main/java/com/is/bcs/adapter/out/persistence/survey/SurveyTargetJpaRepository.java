@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpaEntity, Long> {
+public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpaEntity, ProjectPointId> {
 
     long countByProjectId(Long projectId);
 
