@@ -329,6 +329,11 @@ class ControlPointServiceTest {
         }
 
         @Override
+        public boolean lockByProjectIdAndPointId(Long projectId, Long pointId) {
+            throw new UnsupportedOperationException("기준점 서비스는 대상 잠금을 쓰지 않는다");
+        }
+
+        @Override
         public boolean existsRecordByPointId(Long pointId) {
             return recordUsed;
         }

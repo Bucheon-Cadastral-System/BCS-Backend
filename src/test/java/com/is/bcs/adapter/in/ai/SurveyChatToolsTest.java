@@ -59,36 +59,33 @@ class SurveyChatToolsTest {
         assertEquals(2, progress.completedPoints());
         assertEquals(1, progress.lostPoints());
         assertEquals(60, progress.progressPercent()); // 3/5, 화면과 같은 반올림 규칙
-        assertEquals(2, progress.resultIntactPoints());
-        assertEquals(0, progress.resultEtcPoints());
     }
 
     @Test
-    @DisplayName("완전과 조사완료는 다른 값이다 — 망실 아닌 결과를 모두 합한 것이 조사완료")
+    @DisplayName("조사완료는 망실이 아닌 기록을 모두 합한 값이다 — 판정값별로 쪼개지 않는다")
     void getSurveyProgress_completedIncludesNonLostResults() {
         fake.progress = new SurveyProgress("굴착협의", 49, 44, 5, false,
                 Map.of(SurveyResult.INTACT, 40L, SurveyResult.LOST, 3L, SurveyResult.ETC, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
-        assertEquals(41, progress.completedPoints()); // 완전 40 + 기타 1
-        assertEquals(40, progress.resultIntactPoints());
+        assertEquals(41, progress.completedPoints()); // 망실 아닌 기록 41건이 한 값으로 묶인다
         assertEquals(3, progress.lostPoints());
         assertEquals(90, progress.progressPercent()); // 44/49
+        // 판정값(완전·조사불가·기타)은 화면에 없는 어휘라 모델에 넘길 필드 자체가 없다
+        assertEquals(7, SurveyProgressSummary.class.getRecordComponents().length);
     }
 
     @Test
-    @DisplayName("결과 유형이 빠진 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
+    @DisplayName("망실 기록이 없는 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
     void getSurveyProgress_missingResultKeys_defaultZero() {
         fake.progress = new SurveyProgress("2026 일제조사", 3, 1, 2, false, Map.of(SurveyResult.INTACT, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
         assertEquals(1L, fake.progressProjectId); // 전달받은 id를 그대로 유스케이스에 넘긴다
-        assertEquals(1, progress.resultIntactPoints());
         assertEquals(0, progress.lostPoints());
-        assertEquals(0, progress.resultEtcPoints());
-        assertEquals(0, progress.resultUnavailablePoints());
+        assertEquals(1, progress.completedPoints());
     }
 
     @Test

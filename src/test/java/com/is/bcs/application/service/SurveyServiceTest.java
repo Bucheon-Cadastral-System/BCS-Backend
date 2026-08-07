@@ -590,6 +590,13 @@ class SurveyServiceTest {
         }
 
         @Override
+        public boolean lockByProjectIdAndPointId(Long projectId, Long pointId) {
+            // 잠금은 사진 업로드 축이 쓰는 경로다 — 조사 서비스 시험에서는 존재 여부만 같은 규칙으로 답한다
+            return targets.stream()
+                    .anyMatch(t -> t.getProjectId().equals(projectId) && t.getPointId().equals(pointId));
+        }
+
+        @Override
         public boolean existsByPointId(Long pointId) {
             return targets.stream().anyMatch(t -> t.getPointId().equals(pointId));
         }
