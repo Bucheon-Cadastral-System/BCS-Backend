@@ -168,7 +168,8 @@ class SurveyCsvPreviewServiceTest {
         ControlPointPreviewResult changed = service.previewControlPoints(withColumn.getBytes(StandardCharsets.UTF_8));
         assertEquals(Action.UPDATE, changed.points().getFirst().action());
         assertTrue(changed.points().getFirst().changes().stream().anyMatch(c ->
-                        c.field().equals("최종조사내용") && c.before().equals("망실") && c.after().equals("완전")),
+                        // 파일이 "완전"이라 적어도 화면 어휘인 "정상"으로 옮겨 담는다
+                        c.field().equals("최종조사내용") && c.before().equals("망실") && c.after().equals("정상")),
                 changed.points().getFirst().changes().toString());
     }
 }

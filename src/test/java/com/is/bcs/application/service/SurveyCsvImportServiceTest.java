@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,7 +127,7 @@ class SurveyCsvImportServiceTest {
 
         assertEquals(SurveyResult.INTACT, record.getResult());
         assertEquals(OffsetDateTime.parse("2025-09-08T00:00:00+09:00"), record.getSurveyedAt());
-        assertEquals("대상", record.getNote());
+        assertNull(record.getNote()); // 조사대상여부 값이 비고로 새어 들어오지 않는다
         assertEquals(result.projectId(), record.getProjectId());
     }
 

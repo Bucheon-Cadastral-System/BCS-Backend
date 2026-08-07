@@ -72,7 +72,8 @@ public abstract class ImportFileMapper {
             /** 최종조사내용·최종조사일 — 기준점 마스터의 최근 조사 요약. 내용은 자유 표기가 실재해 문구 그대로 둔다. 열이 없으면 null(기존 값 유지). */
             String lastResult,
             LocalDate lastSurveyDate,
-            String note,
+            /** 조사대상여부 열 값 — 파일이 이 행을 대상으로 표시했는지이지 조사 결과의 비고가 아니다. */
+            String targetMark,
             List<ExtraColumn> extras
     ) {
 
@@ -391,7 +392,7 @@ public abstract class ImportFileMapper {
                 traverse(cells, columns),
                 surveyResult(cell(cells, columns, PRIOR_RESULT), PRIOR_RESULT),
                 date(cell(cells, columns, PRIOR_SURVEY_DATE), PRIOR_SURVEY_DATE),
-                cell(cells, columns, LAST_RESULT),
+                lastResult(cell(cells, columns, LAST_RESULT)),
                 date(cell(cells, columns, LAST_SURVEY_DATE), LAST_SURVEY_DATE),
                 cell(cells, columns, TARGET_NOTE),
                 extras(cells, headers, extraPositions)
@@ -501,6 +502,27 @@ public abstract class ImportFileMapper {
             case "도근점" -> Boolean.FALSE;
             case "교차점" -> Boolean.TRUE;
             default -> throw unknown(INTERSECTION, value);
+        };
+    }
+
+    /**
+     * 최종조사내용을 정해진 표시명으로 맞춘다.
+     *
+     * <p>실파일에 "망실(포장)", "망실,안보임" 같은 자유 표기가 있다. 뒤에 붙은 설명은 버리고 앞의 판정만 취한다.
+     * 파일이 쓰는 "완전"은 화면 어휘가 아니므로 "정상"으로 옮긴다.
+     * 아는 말이 아니면 원문 그대로 둔다. 임의로 버리면 사람이 적어 둔 내용이 사라진다.
+     */
+    private static String lastResult(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        String head = value.split("[(,]", 2)[0].trim();
+        return switch (head) {
+            case "완전" -> SurveyResult.INTACT.getDisplayName();
+            case "망실" -> SurveyResult.LOST.getDisplayName();
+            case "조사불가" -> SurveyResult.UNAVAILABLE.getDisplayName();
+            case "기타" -> SurveyResult.ETC.getDisplayName();
+            default -> value;
         };
     }
 

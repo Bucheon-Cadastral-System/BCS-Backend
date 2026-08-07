@@ -66,8 +66,9 @@ public class SurveyCsvImportService implements ImportSurveyCsvUseCase {
             targets.add(SurveyTarget.create(project.getId(), pointId, row.extras()));
             if (row.priorResult() != null) {
                 // 조사원은 파일에 없는 값이라 비워 둔다 — 인증이 붙으면 앱 내 기록이 채운다
+                // 파일에 조사 비고 열이 없다 — 조사대상여부 값을 비고로 흘려 넣던 배선을 끊었다
                 records.add(SurveyRecord.create(
-                        project.getId(), pointId, row.priorResult(), surveyedAt(row), row.note(), null));
+                        project.getId(), pointId, row.priorResult(), surveyedAt(row), null, null));
             }
         }
         saveSurveyTargetPort.saveAll(targets);

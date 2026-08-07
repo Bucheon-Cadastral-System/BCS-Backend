@@ -101,7 +101,7 @@ class SurveyTargetMapperTest {
         assertEquals(new TraverseInfo("1", null, null, null), first.traverse());
         assertEquals(SurveyResult.INTACT, first.priorResult());
         assertEquals(LocalDate.of(2025, 9, 8), first.priorSurveyDate());
-        assertEquals("대상", first.note());
+        assertEquals("대상", first.targetMark());
     }
 
     @Test
@@ -226,7 +226,7 @@ class SurveyTargetMapperTest {
         Row row = mapper.map(table).rows().getFirst();
 
         assertEquals(SurveyResult.LOST, row.priorResult());
-        assertEquals("대상", row.note());
+        assertEquals("대상", row.targetMark());
     }
 
     @Test
