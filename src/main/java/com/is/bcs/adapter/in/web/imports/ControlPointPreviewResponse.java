@@ -12,8 +12,6 @@ import java.util.Map;
  */
 public record ControlPointPreviewResponse(
         int totalRows,
-        Map<String, String> recognizedColumns,
-        List<String> extraColumns,
         List<ImportPreviewResponse.RowError> errors,
         List<ImportPreviewResponse.RowWarning> warnings,
         List<String> missingColumns,
@@ -25,13 +23,10 @@ public record ControlPointPreviewResponse(
     public record PointPreview(
             int row,
             String pointNo,
-            String type,
             String name,
             String crs,
             String northing,
             String easting,
-            String longitude,
-            String latitude,
             String action,
             List<FieldChange> changes,
             /** 이 행에 대한 경고(부천 범위 밖 등) — 등록을 막지 않는다. 없으면 null */
@@ -47,15 +42,15 @@ public record ControlPointPreviewResponse(
         ImportPreviewResponse file = ImportPreviewResponse.from(result.file());
 
         return new ControlPointPreviewResponse(
-                file.totalRows(), file.recognizedColumns(), file.extraColumns(),
+                file.totalRows(),
                 file.errors(), file.warnings(), file.missingColumns(), file.foreignColumns(),
                 result.points().stream().map(ControlPointPreviewResponse::toPoint).toList());
     }
 
     private static PointPreview toPoint(ControlPointPreviewResult.PointPreview point) {
         return new PointPreview(
-                point.row(), point.pointNo(), point.type().name(), point.name(),
-                point.crs(), point.northing(), point.easting(), point.longitude(), point.latitude(),
+                point.row(), point.pointNo(), point.name(),
+                point.crs(), point.northing(), point.easting(),
                 point.action().name(),
                 point.changes().stream()
                         .map(c -> new FieldChange(c.field(), c.before(), c.after()))

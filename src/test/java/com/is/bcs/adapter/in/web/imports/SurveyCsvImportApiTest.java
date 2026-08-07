@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -48,7 +49,7 @@ class SurveyCsvImportApiTest {
     }
 
     @Test
-    @DisplayName("미리보기 — 200과 건수·열 매핑을 돌려주고 아무것도 등록하지 않는다")
+    @DisplayName("미리보기 — 200과 건수·오류 목록을 돌려주고 아무것도 등록하지 않는다")
     void preview_readsWithoutImporting() throws Exception {
         MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv/preview").file(sampleFile()))
                 .andExpect(status().isOk())
@@ -56,8 +57,9 @@ class SurveyCsvImportApiTest {
 
         String body = bodyOf(result);
         assertTrue(body.contains("\"totalRows\":49"), body);
-        assertTrue(body.contains("\"기존조사내\":\"기존조사내용\""), body);
         assertTrue(body.contains("\"errors\":[]"), body);
+        // 열 대응표는 화면이 쓰지 않아 응답에서 뺐다 — 파일이 제대로 읽혔다는 것은 건수와 오류 없음이 말한다
+        assertFalse(body.contains("recognizedColumns"), body);
 
         // 미리보기는 조사 프로젝트를 만들지 않는다
         MvcResult projects = mockMvc.perform(get("/api/survey-projects")).andExpect(status().isOk()).andReturn();
