@@ -44,7 +44,7 @@ class SurveyChatToolsTest {
     }
 
     @Test
-    @DisplayName("조사 현황 — 유스케이스 진행 현황을 결과별 개수 필드로 펼쳐 준다")
+    @DisplayName("조사 현황 — 화면과 같은 두 축(상태·결과)으로 펼쳐 준다")
     void getSurveyProgress_flattensCounts() {
         fake.progress = new SurveyProgress("2026 일제조사", 5, 3, 2, false,
                 Map.of(SurveyResult.INTACT, 2L, SurveyResult.LOST, 1L, SurveyResult.ETC, 0L));
@@ -55,9 +55,26 @@ class SurveyChatToolsTest {
         assertEquals(5, progress.totalPoints());
         assertEquals(3, progress.surveyedPoints());
         assertEquals(2, progress.notSurveyedPoints());
-        assertEquals(2, progress.intactPoints());
+        // 조사완료는 조사한 점에서 망실을 뺀 값 — 모델이 직접 빼면 화면과 어긋나므로 여기서 계산해 넘긴다
+        assertEquals(2, progress.completedPoints());
         assertEquals(1, progress.lostPoints());
-        assertEquals(0, progress.etcPoints());
+        assertEquals(60, progress.progressPercent()); // 3/5, 화면과 같은 반올림 규칙
+        assertEquals(2, progress.resultIntactPoints());
+        assertEquals(0, progress.resultEtcPoints());
+    }
+
+    @Test
+    @DisplayName("완전과 조사완료는 다른 값이다 — 망실 아닌 결과를 모두 합한 것이 조사완료")
+    void getSurveyProgress_completedIncludesNonLostResults() {
+        fake.progress = new SurveyProgress("굴착협의", 49, 44, 5, false,
+                Map.of(SurveyResult.INTACT, 40L, SurveyResult.LOST, 3L, SurveyResult.ETC, 1L));
+
+        SurveyProgressSummary progress = tools.getSurveyProgress(1L);
+
+        assertEquals(41, progress.completedPoints()); // 완전 40 + 기타 1
+        assertEquals(40, progress.resultIntactPoints());
+        assertEquals(3, progress.lostPoints());
+        assertEquals(90, progress.progressPercent()); // 44/49
     }
 
     @Test
@@ -68,9 +85,18 @@ class SurveyChatToolsTest {
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
         assertEquals(1L, fake.progressProjectId); // 전달받은 id를 그대로 유스케이스에 넘긴다
-        assertEquals(1, progress.intactPoints());
+        assertEquals(1, progress.resultIntactPoints());
         assertEquals(0, progress.lostPoints());
-        assertEquals(0, progress.etcPoints());
+        assertEquals(0, progress.resultEtcPoints());
+        assertEquals(0, progress.resultUnavailablePoints());
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 진행률은 0이다 — 0으로 나누지 않는다")
+    void getSurveyProgress_noTarget_zeroPercent() {
+        fake.progress = new SurveyProgress("빈 조사", 0, 0, 0, false, Map.of());
+
+        assertEquals(0, tools.getSurveyProgress(1L).progressPercent());
     }
 
     @Test
