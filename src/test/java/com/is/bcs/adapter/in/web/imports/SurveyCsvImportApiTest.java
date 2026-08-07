@@ -111,13 +111,13 @@ class SurveyCsvImportApiTest {
         Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(body);
         assertTrue(m.find());
         String projectId = m.group(1);
-        assertEquals("/api/survey-projects/" + projectId, result.getResponse().getHeader("Location"));
 
-        // 임포트 결과가 실제로 조회 API에 반영됐는지
-        MvcResult project = mockMvc.perform(get("/api/survey-projects/" + projectId))
+        // 임포트 결과가 실제로 조회 API에 반영됐는지 — 목록에서 그 조사를 찾아 본다
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects"))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"startedOn\":\"2026-07-01\""));
+        assertTrue(bodyOf(projects).contains("\"id\":" + projectId));
+        assertTrue(bodyOf(projects).contains("\"startedOn\":\"2026-07-01\""));
 
         MvcResult points = mockMvc.perform(get("/api/control-points"))
                 .andExpect(status().isOk())
@@ -160,10 +160,11 @@ class SurveyCsvImportApiTest {
 
         Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(typed));
         assertTrue(m.find());
-        MvcResult project = mockMvc.perform(get("/api/survey-projects/" + m.group(1)))
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects"))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"startedOn\":\"2026-07-01\""));
+        assertTrue(bodyOf(projects).contains("\"id\":" + m.group(1)));
+        assertTrue(bodyOf(projects).contains("\"startedOn\":\"2026-07-01\""));
     }
 
     @Test

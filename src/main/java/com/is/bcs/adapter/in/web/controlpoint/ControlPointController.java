@@ -8,6 +8,7 @@ import com.is.bcs.application.port.in.controlpoint.RegisterControlPointUseCase;
 import com.is.bcs.application.port.in.controlpoint.UpdateControlPointUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +18,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequiredArgsConstructor
@@ -38,11 +38,8 @@ public class ControlPointController {
             // 임포트와 같은 규칙이라 기존 점 갱신·재사용으로 끝날 수 있다 — 만든 자원이 없으므로 201이 아니다
             return ResponseEntity.ok(body);
         }
-        return ResponseEntity
-                // 관리번호는 형식 미확정 입력이라 경로 세그먼트로 인코딩해 Location을 만든다
-                .created(UriComponentsBuilder.fromPath("/api/control-points/{pointNo}")
-                        .buildAndExpand(result.point().getPointNo()).encode().toUri())
-                .body(body);
+        // Location 은 두지 않는다 — 가리킬 단건 조회 경로가 없다. 만든 점은 이 응답 본문에 그대로 실려 있다
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
     @GetMapping
@@ -50,11 +47,6 @@ public class ControlPointController {
         return new ContentResponse<>(getControlPointsUseCase.getAll().stream()
                 .map(ControlPointResponse::from)
                 .toList());
-    }
-
-    @GetMapping("/{pointNo}")
-    public ControlPointResponse getByPointNo(@PathVariable("pointNo") String pointNo) {
-        return ControlPointResponse.from(getControlPointsUseCase.getByPointNo(pointNo));
     }
 
     // 수정·삭제 경로는 관리번호가 아니라 id 다 — 수정이 관리번호 자체를 바꿀 수 있어 경로 식별자로 쓸 수 없다

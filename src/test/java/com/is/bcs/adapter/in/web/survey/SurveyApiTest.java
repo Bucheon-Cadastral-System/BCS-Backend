@@ -119,7 +119,7 @@ class SurveyApiTest {
     }
 
     @Test
-    @DisplayName("프로젝트 생성·목록·단건 조회 — 생성 시 지정한 대상이 대상 목록에 실린다")
+    @DisplayName("프로젝트 생성·목록 — 생성 시 지정한 대상이 대상 목록에 실린다")
     void createAndGetProjects() throws Exception {
         long pointId = registerPoint();
         long id = createProject(pointId);
@@ -133,18 +133,12 @@ class SurveyApiTest {
         assertTrue(bodyOf(list).contains("\"targetCount\":1"));
         assertTrue(bodyOf(list).contains("\"surveyedCount\":0"));
         assertTrue(bodyOf(list).contains("\"authorName\":null"));
-
-        MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
-                .andExpect(status().isOk())
-                .andReturn();
-        assertTrue(bodyOf(single).contains("\"startedOn\":\"2026-07-01\""));
+        assertTrue(bodyOf(list).contains("\"startedOn\":\"2026-07-01\""));
 
         MvcResult targets = mockMvc.perform(get("/api/survey-projects/" + id + "/targets"))
                 .andExpect(status().isOk())
                 .andReturn();
         assertTrue(bodyOf(targets).contains(String.valueOf(pointId)));
-
-        mockMvc.perform(get("/api/survey-projects/999999")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -298,7 +292,6 @@ class SurveyApiTest {
         mockMvc.perform(delete("/api/survey-projects/" + projectId))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/survey-projects/" + projectId)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/survey-projects/" + projectId + "/targets")).andExpect(status().isNotFound());
         mockMvc.perform(delete("/api/survey-projects/" + projectId)).andExpect(status().isNotFound());
     }
