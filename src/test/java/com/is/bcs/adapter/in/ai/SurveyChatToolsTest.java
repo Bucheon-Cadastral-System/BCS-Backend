@@ -62,18 +62,20 @@ class SurveyChatToolsTest {
     }
 
     @Test
-    @DisplayName("정상은 망실이 아닌 기록을 모두 합한 값이다 — 저장된 결과 이름으로 쪼개지 않는다")
-    void getSurveyProgress_completedIncludesNonLostResults() {
-        fake.progress = new SurveyProgress("굴착협의", 49, 44, 5, false,
-                Map.of(SurveyResult.INTACT, 40L, SurveyResult.LOST, 3L, SurveyResult.ETC, 1L));
+    @DisplayName("정상은 조사한 점에서 망실·조사불가·기타를 뺀 값이다")
+    void getSurveyProgress_intactExcludesOtherResults() {
+        fake.progress = new SurveyProgress("굴착협의", 50, 45, 5, false,
+                Map.of(SurveyResult.INTACT, 40L, SurveyResult.LOST, 3L, SurveyResult.UNAVAILABLE, 1L, SurveyResult.ETC, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
-        assertEquals(41, progress.intactPoints()); // 망실 아닌 기록 41건이 정상 한 값으로 묶인다
+        assertEquals(40, progress.intactPoints()); // 조사불가·기타는 정상에 섞이지 않는다
         assertEquals(3, progress.lostPoints());
-        assertEquals(90, progress.progressPercent()); // 44/49
-        // 저장된 결과 이름(완전·조사불가·기타)은 화면에 없는 어휘라 모델에 넘길 필드 자체가 없다
-        assertEquals(7, SurveyProgressSummary.class.getRecordComponents().length);
+        assertEquals(1, progress.unavailablePoints());
+        assertEquals(1, progress.etcPoints());
+        assertEquals(90, progress.progressPercent()); // 45/50
+        // 화면이 쓰는 다섯 갈래(정상·망실·조사불가·기타·미조사)를 모두 필드로 두므로 아홉 개다
+        assertEquals(9, SurveyProgressSummary.class.getRecordComponents().length);
     }
 
     @Test
@@ -89,18 +91,23 @@ class SurveyChatToolsTest {
     }
 
     @Test
-    @DisplayName("정상·망실·미조사는 겹치지 않고 더하면 대상 전체가 된다")
-    void getSurveyProgress_threeBucketsCoverTotal() {
-        fake.progress = new SurveyProgress("굴착협의", 46, 41, 5, false,
-                Map.of(SurveyResult.INTACT, 38L, SurveyResult.LOST, 3L));
+    @DisplayName("정상·망실·조사불가·기타·미조사는 겹치지 않고 더하면 대상 전체가 된다")
+    void getSurveyProgress_fiveBucketsCoverTotal() {
+        fake.progress = new SurveyProgress("굴착협의", 48, 43, 5, false,
+                Map.of(SurveyResult.INTACT, 36L, SurveyResult.LOST, 3L, SurveyResult.UNAVAILABLE, 2L, SurveyResult.ETC, 2L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
-        assertEquals(38, progress.intactPoints());
+        assertEquals(36, progress.intactPoints());
         assertEquals(3, progress.lostPoints());
+        assertEquals(2, progress.unavailablePoints());
+        assertEquals(2, progress.etcPoints());
         assertEquals(5, progress.notSurveyedPoints());
-        assertEquals(46, progress.intactPoints() + progress.lostPoints() + progress.notSurveyedPoints());
-        assertEquals(41, progress.surveyedPoints()); // 조사한 수는 정상과 망실의 합이라 셋과 함께 더하면 안 된다
+        assertEquals(
+                48,
+                progress.intactPoints() + progress.lostPoints() + progress.unavailablePoints()
+                        + progress.etcPoints() + progress.notSurveyedPoints());
+        assertEquals(43, progress.surveyedPoints()); // 조사한 수는 넷의 합이라 미조사까지 함께 더하면 안 된다
     }
 
     @Test

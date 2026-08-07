@@ -12,6 +12,7 @@ import com.is.bcs.application.port.in.survey.UpdateSurveyProjectUseCase;
 import com.is.bcs.domain.survey.SurveyProject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 
 @RestController
 @RequiredArgsConstructor
@@ -46,9 +46,8 @@ public class SurveyController {
     ) {
         SurveyProject project = createSurveyProjectUseCase.create(
                 request.toCommand(optionalMemberId.of(authentication)));
-        return ResponseEntity
-                .created(URI.create("/api/survey-projects/" + project.getId()))
-                .body(SurveyProjectResponse.from(project));
+        // Location 은 두지 않는다 — 가리킬 단건 조회 경로가 없다. 만든 조사는 이 응답 본문에 그대로 실려 있다
+        return ResponseEntity.status(HttpStatus.CREATED).body(SurveyProjectResponse.from(project));
     }
 
     /** 목록은 요약으로 내린다 — 행마다 완료 표시·작성자를 그리는 화면이 진행률을 건별로 다시 묻지 않게. */
@@ -57,11 +56,6 @@ public class SurveyController {
         return new ContentResponse<>(getSurveyProjectsUseCase.getSummaries().stream()
                 .map(SurveyProjectSummaryResponse::from)
                 .toList());
-    }
-
-    @GetMapping("/{projectId}")
-    public SurveyProjectResponse getById(@PathVariable("projectId") Long projectId) {
-        return SurveyProjectResponse.from(getSurveyProjectsUseCase.getById(projectId));
     }
 
     @PutMapping("/{projectId}")
@@ -76,11 +70,6 @@ public class SurveyController {
     public ResponseEntity<Void> delete(@PathVariable("projectId") Long projectId) {
         deleteSurveyProjectUseCase.delete(projectId);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{projectId}/progress")
-    public SurveyProgressResponse progress(@PathVariable("projectId") Long projectId) {
-        return SurveyProgressResponse.from(getSurveyRecordsUseCase.getProgress(projectId));
     }
 
     /** 조사 대상 점 id 목록 — 화면이 지도·목록을 그 조사의 대상으로만 좁히는 데 쓴다. */

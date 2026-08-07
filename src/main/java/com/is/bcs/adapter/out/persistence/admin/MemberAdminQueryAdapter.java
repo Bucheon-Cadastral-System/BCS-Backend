@@ -67,6 +67,7 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
                 entity.getPhone(),
                 entity.getEmail(),
                 entity.getDistrict(),
+                entity.getDepartment(),
                 entity.getTeam(),
                 entity.getPosition(),
                 entity.getStatus(),
@@ -101,12 +102,12 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
             builder.and(memberJpaEntity.position.eq(command.position()));
         }
 
-        if (command.memberStatus() != null) {
-            builder.and(memberJpaEntity.status.eq(command.memberStatus()));
+        if (command.status() != null) {
+            builder.and(memberJpaEntity.status.eq(command.status()));
         }
 
-        if (command.memberRole() != null) {
-            builder.and(memberJpaEntity.role.eq(command.memberRole()));
+        if (command.role() != null) {
+            builder.and(memberJpaEntity.role.eq(command.role()));
         }
 
         return builder;
@@ -132,8 +133,8 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
             case "district" -> memberJpaEntity.district;
             case "team" -> memberJpaEntity.team;
             case "position" -> memberJpaEntity.position;
-            case "memberStatus" -> memberJpaEntity.status;
-            case "memberRole" -> memberJpaEntity.role;
+            case "status" -> memberJpaEntity.status;
+            case "role" -> memberJpaEntity.role;
             case "createdAt" -> memberJpaEntity.createdAt;
             default -> throw new InvalidPageRequestException("지원하지 않는 정렬 기준입니다: " + property);
         };

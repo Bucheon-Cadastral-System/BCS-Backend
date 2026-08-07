@@ -92,7 +92,7 @@ class SurveyCsvPreviewServiceTest {
                 "41192D000001265", PointType.DOGEUN, "1465공",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.790000, 37.500000),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         ControlPointPreviewResult result = service.previewControlPoints(sampleCsv());
 
@@ -113,7 +113,7 @@ class SurveyCsvPreviewServiceTest {
                 "41192D000000001", PointType.DOGEUN, "선점",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.790000, 37.500000),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         String csv = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
@@ -152,7 +152,7 @@ class SurveyCsvPreviewServiceTest {
                 "41192D000000003", PointType.DOGEUN, "그대로", tm,
                 transformer.toWgs84(tm),
                 null, null, null, null, null, null, null,
-                "망실", LocalDate.of(2025, 9, 8), null));
+                "망실", LocalDate.of(2025, 9, 8)));
 
         String withoutColumn = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
@@ -168,7 +168,8 @@ class SurveyCsvPreviewServiceTest {
         ControlPointPreviewResult changed = service.previewControlPoints(withColumn.getBytes(StandardCharsets.UTF_8));
         assertEquals(Action.UPDATE, changed.points().getFirst().action());
         assertTrue(changed.points().getFirst().changes().stream().anyMatch(c ->
-                        c.field().equals("최종조사내용") && c.before().equals("망실") && c.after().equals("완전")),
+                        // 파일이 "완전"이라 적어도 화면 어휘인 "정상"으로 옮겨 담는다
+                        c.field().equals("최종조사내용") && c.before().equals("망실") && c.after().equals("정상")),
                 changed.points().getFirst().changes().toString());
     }
 }

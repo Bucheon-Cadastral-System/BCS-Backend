@@ -8,6 +8,8 @@ import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
+import com.is.bcs.adapter.out.persistence.common.EntityReferenceStubs;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /** 도메인 ↔ JPA 엔티티 매핑 왕복 검증 — 기대값은 고객사 대상지 CSV 실데이터. */
 class ControlPointJpaEntityTest {
 
+    private final EntityManager entityManager = EntityReferenceStubs.entityManager();
+
     private static ControlPoint csvRow1(Long id) {
         return ControlPoint.restore(
                 id, "41192D000001265", PointType.DOGEUN, "1465공",
@@ -29,7 +33,7 @@ class ControlPointJpaEntityTest {
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", null, null, false),
-                "망실,안보임", LocalDate.of(2026, 6, 23), 3L);
+                "망실,안보임", LocalDate.of(2026, 6, 23));
     }
 
     @Test
@@ -37,7 +41,7 @@ class ControlPointJpaEntityTest {
     void roundTrip_preservesAllAttributes() {
         ControlPoint origin = csvRow1(5L);
 
-        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin).toDomain();
+        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin, entityManager).toDomain();
 
         assertEquals(5L, restored.getId());
         assertEquals("41192D000001265", restored.getPointNo());
@@ -57,7 +61,6 @@ class ControlPointJpaEntityTest {
         assertEquals(new TraverseInfo("1", null, null, false), restored.getTraverse());
         assertEquals("망실,안보임", restored.getLastSurveyResult());
         assertEquals(LocalDate.of(2026, 6, 23), restored.getLastSurveyedOn());
-        assertEquals(3L, restored.getLastSurveyedById());
     }
 
     @Test
@@ -68,9 +71,9 @@ class ControlPointJpaEntityTest {
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                         new BigDecimal("545236.7712"), new BigDecimal("181840.9605")),
                 new GeoCoordinate(126.794623, 37.506423),
-                null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
-        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin).toDomain();
+        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin, entityManager).toDomain();
 
         // compareTo는 스케일을 무시하므로 equals로 자릿수까지 본다
         assertEquals(new BigDecimal("545236.7712"), restored.getTm().northing());
@@ -86,9 +89,9 @@ class ControlPointJpaEntityTest {
                         new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
                 null, null, null, null, null, null, null
-        , null, null, null);
+        , null, null);
 
-        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin).toDomain();
+        ControlPoint restored = ControlPointJpaEntity.fromDomain(origin, entityManager).toDomain();
 
         assertNull(restored.getTraverse()); // 전 항목 null이면 TraverseInfo(null,null,null,null)이 아니라 null
         assertNull(restored.getRegionCode());

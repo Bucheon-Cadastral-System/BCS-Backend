@@ -168,6 +168,47 @@ class ControlPointImportServiceTest {
         assertEquals(0, second.updatedPoints()); // 지워지지 않으므로 갱신도 아니다
     }
 
+    @Test
+    @DisplayName("겹치는 점의 시드 조사는 조사일이 늦은 쪽이 남는다 — 옛 자료 파일이 최신 값을 덮지 않게")
+    void importControlPoints_seedSurvey_prefersLaterDate() {
+        String recent = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,망실,2026-06-23
+                """;
+        service.importControlPoints(recent.getBytes(StandardCharsets.UTF_8));
+
+        String older = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,정상,2025-09-08
+                """;
+        ControlPointImportResult second = service.importControlPoints(older.getBytes(StandardCharsets.UTF_8));
+
+        ControlPoint kept = store.findByNameAndType("1465공", PointType.DOGEUN).orElseThrow();
+        assertEquals("망실", kept.getLastSurveyResult());
+        assertEquals(LocalDate.of(2026, 6, 23), kept.getLastSurveyedOn());
+        assertEquals(0, second.updatedPoints()); // 바뀐 것이 없으므로 갱신도 아니다
+    }
+
+    @Test
+    @DisplayName("조사일이 더 늦은 파일이 오면 내용과 날짜가 함께 바뀐다 — 두 칸은 한 쌍이다")
+    void importControlPoints_seedSurvey_laterFileReplacesBothCells() {
+        String older = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,정상,2025-09-08
+                """;
+        service.importControlPoints(older.getBytes(StandardCharsets.UTF_8));
+
+        String recent = """
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,망실,2026-06-23
+                """;
+        service.importControlPoints(recent.getBytes(StandardCharsets.UTF_8));
+
+        ControlPoint kept = store.findByNameAndType("1465공", PointType.DOGEUN).orElseThrow();
+        assertEquals("망실", kept.getLastSurveyResult());
+        assertEquals(LocalDate.of(2026, 6, 23), kept.getLastSurveyedOn());
+    }
+
     private static TransactionTemplate directTransaction() {
         return new TransactionTemplate(new PlatformTransactionManager() {
 

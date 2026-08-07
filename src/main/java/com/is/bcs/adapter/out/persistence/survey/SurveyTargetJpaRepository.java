@@ -12,21 +12,21 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpaEntity, Long> {
+public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpaEntity, ProjectPointId> {
 
     long countByProjectId(Long projectId);
 
     boolean existsByPointId(Long pointId);
 
     /** 점 상세는 화면이 이미 들고 있으므로 id 만 뽑는다. */
-    @Query("select t.pointId from SurveyTargetJpaEntity t where t.projectId = :projectId order by t.pointId")
+    @Query("select t.point.id from SurveyTargetJpaEntity t where t.project.id = :projectId order by t.point.id")
     List<Long> findPointIdsByProjectId(@Param("projectId") Long projectId);
 
     /** 파생 삭제(엔티티 단위) — 벌크 JPQL 이면 추가 열(@ElementCollection) 행이 남아 FK 에 걸린다. */
     void deleteByProjectId(Long projectId);
 
     /** 프로젝트별 대상 점 수 — 목록의 완료 표시용 일괄 집계. */
-    @Query("select t.projectId as projectId, count(t) as cnt from SurveyTargetJpaEntity t group by t.projectId")
+    @Query("select t.project.id as projectId, count(t) as cnt from SurveyTargetJpaEntity t group by t.project.id")
     List<ProjectCount> countByProject();
 
     interface ProjectCount {
@@ -44,8 +44,8 @@ public interface SurveyTargetJpaRepository extends JpaRepository<SurveyTargetJpa
     @Query("""
         select target
         from SurveyTargetJpaEntity target
-        where target.projectId = :projectId
-          and target.pointId = :pointId
+        where target.project.id = :projectId
+          and target.point.id = :pointId
         """)
     Optional<SurveyTargetJpaEntity> findByProjectIdAndPointIdForUpdate(@Param("projectId") Long projectId, @Param("pointId") Long pointId);
 

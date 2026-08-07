@@ -18,6 +18,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -78,12 +79,11 @@ class ControlPointApiTest {
     }
 
     @Test
-    @DisplayName("등록 — 201과 Location, 서버가 파생한 경위도를 실은 리소스를 반환한다")
-    void register_returns201WithLocation() throws Exception {
+    @DisplayName("등록 — 201과 서버가 파생한 경위도를 실은 리소스를 반환한다")
+    void register_returns201WithResource() throws Exception {
         MvcResult result = register();
 
         assertEquals(201, result.getResponse().getStatus());
-        assertEquals("/api/control-points/41192D000001265", result.getResponse().getHeader("Location"));
         String body = bodyOf(result);
         assertTrue(body.contains("\"created\":true"));
         assertTrue(body.contains("\"pointNo\":\"41192D000001265\""));
@@ -155,7 +155,7 @@ class ControlPointApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"pointNo": "41192D000012345", "type": "DOGEUN", "name": "1465공(이설)",
-                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00}
+                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00, "version": 0}
                                 """))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -168,9 +168,34 @@ class ControlPointApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"pointNo": "41192D000000001", "type": "DOGEUN", "name": "이름",
-                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00}
+                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00, "version": 0}
                                 """))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("수정 — 창을 열어 둔 사이 다른 사람이 먼저 고쳤으면 409 CONTROL_POINT_MODIFIED")
+    void updatePoint_staleVersion() throws Exception {
+        long id = extractId(bodyOf(register()));
+        // 한 번 저장해 판 번호를 올린다
+        mockMvc.perform(put("/api/control-points/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000012345", "type": "DOGEUN", "name": "1465공",
+                                 "crs": "GRS80_CENTRAL", "northing": 545240.00, "easting": 181845.00, "version": 0}
+                                """))
+                .andExpect(status().isOk());
+
+        // 옛 판을 든 두 번째 사람의 저장은 거절된다
+        MvcResult stale = mockMvc.perform(put("/api/control-points/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"pointNo": "41192D000099999", "type": "DOGEUN", "name": "다른이름",
+                                 "crs": "GRS80_CENTRAL", "northing": 545000.00, "easting": 181000.00, "version": 0}
+                                """))
+                .andExpect(status().isConflict())
+                .andReturn();
+        assertTrue(bodyOf(stale).contains("\"code\":\"CONTROL_POINT_MODIFIED\""));
     }
 
     @Test
@@ -206,7 +231,8 @@ class ControlPointApiTest {
                 .andReturn();
         assertTrue(bodyOf(free).contains("\"referenced\":false"));
         mockMvc.perform(delete("/api/control-points/" + id)).andExpect(status().isNoContent());
-        mockMvc.perform(get("/api/control-points/41192D000001265")).andExpect(status().isNotFound());
+        MvcResult gone = mockMvc.perform(get("/api/control-points")).andExpect(status().isOk()).andReturn();
+        assertFalse(bodyOf(gone).contains("\"41192D000001265\""));
         mockMvc.perform(delete("/api/control-points/" + id)).andExpect(status().isNotFound());
     }
 
@@ -224,19 +250,4 @@ class ControlPointApiTest {
         assertTrue(body.contains("\"pointNo\":\"41192D000001265\""));
     }
 
-    @Test
-    @DisplayName("관리번호 단건 조회 — 있으면 200, 없으면 404 CONTROL_POINT_NOT_FOUND")
-    void getByPointNo() throws Exception {
-        register();
-
-        MvcResult found = mockMvc.perform(get("/api/control-points/41192D000001265"))
-                .andExpect(status().isOk())
-                .andReturn();
-        assertTrue(bodyOf(found).contains("\"name\":\"1465공\""));
-
-        MvcResult missing = mockMvc.perform(get("/api/control-points/41192D999999999"))
-                .andExpect(status().isNotFound())
-                .andReturn();
-        assertTrue(bodyOf(missing).contains("\"code\":\"CONTROL_POINT_NOT_FOUND\""));
-    }
 }

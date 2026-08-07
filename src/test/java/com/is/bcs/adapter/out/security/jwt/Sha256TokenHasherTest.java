@@ -1,6 +1,5 @@
-package com.is.bcs.iw;
+package com.is.bcs.adapter.out.security.jwt;
 
-import com.is.bcs.adapter.out.security.jwt.Sha256TokenHasher;
 import com.is.bcs.domain.token.exception.TokenHashingException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

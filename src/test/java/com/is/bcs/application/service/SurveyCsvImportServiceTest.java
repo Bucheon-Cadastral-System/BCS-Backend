@@ -50,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,7 +127,7 @@ class SurveyCsvImportServiceTest {
 
         assertEquals(SurveyResult.INTACT, record.getResult());
         assertEquals(OffsetDateTime.parse("2025-09-08T00:00:00+09:00"), record.getSurveyedAt());
-        assertEquals("대상", record.getNote());
+        assertNull(record.getNote()); // 조사대상여부 값이 비고로 새어 들어오지 않는다
         assertEquals(result.projectId(), record.getProjectId());
     }
 
@@ -155,7 +156,7 @@ class SurveyCsvImportServiceTest {
                 new GeoCoordinate(126.744200, 37.511900),
                 "10900", "상동", "부천시 상동 529-2",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
-                new TraverseInfo("2", "ㅁ", "78", false), null, null, null));
+                new TraverseInfo("2", "ㅁ", "78", false), null, null));
 
         SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
         assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
@@ -189,7 +190,7 @@ class SurveyCsvImportServiceTest {
                 new GeoCoordinate(126.744000, 37.511000),
                 "10900", "상동", "부천시 상동 529-2",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
-                new TraverseInfo("2", "ㅁ", "78", false), null, null, null));
+                new TraverseInfo("2", "ㅁ", "78", false), null, null));
 
         SurveyCsvImportResult result = service.importCsv(
                 new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
@@ -275,7 +276,7 @@ class SurveyCsvImportServiceTest {
                 "41192D000000001", PointType.DOGEUN, "다른이름",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         byte[] csv = """
                 기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부
@@ -305,9 +306,9 @@ class SurveyCsvImportServiceTest {
     private static class FakeSurveyStore implements SaveSurveyProjectPort, SaveSurveyRecordPort {
 
         final Map<Long, SurveyProject> projects = new HashMap<>();
-        final Map<Long, SurveyRecord> records = new HashMap<>();
+        // 기록의 식별자는 (프로젝트, 기준점)이다 — 저장소도 같은 열쇠로 잡는다
+        final Map<List<Long>, SurveyRecord> records = new HashMap<>();
         private long projectSeq = 0;
-        private long recordSeq = 0;
 
         @Override
         public SurveyProject save(SurveyProject project) {
@@ -319,12 +320,8 @@ class SurveyCsvImportServiceTest {
 
         @Override
         public SurveyRecord save(SurveyRecord record) {
-            long id = record.getId() != null ? record.getId() : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
-            records.put(id, saved);
-            return saved;
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return record;
         }
 
         @Override
@@ -342,14 +339,11 @@ class SurveyCsvImportServiceTest {
     private static class FakeTargetStore implements SaveSurveyTargetPort {
 
         final List<SurveyTarget> targets = new ArrayList<>();
-        private long sequence = 0;
 
         @Override
         public SurveyTarget save(SurveyTarget target) {
-            SurveyTarget saved = SurveyTarget.restore(
-                    ++sequence, target.getProjectId(), target.getPointId(), target.getExtras());
-            targets.add(saved);
-            return saved;
+            targets.add(target);
+            return target;
         }
 
         @Override

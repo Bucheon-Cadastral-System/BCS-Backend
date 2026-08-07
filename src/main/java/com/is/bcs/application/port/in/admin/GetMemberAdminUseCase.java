@@ -19,8 +19,8 @@ public interface GetMemberAdminUseCase {
             District district,
             Team team,
             Position position,
-            MemberStatus memberStatus,
-            MemberRole memberRole
+            MemberStatus status,
+            MemberRole role
     ) {
     }
 
@@ -30,10 +30,11 @@ public interface GetMemberAdminUseCase {
             String phone,
             String email,
             District district,
+            String department,
             Team team,
             Position position,
-            MemberStatus memberStatus,
-            MemberRole memberRole
+            MemberStatus status,
+            MemberRole role
     ) {
     }
 }

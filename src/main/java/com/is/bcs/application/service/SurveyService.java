@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -204,13 +205,8 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     @Transactional(readOnly = true)
     public List<SurveyRecordSummary> getByProjectId(Long projectId) {
         requireProject(projectId);
-        List<SurveyRecord> records = loadSurveyRecordPort.findRecordsByProjectId(projectId);
-        Map<Long, String> names = loadMemberNamesPort.findNamesByIds(records.stream()
-                .map(SurveyRecord::getSurveyedById).filter(Objects::nonNull).collect(Collectors.toSet()));
-        return records.stream()
-                .map(record -> new SurveyRecordSummary(
-                        record, record.getSurveyedById() == null ? null : names.get(record.getSurveyedById())))
-                .toList();
+        // 기록과 조사원 이름을 한 문장으로 받는다 — 이름을 모아 다시 조회하던 두 번째 문장이 사라졌다
+        return loadSurveyRecordPort.findRecordSummariesByProjectId(projectId);
     }
 
     /** 한 건에 조사원 이름을 붙인다 — 기록 응답만으로 화면이 이름을 그릴 수 있게. */

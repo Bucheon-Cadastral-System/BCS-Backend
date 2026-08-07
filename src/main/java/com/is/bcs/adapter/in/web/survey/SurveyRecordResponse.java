@@ -6,9 +6,11 @@ import com.is.bcs.domain.survey.SurveyResult;
 
 import java.time.OffsetDateTime;
 
+/**
+ * 조사기록 한 줄. 프로젝트 id 는 싣지 않는다 — 이 목록은 이미 한 프로젝트로 좁혀 조회한 결과라
+ * 행마다 같은 값을 다시 나르게 된다.
+ */
 public record SurveyRecordResponse(
-        Long id,
-        Long projectId,
         Long pointId,
         SurveyResult result,
         OffsetDateTime surveyedAt,
@@ -20,7 +22,7 @@ public record SurveyRecordResponse(
     public static SurveyRecordResponse from(SurveyRecordSummary summary) {
         SurveyRecord record = summary.record();
         return new SurveyRecordResponse(
-                record.getId(), record.getProjectId(), record.getPointId(),
-                record.getResult(), record.getSurveyedAt(), record.getNote(), summary.surveyorName());
+                record.getPointId(), record.getResult(), record.getSurveyedAt(),
+                record.getNote(), summary.surveyorName());
     }
 }

@@ -13,10 +13,11 @@ public record MemberAdminResponse(
         String phone,
         String email,
         District district,
+        String department,
         Team team,
         Position position,
-        MemberStatus memberStatus,
-        MemberRole memberRole
+        MemberStatus status,
+        MemberRole role
 ) {
 
     public static MemberAdminResponse from(GetMemberAdminUseCase.Result result) {
@@ -26,10 +27,11 @@ public record MemberAdminResponse(
                 result.phone(),
                 result.email(),
                 result.district(),
+                result.department(),
                 result.team(),
                 result.position(),
-                result.memberStatus(),
-                result.memberRole()
+                result.status(),
+                result.role()
         );
     }
 }

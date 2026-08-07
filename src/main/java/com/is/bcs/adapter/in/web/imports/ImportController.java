@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.URI;
 import java.time.LocalDate;
 
 /**
@@ -63,9 +62,8 @@ public class ImportController {
         SurveyCsvImportResult result = importSurveyCsvUseCase.importCsv(new ImportSurveyCsvCommand(
                 optionalMemberId.of(authentication), name, startedOn, endedOn, note, file.getBytes()));
 
-        return ResponseEntity
-                .created(URI.create("/api/survey-projects/" + result.projectId()))
-                .body(SurveyCsvImportResponse.from(result));
+        // Location 은 두지 않는다 — 가리킬 단건 조회 경로가 없다
+        return ResponseEntity.status(HttpStatus.CREATED).body(SurveyCsvImportResponse.from(result));
     }
 
     /** 조사 없이 기준점만 등록·갱신한다 — 만들어지는 자원이 여럿이라 Location 은 두지 않는다. */

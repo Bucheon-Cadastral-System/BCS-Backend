@@ -45,6 +45,15 @@ class SurveyApiTest {
         return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
+    /** 본문에 그 조각이 몇 번 나오는지 — 목록에 같은 점의 기록이 하나뿐인지 볼 때 쓴다. */
+    private int countOf(String body, String piece) {
+        int count = 0;
+        for (int at = body.indexOf(piece); at >= 0; at = body.indexOf(piece, at + piece.length())) {
+            count++;
+        }
+        return count;
+    }
+
     private long extractId(String body) {
         Matcher m = Pattern.compile("\"id\":(\\d+)").matcher(body);
         assertTrue(m.find());
@@ -110,7 +119,7 @@ class SurveyApiTest {
     }
 
     @Test
-    @DisplayName("프로젝트 생성·목록·단건 조회 — 생성 시 지정한 대상이 대상 목록에 실린다")
+    @DisplayName("프로젝트 생성·목록 — 생성 시 지정한 대상이 대상 목록에 실린다")
     void createAndGetProjects() throws Exception {
         long pointId = registerPoint();
         long id = createProject(pointId);
@@ -124,18 +133,12 @@ class SurveyApiTest {
         assertTrue(bodyOf(list).contains("\"targetCount\":1"));
         assertTrue(bodyOf(list).contains("\"surveyedCount\":0"));
         assertTrue(bodyOf(list).contains("\"authorName\":null"));
-
-        MvcResult single = mockMvc.perform(get("/api/survey-projects/" + id))
-                .andExpect(status().isOk())
-                .andReturn();
-        assertTrue(bodyOf(single).contains("\"startedOn\":\"2026-07-01\""));
+        assertTrue(bodyOf(list).contains("\"startedOn\":\"2026-07-01\""));
 
         MvcResult targets = mockMvc.perform(get("/api/survey-projects/" + id + "/targets"))
                 .andExpect(status().isOk())
                 .andReturn();
         assertTrue(bodyOf(targets).contains(String.valueOf(pointId)));
-
-        mockMvc.perform(get("/api/survey-projects/999999")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -289,7 +292,6 @@ class SurveyApiTest {
         mockMvc.perform(delete("/api/survey-projects/" + projectId))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/survey-projects/" + projectId)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/survey-projects/" + projectId + "/targets")).andExpect(status().isNotFound());
         mockMvc.perform(delete("/api/survey-projects/" + projectId)).andExpect(status().isNotFound());
     }
@@ -317,13 +319,16 @@ class SurveyApiTest {
                 .andExpect(status().isOk())
                 .andReturn();
         assertTrue(bodyOf(revised).contains("\"result\":\"LOST\""));
-        assertEquals(extractId(firstBody), extractId(bodyOf(revised))); // 새 레코드가 아니라 정정
 
         MvcResult list = mockMvc.perform(get("/api/survey-projects/" + projectId + "/records"))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(list).contains("\"content\":["));
-        assertTrue(bodyOf(list).contains("\"pointId\":" + pointId));
+        String listBody = bodyOf(list);
+        assertTrue(listBody.contains("\"content\":["));
+        assertTrue(listBody.contains("\"pointId\":" + pointId));
+        // 새 레코드가 아니라 정정 — 두 번 기록해도 그 점의 기록은 목록에 하나다
+        assertEquals(1, countOf(listBody, "\"pointId\":" + pointId));
+        assertTrue(listBody.contains("\"result\":\"LOST\""));
     }
 
     @Test
@@ -366,18 +371,4 @@ class SurveyApiTest {
         assertTrue(bodyOf(result).contains("\"code\":\"COMMON_INVALID_INPUT\""));
     }
 
-    @Test
-    @DisplayName("진행률 — 임포트한 프로젝트의 대상 49·조사 44·미조사 5, 완료 아님")
-    void getProgress_reportsTargetScopedCounts() throws Exception {
-        long projectId = importSample();
-
-        MvcResult result = mockMvc.perform(get("/api/survey-projects/" + projectId + "/progress"))
-                .andExpect(status().isOk())
-                .andReturn();
-        String body = bodyOf(result);
-        assertTrue(body.contains("\"totalPoints\":49"));
-        assertTrue(body.contains("\"surveyedPoints\":44"));
-        assertTrue(body.contains("\"notSurveyedPoints\":5"));
-        assertTrue(body.contains("\"complete\":false"));
-    }
 }

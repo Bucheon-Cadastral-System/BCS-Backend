@@ -1,11 +1,17 @@
 package com.is.bcs.adapter.out.persistence.controlpointimage;
 
 import com.is.bcs.adapter.out.persistence.common.BaseCreatedTime;
+import com.is.bcs.adapter.out.persistence.common.EntityReferences;
+import com.is.bcs.adapter.out.persistence.controlpoint.ControlPointJpaEntity;
+import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
+import com.is.bcs.adapter.out.persistence.survey.SurveyProjectJpaEntity;
 import com.is.bcs.domain.controlpointimage.ControlPointImage;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.OffsetDateTime;
 
@@ -32,11 +38,19 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "project_id", nullable = false)
-    private Long projectId;
+    /** 사진은 그 조사에 딸린 자료 — 프로젝트가 사라지면 함께 사라진다. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "project_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_control_point_images_project"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private SurveyProjectJpaEntity project;
 
-    @Column(name = "point_id", nullable = false)
-    private Long pointId;
+    /** 찍은 대상 기준점 — 점이 사라지면 그 점의 사진도 함께 사라진다. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "point_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_control_point_images_point"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private ControlPointJpaEntity point;
 
     @Column(name = "stored_file_name", nullable = false, length = 150)
     private String storedFileName;
@@ -64,13 +78,16 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
     @Column(name = "captured_at", nullable = false)
     private OffsetDateTime capturedAt;
 
-    @Column(name = "created_by")
-    private Long createdById;
+    /** 올린 사람 — 회원이 지워져도 사진은 남고 이 칸만 비운다. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", foreignKey = @ForeignKey(name = "fk_control_point_images_created_by"))
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private MemberJpaEntity createdBy;
 
     private ControlPointImageJpaEntity(
             Long id,
-            Long projectId,
-            Long pointId,
+            SurveyProjectJpaEntity project,
+            ControlPointJpaEntity point,
             String storedFileName,
             String storagePath,
             String originalFileName,
@@ -79,11 +96,11 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
             int width,
             int height,
             OffsetDateTime capturedAt,
-            Long createdById
+            MemberJpaEntity createdBy
     ) {
         this.id = id;
-        this.projectId = projectId;
-        this.pointId = pointId;
+        this.project = project;
+        this.point = point;
         this.storedFileName = storedFileName;
         this.storagePath = storagePath;
         this.originalFileName = originalFileName;
@@ -92,16 +109,16 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
         this.width = width;
         this.height = height;
         this.capturedAt = capturedAt;
-        this.createdById = createdById;
+        this.createdBy = createdBy;
     }
 
     public static ControlPointImageJpaEntity fromDomain(
-            ControlPointImage image
+            ControlPointImage image, EntityManager entityManager
     ) {
         return new ControlPointImageJpaEntity(
                 image.getId(),
-                image.getProjectId(),
-                image.getPointId(),
+                EntityReferences.of(entityManager, SurveyProjectJpaEntity.class, image.getProjectId()),
+                EntityReferences.of(entityManager, ControlPointJpaEntity.class, image.getPointId()),
                 image.getStoredFileName(),
                 image.getStoragePath(),
                 image.getOriginalFileName(),
@@ -110,15 +127,16 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
                 image.getWidth(),
                 image.getHeight(),
                 image.getCapturedAt(),
-                image.getCreatedById()
+                EntityReferences.of(entityManager, MemberJpaEntity.class, image.getCreatedById())
         );
     }
 
     public ControlPointImage toDomain() {
+        // 껍데기에서 id 만 읽는 접근이라 DB 에 가지 않는다
         return ControlPointImage.restore(
                 id,
-                projectId,
-                pointId,
+                project.getId(),
+                point.getId(),
                 storedFileName,
                 storagePath,
                 originalFileName,
@@ -126,7 +144,7 @@ public class ControlPointImageJpaEntity extends BaseCreatedTime {
                 fileSize,
                 width,
                 height,
-                createdById,
+                createdBy == null ? null : createdBy.getId(),
                 capturedAt,
                 getCreatedAt()
         );

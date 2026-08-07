@@ -5,6 +5,8 @@ import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.PointType;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +23,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ControlPointPersistenceAdapter
         implements LoadControlPointPort, SaveControlPointPort, DeleteControlPointPort {
+
+    // 연관을 껍데기 참조로 만들려면 EntityManager 가 필요하다 — 저장 경로가 상대 행을 읽지 않게 한다
+    @PersistenceContext
+    private EntityManager entityManager;
+
 
     private final ControlPointJpaRepository repository;
 
@@ -102,12 +109,12 @@ public class ControlPointPersistenceAdapter
 
     @Override
     public ControlPoint save(ControlPoint point) {
-        return repository.save(ControlPointJpaEntity.fromDomain(point)).toDomain();
+        return repository.save(ControlPointJpaEntity.fromDomain(point, entityManager)).toDomain();
     }
 
     @Override
     public List<ControlPoint> saveAll(List<ControlPoint> points) {
-        List<ControlPointJpaEntity> entities = points.stream().map(ControlPointJpaEntity::fromDomain).toList();
+        List<ControlPointJpaEntity> entities = points.stream().map(p -> ControlPointJpaEntity.fromDomain(p, entityManager)).toList();
         return repository.saveAll(entities).stream().map(ControlPointJpaEntity::toDomain).toList();
     }
 }

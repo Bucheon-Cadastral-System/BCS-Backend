@@ -3,9 +3,13 @@ package com.is.bcs.adapter.out.persistence.admin;
 import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.adapter.out.persistence.member.MemberJpaRepository;
 import com.is.bcs.application.port.out.admin.ApproveMemberAdminPort;
+import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+
+import java.time.Clock;
+import java.time.OffsetDateTime;
 
 @Repository
 @RequiredArgsConstructor
@@ -13,12 +17,16 @@ public class ApproveMemberAdminAdapter
         implements ApproveMemberAdminPort {
 
     private final MemberJpaRepository memberJpaRepository;
+    private final Clock clock;
 
     @Override
     public void approve(Long memberId) {
-        MemberJpaEntity member = memberJpaRepository.findById(memberId)
+        MemberJpaEntity entity = memberJpaRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + memberId));
 
-        member.approve();
+        Member member = entity.toDomain();
+        member.approve(OffsetDateTime.now(clock));
+
+        memberJpaRepository.save(MemberJpaEntity.fromDomain(member));
     }
 }

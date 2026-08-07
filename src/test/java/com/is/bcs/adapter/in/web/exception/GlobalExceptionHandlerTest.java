@@ -54,6 +54,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("페이지·커서 요청 오류 — 400 으로 매핑되고 서버 문장이 아니라 안내 문구가 실린다")
+    void pagingExceptions() {
+        // 받는 핸들러가 없으면 미처리 예외로 새어 500 이 된다. 잘못 보낸 요청이므로 400 이어야 한다
+        assertMapped(handler.handleInvalidPageRequest(new InvalidPageRequestException("page는 0 이상이어야 합니다. 입력값=-1")),
+                HttpStatus.BAD_REQUEST, CommonErrorCode.PAGE_REQUEST_INVALID,
+                "목록을 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+        assertMapped(handler.handleInvalidCursor(new InvalidCursorException()),
+                HttpStatus.BAD_REQUEST, CommonErrorCode.CURSOR_INVALID,
+                "목록을 이어 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
+    @Test
     @DisplayName("토큰·교환코드 예외 — 각각의 보안 코드로 매핑된다")
     void tokenExceptions() {
         assertMapped(handler.handleExpiredToken(new ExpiredTokenException("만료", new IllegalStateException())),

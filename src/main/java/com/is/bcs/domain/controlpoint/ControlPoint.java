@@ -34,9 +34,24 @@ public class ControlPoint {
     private LocalDate installedDate; // 설치일자(원천이 날짜라 LocalDate — 시각으로 바꾸면 UTC 정규화 때 날짜가 밀린다)
     private TraverseInfo traverse; // 도선 정보 — 도근점 외에는 null
 
+    /**
+     * 시드 조사 — 기준점 파일이 들고 온, 이 시스템에 올라오기 전까지의 조사 총정리다.
+     *
+     * <p>회차 하나가 아니라 여러 회차를 눌러 담은 값이라 조사기록으로 풀 수 없다. 조사원도 없다.
+     * 임포트만 이 칸에 쓴다. 앱이 남기는 판정은 조사기록에 있고, 기준점의 최종조사는 이 값과 기록을
+     * 같은 축에 놓고 날짜가 늦은 쪽을 고른 결과다(ControlPointService.getLastSurvey).
+     */
     private String lastSurveyResult; // 최종조사내용 — 파일 문구 그대로("망실,안보임" 같은 자유 표기가 실재해 어휘를 강제하지 않는다)
     private LocalDate lastSurveyedOn; // 최종조사일
-    private Long lastSurveyedById; // 최종조사원(회원 id) — 파일에는 없는 값이라 앱 내 조사 기록이 채운다(인증 전 null)
+
+    /**
+     * 저장할 때마다 오르는 판 번호.
+     *
+     * <p>사람이 수정 창을 열어 둔 사이 다른 사람이 먼저 저장했는지 가리는 값이다. 화면이 읽을 때 함께 받아
+     * 고칠 때 되보내고, 그사이 번호가 올라 있으면 서버가 거절한다. 읽기와 쓰기가 서로 다른 요청이라
+     * 행 잠금으로는 그 시간을 덮을 수 없다.
+     */
+    private long version;
 
     private ControlPoint(
             Long id,
@@ -54,7 +69,7 @@ public class ControlPoint {
             TraverseInfo traverse,
             String lastSurveyResult,
             LocalDate lastSurveyedOn,
-            Long lastSurveyedById
+            long version
     ) {
         this.id = id;
         this.pointNo = requireText(pointNo, "관리번호");
@@ -71,7 +86,7 @@ public class ControlPoint {
         this.traverse = traverse;
         this.lastSurveyResult = lastSurveyResult;
         this.lastSurveyedOn = lastSurveyedOn;
-        this.lastSurveyedById = lastSurveyedById;
+        this.version = version;
     }
 
     /** 신규 등록(데이터 임포트 포함). */
@@ -89,17 +104,38 @@ public class ControlPoint {
             LocalDate installedDate,
             TraverseInfo traverse,
             String lastSurveyResult,
-            LocalDate lastSurveyedOn,
-            Long lastSurveyedById
+            LocalDate lastSurveyedOn
     ) {
         return new ControlPoint(
                 null, pointNo, type, name, tm, geo,
                 regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
-                lastSurveyResult, lastSurveyedOn, lastSurveyedById
+                lastSurveyResult, lastSurveyedOn, 0L
         );
     }
 
-    /** DB 데이터를 도메인 객체로 복원한다. */
+    /** DB 데이터를 도메인 객체로 복원한다. 판 번호를 모르는 자리(시험·페이크)는 0 으로 둔다. */
+    public static ControlPoint restore(
+            Long id,
+            String pointNo,
+            PointType type,
+            String name,
+            TmCoordinate tm,
+            GeoCoordinate geo,
+            String regionCode,
+            String regionName,
+            String address,
+            MarkerMaterial markerMaterial,
+            InstallType installType,
+            LocalDate installedDate,
+            TraverseInfo traverse,
+            String lastSurveyResult,
+            LocalDate lastSurveyedOn
+    ) {
+        return restore(id, pointNo, type, name, tm, geo, regionCode, regionName, address,
+                markerMaterial, installType, installedDate, traverse, lastSurveyResult, lastSurveyedOn, 0L);
+    }
+
+    /** 판 번호까지 함께 복원한다 — 저장 경로가 이 번호로 앞선 수정을 가린다. */
     public static ControlPoint restore(
             Long id,
             String pointNo,
@@ -116,12 +152,12 @@ public class ControlPoint {
             TraverseInfo traverse,
             String lastSurveyResult,
             LocalDate lastSurveyedOn,
-            Long lastSurveyedById
+            long version
     ) {
         return new ControlPoint(
                 id, pointNo, type, name, tm, geo,
                 regionCode, regionName, address, markerMaterial, installType, installedDate, traverse,
-                lastSurveyResult, lastSurveyedOn, lastSurveyedById
+                lastSurveyResult, lastSurveyedOn, version
         );
     }
 

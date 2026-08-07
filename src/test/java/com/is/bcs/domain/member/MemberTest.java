@@ -2,6 +2,7 @@ package com.is.bcs.domain.member;
 
 import com.is.bcs.domain.member.exception.InvalidMemberInvariantException;
 import com.is.bcs.domain.member.exception.InvalidMemberProfileException;
+import com.is.bcs.domain.member.exception.InvalidMemberRoleException;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -172,20 +173,147 @@ class MemberTest {
     }
 
     @Test
-    @DisplayName("INACTIVE 회원을 재활성화하면 ACTIVE가 되고 비활성화 시각이 지워진다")
-    void reactivate_inactive_activates() {
+    @DisplayName("INACTIVE 회원을 활성화하면 ACTIVE가 되고 비활성화 시각이 지워진다")
+    void activate_inactive_activates() {
         Member member = activeMember();
         member.deactivate(NOW.plusDays(2));
 
-        member.reactivate();
+        member.activate(NOW.plusDays(3));
 
         assertEquals(MemberStatus.ACTIVE, member.getStatus());
         assertNull(member.getDeactivatedAt());
     }
 
     @Test
-    @DisplayName("INACTIVE가 아닌 회원은 재활성화할 수 없다")
-    void reactivate_notInactive_throws() {
-        assertThrows(InvalidMemberStateException.class, () -> activeMember().reactivate());
+    @DisplayName("승인 시각이 없던 회원을 활성화하면 활성화 시각이 승인 시각을 채운다")
+    void activate_withoutApprovedAt_backfillsApprovedAt() {
+        Member member = completedPendingMember();
+        member.reject(NOW.plusDays(1));
+        OffsetDateTime activatedAt = NOW.plusDays(2);
+
+        member.activate(activatedAt);
+
+        assertEquals(MemberStatus.ACTIVE, member.getStatus());
+        assertEquals(activatedAt, member.getApprovedAt());
+        assertNull(member.getDeactivatedAt());
+    }
+
+    @Test
+    @DisplayName("INACTIVE가 아닌 회원은 활성화할 수 없다")
+    void activate_notInactive_throws() {
+        assertThrows(InvalidMemberStateException.class, () -> activeMember().activate(NOW));
+    }
+
+    @Test
+    @DisplayName("활성화 시각이 없으면 회원 불변식 예외가 발생한다")
+    void activate_nullTime_throws() {
+        Member member = activeMember();
+        member.deactivate(NOW.plusDays(2));
+
+        assertThrows(InvalidMemberInvariantException.class, () -> member.activate(null));
+    }
+
+    @Test
+    @DisplayName("PENDING 회원을 거절하면 INACTIVE가 되고 승인 시각은 비워진다")
+    void reject_pending_deactivates() {
+        Member member = completedPendingMember();
+        OffsetDateTime rejectedAt = NOW.plusDays(1);
+
+        member.reject(rejectedAt);
+
+        assertEquals(MemberStatus.INACTIVE, member.getStatus());
+        assertEquals(rejectedAt, member.getDeactivatedAt());
+        assertNull(member.getApprovedAt());
+    }
+
+    @Test
+    @DisplayName("PENDING이 아닌 회원은 거절할 수 없다")
+    void reject_notPending_throws() {
+        assertThrows(InvalidMemberStateException.class, () -> activeMember().reject(NOW));
+    }
+
+    @Test
+    @DisplayName("ACTIVE·USER 회원을 승격하면 ADMIN이 된다")
+    void promoteToAdmin_activeUser_promotes() {
+        Member member = activeMember();
+
+        member.promoteToAdmin();
+
+        assertEquals(MemberRole.ADMIN, member.getRole());
+    }
+
+    @Test
+    @DisplayName("USER가 아닌 회원은 관리자로 승격할 수 없다")
+    void promoteToAdmin_notUser_throws() {
+        Member member = activeMember();
+        member.promoteToAdmin();
+
+        assertThrows(InvalidMemberRoleException.class, member::promoteToAdmin);
+    }
+
+    @Test
+    @DisplayName("ACTIVE가 아닌 회원은 관리자로 승격할 수 없다")
+    void promoteToAdmin_notActive_throws() {
+        assertThrows(InvalidMemberStateException.class, () -> completedPendingMember().promoteToAdmin());
+    }
+
+    @Test
+    @DisplayName("ADMIN 회원을 강등하면 USER가 된다")
+    void demoteToUser_admin_demotes() {
+        Member member = activeMember();
+        member.promoteToAdmin();
+
+        member.demoteToUser();
+
+        assertEquals(MemberRole.USER, member.getRole());
+    }
+
+    @Test
+    @DisplayName("ADMIN이 아닌 회원은 강등할 수 없다")
+    void demoteToUser_notAdmin_throws() {
+        assertThrows(InvalidMemberRoleException.class, () -> activeMember().demoteToUser());
+    }
+
+    @Test
+    @DisplayName("관리자가 회원 정보를 수정하면 null이 아닌 값만 트림·정규화되어 반영된다")
+    void updateProfileByAdmin_appliesOnlyNonNullFields() {
+        Member member = activeMember();
+
+        member.updateProfileByAdmin(
+                " 김철수 ", null, " HONG@EXAMPLE.COM ",
+                null, null, null, null
+        );
+
+        assertEquals("김철수", member.getName());
+        assertEquals("hong@example.com", member.getEmail());
+        assertEquals("010-1234-5678", member.getPhone());
+    }
+
+    @Test
+    @DisplayName("관리자 수정에 공백 문자열이 오면 거부한다 — null 은 미변경, 공백은 값이 아니다")
+    void updateProfileByAdmin_blankValue_throws() {
+        Member member = activeMember();
+
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                "  ", null, null, null, null, null, null));
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                null, "  ", null, null, null, null, null));
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                null, null, "  ", null, null, null, null));
+        assertThrows(InvalidMemberProfileException.class, () -> member.updateProfileByAdmin(
+                null, null, null, null, "  ", null, null));
+
+        assertEquals("홍길동", member.getName());
+        assertTrue(member.isProfileCompleted());
+    }
+
+    @Test
+    @DisplayName("프로필이 미완성인 채 거절된 회원은 활성화할 수 없다 — 승인과 같은 조건을 건다")
+    void activate_incompleteProfile_throws() {
+        Member member = pendingMember();
+        member.reject(NOW.plusDays(1));
+
+        assertThrows(InvalidMemberStateException.class, () -> member.activate(NOW.plusDays(2)));
+        assertEquals(MemberStatus.INACTIVE, member.getStatus());
     }
 }

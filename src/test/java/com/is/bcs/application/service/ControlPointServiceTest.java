@@ -2,18 +2,23 @@ package com.is.bcs.application.service;
 
 import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.ControlPointCountSummary;
+import com.is.bcs.application.dto.LastSurveySummary;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
 import com.is.bcs.application.dto.UpdateControlPointCommand;
 import com.is.bcs.application.dto.UpdateControlPointResult;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
+import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
+import com.is.bcs.domain.controlpoint.GeoCoordinate;
 import com.is.bcs.domain.controlpoint.InstallType;
 import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
+import com.is.bcs.domain.controlpoint.exception.ControlPointModifiedException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.survey.SurveyRecord;
@@ -22,8 +27,15 @@ import com.is.bcs.support.FakeControlPointStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.is.bcs.config.TimeConfig;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,11 +50,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** 수동 한 점 등록 — 파일 임포트와 같은 규칙(이름·종류 매칭, 있으면 갱신)을 따르는지 검증한다. */
 class ControlPointServiceTest {
 
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST);
+
     private final FakeControlPointStore store = new FakeControlPointStore();
     private final FakeSurveyUsage surveyUsage = new FakeSurveyUsage();
     private final ControlPointService service = new ControlPointService(
             store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
-            surveyUsage, surveyUsage);
+            surveyUsage, surveyUsage, ids -> Map.of(), FIXED_CLOCK);
 
     private static RegisterControlPointCommand csvRow1Command() {
         return new RegisterControlPointCommand(
@@ -53,6 +67,149 @@ class ControlPointServiceTest {
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", null, null, false)
         );
+    }
+
+    /** 이름 표를 든 서비스 — 기본 서비스는 빈 표라 조사원 이름이 붙는지 볼 수 없다. */
+    private ControlPointService serviceWithNames(Map<Long, String> names) {
+        return new ControlPointService(
+                store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
+                surveyUsage, surveyUsage, ids -> names, FIXED_CLOCK);
+    }
+
+    /** 파일이 적어 온 최종조사를 든 점 — 이 세 칸은 임포트만 쓴다. */
+    private ControlPoint pointWithFileSurvey(String result, LocalDate surveyedOn) {
+        ControlPoint registered = service.register(csvRow1Command()).point();
+        return store.save(ControlPoint.restore(
+                registered.getId(), registered.getPointNo(), registered.getType(), registered.getName(),
+                registered.getTm(), registered.getGeo(), registered.getRegionCode(), registered.getRegionName(),
+                registered.getAddress(), registered.getMarkerMaterial(), registered.getInstallType(),
+                registered.getInstalledDate(), registered.getTraverse(), result, surveyedOn));
+    }
+
+    @Test
+    @DisplayName("앱이 남긴 기록이 있으면 그 판정을 따르고 조사원 이름을 붙인다")
+    void getLastSurvey_prefersRecordOverFileValue() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.LOST, OffsetDateTime.parse("2026-07-22T10:00:00+09:00"), null, 7L));
+
+        LastSurveySummary summary = serviceWithNames(Map.of(7L, "김측량")).getLastSurvey(point.getId());
+
+        assertEquals("망실", summary.result());
+        assertEquals(LocalDate.of(2026, 7, 22), summary.surveyedOn());
+        assertEquals("김측량", summary.surveyorName());
+    }
+
+    @Test
+    @DisplayName("기록이 없으면 시드 조사를 보인다 — 올라오기 전까지의 총정리가 유일한 정보다")
+    void getLastSurvey_withoutRecord_fallsBackToFileValue() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+
+        LastSurveySummary summary = service.getLastSurvey(point.getId());
+
+        assertEquals("정상", summary.result());
+        assertEquals(LocalDate.of(2025, 9, 8), summary.surveyedOn());
+        assertNull(summary.surveyorName()); // 파일에는 조사원이 없다
+    }
+
+    @Test
+    @DisplayName("여러 회차의 기록 중 조사 시각이 가장 늦은 판정을 따른다")
+    void getLastSurvey_takesLatestRecordAcrossProjects() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.LOST, OffsetDateTime.parse("2026-07-22T10:00:00+09:00"), null, null));
+        surveyUsage.records.add(SurveyRecord.restore(
+                2L, point.getId(), SurveyResult.UNAVAILABLE, OffsetDateTime.parse("2026-08-01T10:00:00+09:00"), null, null));
+
+        assertEquals("조사불가", service.getLastSurvey(point.getId()).result());
+    }
+
+    @Test
+    @DisplayName("조사 시각이 같으면 나중에 남긴 기록의 판정을 따른다 — 옛 회차에 붙은 기록이라도")
+    void getLastSurvey_sameInstant_prefersLaterRecord() {
+        ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
+        OffsetDateTime same = OffsetDateTime.parse("2026-07-22T10:00:00+09:00");
+        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 서로 다른 회차가 같은 날짜를 적으면 시각이 완전히 겹친다.
+        // 나중에 담은 쪽이 더 앞선 회차(1번)라 프로젝트 번호로 가르면 순서가 뒤집힌다
+        surveyUsage.records.add(SurveyRecord.restore(2L, point.getId(), SurveyResult.INTACT, same, null, null));
+        surveyUsage.records.add(SurveyRecord.restore(1L, point.getId(), SurveyResult.LOST, same, null, null));
+
+        assertEquals("망실", service.getLastSurvey(point.getId()).result());
+    }
+
+    @Test
+    @DisplayName("최종조사일은 KST 날짜다 — 같은 순간이라도 지역에 따라 날짜가 갈린다")
+    void getLastSurvey_derivesDateInKst() {
+        ControlPoint point = pointWithFileSurvey(null, null);
+        // UTC 20시는 KST 로 다음 날 05시다. 날짜를 UTC 로 뽑으면 하루 앞선 날이 적힌다
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.INTACT, OffsetDateTime.parse("2026-07-22T20:00:00Z"), null, null));
+
+        assertEquals(LocalDate.of(2026, 7, 23), service.getLastSurvey(point.getId()).surveyedOn());
+    }
+
+    @Test
+    @DisplayName("시드보다 오래된 기록이 있으면 시드를 따른다 — 임포트가 기존조사일로 과거 기록을 만든다")
+    void getLastSurvey_seedNewerThanRecord_prefersSeed() {
+        ControlPoint point = pointWithFileSurvey("망실", LocalDate.of(2026, 6, 23));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.INTACT, OffsetDateTime.parse("2025-09-08T10:00:00+09:00"), null, null));
+
+        LastSurveySummary summary = service.getLastSurvey(point.getId());
+
+        assertEquals("망실", summary.result());
+        assertEquals(LocalDate.of(2026, 6, 23), summary.surveyedOn());
+    }
+
+    @Test
+    @DisplayName("수정 창을 열어 둔 사이 다른 사람이 먼저 고쳤으면 덮지 않고 거절한다")
+    void update_staleVersion_rejected() {
+        ControlPoint saved = store.save(ControlPoint.restore(
+                1L, "41192D000001265", PointType.DOGEUN, "1465공",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545236.77"), new BigDecimal("181840.96")),
+                new GeoCoordinate(126.794623, 37.506423),
+                null, null, null, null, null, null, null, null, null, 3L));
+
+        // 화면이 2판을 보고 있는 사이 저장된 것은 3판이다
+        assertThrows(ControlPointModifiedException.class, () -> service.update(new UpdateControlPointCommand(
+                saved.getId(), "41192D000009999", PointType.DOGEUN, "1465공",
+                CoordinateSystem.GRS80_CENTRAL,
+                new BigDecimal("545240.00"), new BigDecimal("181845.00"), 2L)));
+
+        assertEquals("41192D000001265", store.findById(saved.getId()).orElseThrow().getPointNo());
+    }
+
+    @Test
+    @DisplayName("기타 판정이면 비고도 함께 실린다 — 결과만으로는 무엇이었는지 알 수 없다")
+    void getLastSurvey_etc_carriesNote() {
+        ControlPoint point = pointWithFileSurvey(null, null);
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.ETC, OffsetDateTime.parse("2026-07-22T10:00:00+09:00"),
+                "포장 공사로 덮여 있음", null));
+
+        LastSurveySummary summary = service.getLastSurvey(point.getId());
+
+        assertEquals("기타", summary.result());
+        assertEquals("포장 공사로 덮여 있음", summary.note());
+    }
+
+    @Test
+    @DisplayName("파일 값도 기록도 없으면 세 칸이 모두 비어 있다")
+    void getLastSurvey_neverSurveyed_isEmpty() {
+        Long id = service.register(csvRow1Command()).point().getId();
+
+        LastSurveySummary summary = service.getLastSurvey(id);
+
+        assertNull(summary.result());
+        assertNull(summary.surveyedOn());
+        assertNull(summary.surveyorName());
+    }
+
+    @Test
+    @DisplayName("없는 점의 최종조사를 물으면 찾을 수 없다고 답한다")
+    void getLastSurvey_unknownPoint_throws() {
+        assertThrows(ControlPointNotFoundException.class, () -> service.getLastSurvey(9999L));
     }
 
     @Test
@@ -167,7 +324,7 @@ class ControlPointServiceTest {
         UpdateControlPointResult result = service.update(new UpdateControlPointCommand(
                 id, " 41192D000012345 ", PointType.DOGEUN, " 1465공(이설) ",
                 CoordinateSystem.GRS80_CENTRAL,
-                new BigDecimal("545240.00"), new BigDecimal("181845.00")));
+                new BigDecimal("545240.00"), new BigDecimal("181845.00"), 0L));
 
         assertEquals(id, result.point().getId());
         assertEquals("41192D000012345", result.point().getPointNo()); // 다듬어(trim) 저장
@@ -188,12 +345,12 @@ class ControlPointServiceTest {
         UpdateControlPointResult result = service.update(new UpdateControlPointCommand(
                 id, "41192D000001265", PointType.DOGEUN, "1465공",
                 CoordinateSystem.GRS80_CENTRAL,
-                new BigDecimal("545300.00"), new BigDecimal("181900.00")));
+                new BigDecimal("545300.00"), new BigDecimal("181900.00"), 0L));
 
         assertEquals(id, result.point().getId());
         assertThrows(ControlPointNotFoundException.class, () -> service.update(new UpdateControlPointCommand(
                 999L, "41192D000000001", PointType.DOGEUN, "이름",
-                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00"))));
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00"), 0L)));
     }
 
     @Test
@@ -209,10 +366,10 @@ class ControlPointServiceTest {
 
         assertThrows(DuplicateControlPointException.class, () -> service.update(new UpdateControlPointCommand(
                 otherId, "41192D000001265", PointType.DOGEUN, "9999공",
-                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"))));
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"), 0L)));
         assertThrows(DuplicateControlPointException.class, () -> service.update(new UpdateControlPointCommand(
                 otherId, "41192D000009999", PointType.DOGEUN, "1465공",
-                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"))));
+                CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545100.00"), new BigDecimal("181100.00"), 0L)));
         assertEquals("9999공", service.getByPointNo("41192D000009999").getName()); // 거부된 수정은 남지 않는다
     }
 
@@ -322,6 +479,7 @@ class ControlPointServiceTest {
 
         boolean targetUsed = false;
         boolean recordUsed = false;
+        final List<SurveyRecord> records = new ArrayList<>();
 
         @Override
         public boolean existsByPointId(Long pointId) {
@@ -360,6 +518,26 @@ class ControlPointServiceTest {
 
         @Override
         public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
+            return List.of();
+        }
+
+        @Override
+
+        public List<SurveyRecord> findRecordsByPointId(Long pointId) {
+
+            return records.stream().filter(r -> r.getPointId().equals(pointId)).toList();
+
+        }
+
+        /** 조사 시각이 겹치면 나중에 담은 기록이 이긴다 — 실제 어댑터가 기록을 만든 시각으로 가르는 것과 같은 규칙이다. */
+        @Override
+        public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
+            return findRecordsByPointId(pointId).stream()
+                    .reduce((older, newer) -> newer.getSurveyedAt().isBefore(older.getSurveyedAt()) ? older : newer);
+        }
+
+        @Override
+        public List<com.is.bcs.application.dto.SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
             return List.of();
         }
 

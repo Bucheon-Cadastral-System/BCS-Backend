@@ -1,4 +1,4 @@
-package com.is.bcs.iw;
+package com.is.bcs.adapter.out.token;
 
 import com.is.bcs.application.port.out.token.RefreshTokenStore;
 import com.is.bcs.domain.token.RefreshToken;

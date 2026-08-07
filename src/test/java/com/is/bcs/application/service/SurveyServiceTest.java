@@ -7,6 +7,7 @@ import com.is.bcs.application.dto.SurveyProjectSummary;
 import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.application.dto.UpdateSurveyProjectCommand;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
+import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.member.LoadMemberNamesPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
@@ -40,9 +41,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +74,10 @@ class SurveyServiceTest {
     private final SurveyService service = new SurveyService(
             store, store, store, store, store, store, targetStore, targetStore, targetStore,
             pointStore, memberNames, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
+
+    {
+        store.surveyorNames = memberNames.names;
+    }
 
     /** 대상 점을 등록소에 넣고 그 점들을 대상으로 프로젝트를 만든다 — 대상 없는 프로젝트는 만들 수 없다. */
     private SurveyProject sampleProject(Long... targetPointIds) {
@@ -283,7 +290,7 @@ class SurveyServiceTest {
         SurveyRecord record = service.record(
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.INTACT, "대상(2건)", null)).record();
 
-        assertNotNull(record.getId());
+        assertEquals(10L, record.getPointId());
         assertEquals(FIXED_KST, record.getSurveyedAt());
         assertEquals(SurveyResult.INTACT, record.getResult());
         assertEquals(1, service.getByProjectId(project.getId()).size());
@@ -300,11 +307,11 @@ class SurveyServiceTest {
         SurveyRecordSummary revised = service.record(
                 new RecordSurveyCommand(project.getId(), 10L, SurveyResult.LOST, "정정 비고", 7L));
 
-        assertEquals(first.getId(), revised.record().getId()); // 레코드는 하나 — id 유지
         assertTrue(revised.record().isLost());
         assertEquals("정정 비고", revised.record().getNote()); // 정정 시 비고도 교체된다
         assertEquals("김측량", revised.surveyorName()); // 마지막 판정의 주체가 남는다
-        assertEquals(1, service.getByProjectId(project.getId()).size());
+        assertEquals(1, service.getByProjectId(project.getId()).size()); // 새 레코드가 아니라 같은 행의 교체다
+        assertEquals(SurveyResult.INTACT, first.getResult()); // 처음 판정은 그대로 두고 저장된 값만 바뀐다
     }
 
     @Test
@@ -443,12 +450,16 @@ class SurveyServiceTest {
     private static class FakeSurveyStore implements LoadSurveyProjectPort, SaveSurveyProjectPort,
             DeleteSurveyProjectPort, LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort {
 
+        // 실제 어댑터는 조인으로 이름을 함께 실어 온다 — 페이크는 회원 이름 페이크와 같은 표를 본다
+        Map<Long, String> surveyorNames = Map.of();
+
+
         private final Map<Long, SurveyProject> projects = new HashMap<>();
-        private final Map<Long, SurveyRecord> records = new HashMap<>();
+        // 기록의 식별자는 (프로젝트, 기준점)이다 — 저장소도 같은 열쇠로 잡는다
+        private final Map<List<Long>, SurveyRecord> records = new HashMap<>();
         // 진행률 집계가 대상 여부로 거른다 — 실제 쿼리의 exists 필터에 해당하는 참조
         private final FakeTargetStore targetStore;
         private long projectSeq = 0;
-        private long recordSeq = 0;
 
         FakeSurveyStore(FakeTargetStore targetStore) {
             this.targetStore = targetStore;
@@ -475,6 +486,26 @@ class SurveyServiceTest {
         @Override
         public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
             return records.values().stream().filter(r -> r.getProjectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<SurveyRecord> findRecordsByPointId(Long pointId) {
+            return records.values().stream().filter(r -> r.getPointId().equals(pointId)).toList();
+        }
+
+        /** 조사 시각이 겹치면 나중에 담은 기록이 이긴다 — 실제 어댑터가 기록을 만든 시각으로 가르는 것과 같은 규칙이다. */
+        @Override
+        public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
+            return findRecordsByPointId(pointId).stream()
+                    .reduce((older, newer) -> newer.getSurveyedAt().isBefore(older.getSurveyedAt()) ? older : newer);
+        }
+
+        @Override
+        public List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
+            // 실제 어댑터는 조인으로 이름을 함께 실어 온다 — 페이크는 이름 없이 같은 목록을 돌려준다
+            return findRecordsByProjectId(projectId).stream()
+                    .map(record -> new SurveyRecordSummary(record, surveyorNames.get(record.getSurveyedById())))
+                    .toList();
         }
 
         @Override
@@ -514,12 +545,8 @@ class SurveyServiceTest {
 
         @Override
         public SurveyRecord save(SurveyRecord record) {
-            long id = record.getId() != null ? record.getId() : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
-            records.put(id, saved);
-            return saved;
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return record;
         }
 
         @Override
@@ -529,23 +556,14 @@ class SurveyServiceTest {
 
         @Override
         public Optional<SurveyRecord> upsertForTarget(SurveyRecord record) {
-            // 실제 문장과 같은 규칙: 대상 검사 → 있으면 전 필드 교체(id 유지), 없으면 새 행
+            // 실제 문장과 같은 규칙: 대상 검사 → 있으면 전 필드 교체, 없으면 새 행
             boolean target = targetStore.targets.stream().anyMatch(
                     t -> t.getProjectId().equals(record.getProjectId()) && t.getPointId().equals(record.getPointId()));
             if (!target) {
                 return Optional.empty();
             }
-            Long existingId = records.values().stream()
-                    .filter(r -> r.getProjectId().equals(record.getProjectId())
-                            && r.getPointId().equals(record.getPointId()))
-                    .map(SurveyRecord::getId)
-                    .findFirst().orElse(null);
-            long id = existingId != null ? existingId : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote(), record.getSurveyedById());
-            records.put(id, saved);
-            return Optional.of(saved);
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return Optional.of(record);
         }
 
         @Override
@@ -647,9 +665,21 @@ class SurveyServiceTest {
     }
 
     /** 기준점 존재 확인용 페이크. */
-    private static class FakePointStore implements LoadControlPointPort {
+    private static class FakePointStore implements LoadControlPointPort, SaveControlPointPort {
 
         private final Map<Long, ControlPoint> points = new HashMap<>();
+
+        @Override
+        public ControlPoint save(ControlPoint point) {
+            points.put(point.getId(), point);
+            return point;
+        }
+
+        @Override
+        public List<ControlPoint> saveAll(List<ControlPoint> batch) {
+            batch.forEach(this::save);
+            return batch;
+        }
 
         void add(Long id) {
             points.put(id, ControlPoint.restore(
@@ -657,7 +687,7 @@ class SurveyServiceTest {
                     new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                             new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                     new GeoCoordinate(126.79, 37.50),
-                    null, null, null, null, null, null, null, null, null, null));
+                    null, null, null, null, null, null, null, null, null));
         }
 
         @Override

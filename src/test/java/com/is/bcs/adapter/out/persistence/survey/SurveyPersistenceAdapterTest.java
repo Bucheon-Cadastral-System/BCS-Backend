@@ -17,6 +17,9 @@ import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
 import jakarta.persistence.EntityManager;
+import java.util.Objects;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +35,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,7 +91,7 @@ class SurveyPersistenceAdapterTest {
                 new GeoCoordinate(126.794623, 37.506423),
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
-                new TraverseInfo("1", null, null, false), null, null, null)).getId();
+                new TraverseInfo("1", null, null, false), null, null)).getId();
     }
 
     /** 대상으로 지정된 점 — 기록은 대상에만 남길 수 있으므로 기록 시험은 이 자리를 먼저 만든다. */
@@ -100,6 +104,31 @@ class SurveyPersistenceAdapterTest {
     private long savedMemberId() {
         memberSeq++;
         return memberPort.save(Member.registerWithKakao("kakao-" + memberSeq, SURVEYED_AT)).getId();
+    }
+
+    @Test
+    @DisplayName("기록 목록을 도메인으로 바꿔도 건별 조회가 나가지 않는다 — 연관에서 id 만 읽기 때문")
+    void findRecords_doesNotQueryPerRow() {
+        SurveyProject project = savedProject();
+        long memberId = savedMemberId();
+        for (int i = 0; i < 3; i++) {
+            adapter.save(SurveyRecord.create(
+                    project.getId(), targetPointId(project), SurveyResult.INTACT, SURVEYED_AT, null, memberId));
+        }
+        entityManager.flush();
+        entityManager.clear();
+
+        Statistics statistics = entityManager.getEntityManagerFactory()
+                .unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+
+        List<SurveyRecord> records = adapter.findRecordsByProjectId(project.getId());
+
+        assertEquals(3, records.size());
+        assertEquals(3, records.stream().map(SurveyRecord::getSurveyedById).filter(Objects::nonNull).count());
+        // 프로젝트·기준점·조사원을 하나씩 더 읽었다면 여기서 1 이 아니다
+        assertEquals(1, statistics.getPrepareStatementCount());
     }
 
     @Test
@@ -182,33 +211,6 @@ class SurveyPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("대상이 아닌 점의 기록은 저장 자체가 거부된다 — 진행률의 전제를 DB 가 지킨다")
-    void recordWithoutTarget_rejected() {
-        SurveyProject project = savedProject();
-        long pointId = savedPointId(); // 대상으로 지정하지 않은 점
-
-        assertThrows(DataIntegrityViolationException.class, () -> {
-            adapter.save(SurveyRecord.create(project.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
-            recordRepository.flush();
-        });
-    }
-
-    @Test
-    @DisplayName("대상에서 빠지면 그 점의 기록도 함께 사라진다 — 재지정이 남긴 기록을 DB 가 거둔다")
-    void deletingTarget_cascadesRecord() {
-        SurveyProject project = savedProject();
-        long pointId = targetPointId(project);
-        adapter.save(SurveyRecord.create(project.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
-        recordRepository.flush();
-
-        targetAdapter.deleteByProjectIdAndPointIds(project.getId(), List.of(pointId));
-        entityManager.flush();
-        entityManager.clear();
-
-        assertTrue(adapter.findRecordByProjectIdAndPointId(project.getId(), pointId).isEmpty());
-    }
-
-    @Test
     @DisplayName("원자 upsert — 대상이면 쓰고, 다시 부르면 같은 행을 정정하며, 대상이 아니면 아무것도 쓰지 않는다")
     void upsertForTarget_writesRevisesAndRefuses() {
         SurveyProject project = savedProject();
@@ -222,11 +224,11 @@ class SurveyPersistenceAdapterTest {
         OffsetDateTime revisedAt = SURVEYED_AT.plusDays(1);
         SurveyRecord revised = adapter.upsertForTarget(SurveyRecord.create(
                 project.getId(), pointId, SurveyResult.LOST, revisedAt, null, memberId)).orElseThrow();
-        assertEquals(written.getId(), revised.getId()); // 정정은 새 행이 아니라 같은 행이다
         assertEquals(SurveyResult.LOST, revised.getResult());
         assertTrue(revised.getSurveyedAt().isEqual(revisedAt)); // 조사 시각도 정정한 시각으로 바뀐다
         assertEquals(memberId, revised.getSurveyedById()); // 마지막 판정의 주체가 남는다
         assertEquals(null, revised.getNote()); // 전 필드 교체 — 비고 없는 정정은 비고를 지운다
+        // 정정은 새 행이 아니라 같은 행이다 — 식별자가 (프로젝트, 기준점)이라 정정해도 행 수가 늘지 않는다
         assertEquals(1, adapter.findRecordsByProjectId(project.getId()).size());
 
         long outsider = savedPointId();
@@ -257,7 +259,64 @@ class SurveyPersistenceAdapterTest {
     /** 감사 시각까지 보려면 도메인이 아니라 저장된 행을 읽어야 한다 — 1차 캐시가 아니라 DB 에서. */
     private SurveyRecordJpaEntity auditOf(Long projectId, Long pointId) {
         entityManager.clear();
-        return recordRepository.findByProjectIdAndPointId(projectId, pointId).orElseThrow();
+        return recordRepository.findById(new ProjectPointId(projectId, pointId)).orElseThrow();
+    }
+
+    @Test
+    @DisplayName("조사 시각이 겹치면 나중에 남긴 기록이 최신이다 — 그 기록이 앞선 회차에 붙어 있어도")
+    void findLatestRecordByPointId_sameInstant_prefersLaterWrite() {
+        // 회차를 먼저 만들어 번호를 앞뒤로 갈라 둔다
+        SurveyProject earlier = savedProject();
+        SurveyProject later = savedProject();
+        long pointId = savedPointId();
+        targetAdapter.save(SurveyTarget.create(earlier.getId(), pointId));
+        targetAdapter.save(SurveyTarget.create(later.getId(), pointId));
+
+        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 두 회차가 같은 날짜를 적으면 시각이 완전히 겹친다
+        adapter.upsertForTarget(SurveyRecord.create(
+                later.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        adapter.upsertForTarget(SurveyRecord.create(
+                earlier.getId(), pointId, SurveyResult.LOST, SURVEYED_AT, null, null));
+        // 기록한 시각을 직접 갈라 놓는다. 연달아 부른 두 문장의 시각 차이에 기대면
+        // 저장소가 같은 마이크로초로 잘라 넣을 때 어느 쪽이 이길지 시험이 정하지 못한다
+        setCreatedAt(earlier.getId(), pointId, SURVEYED_AT.plusHours(1));
+        setCreatedAt(later.getId(), pointId, SURVEYED_AT);
+        entityManager.clear();
+
+        SurveyRecord latest = adapter.findLatestRecordByPointId(pointId).orElseThrow();
+        // 프로젝트 번호로 가르면 번호가 큰 later 가 이겨 '정상'이 나온다
+        assertEquals(SurveyResult.LOST, latest.getResult());
+        assertEquals(earlier.getId(), latest.getProjectId());
+    }
+
+    /** 감사 시각은 저장 경로가 찍으므로 시험에서 갈라 놓으려면 저장된 행을 직접 고쳐야 한다. */
+    private void setCreatedAt(Long projectId, Long pointId, OffsetDateTime createdAt) {
+        entityManager.createNativeQuery(
+                        "update bcs.survey_records set created_at = :createdAt"
+                                + " where project_id = :projectId and point_id = :pointId")
+                .setParameter("createdAt", createdAt)
+                .setParameter("projectId", projectId)
+                .setParameter("pointId", pointId)
+                .executeUpdate();
+    }
+
+    @Test
+    @DisplayName("프로젝트별 기록 목록은 조사 시각 내림차순으로 온다 — 저장 순서와 무관하게")
+    void findRecordSummariesByProjectId_sortsBySurveyedAtDesc() {
+        SurveyProject project = savedProject();
+        long older = targetPointId(project);
+        long newer = targetPointId(project);
+
+        adapter.upsertForTarget(SurveyRecord.create(
+                project.getId(), older, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        adapter.upsertForTarget(SurveyRecord.create(
+                project.getId(), newer, SurveyResult.LOST, SURVEYED_AT.plusDays(1), null, null));
+        entityManager.clear();
+
+        List<Long> order = adapter.findRecordSummariesByProjectId(project.getId()).stream()
+                .map(summary -> summary.record().getPointId())
+                .toList();
+        assertEquals(List.of(newer, older), order);
     }
 
     @Test
@@ -272,7 +331,9 @@ class SurveyPersistenceAdapterTest {
         targetRepository.flush();
         entityManager.clear(); // 1차 캐시가 아니라 DB에서 다시 읽는다
 
-        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        SurveyTarget found = targetRepository
+                .findById(new ProjectPointId(saved.getProjectId(), saved.getPointId()))
+                .orElseThrow().toDomain();
         assertEquals(List.of(
                 new ExtraColumn("순번", "131"),
                 new ExtraColumn("점검자", "김주무관"),
@@ -290,7 +351,9 @@ class SurveyPersistenceAdapterTest {
         targetRepository.flush();
         entityManager.clear();
 
-        SurveyTarget found = targetRepository.findById(saved.getId()).orElseThrow().toDomain();
+        SurveyTarget found = targetRepository
+                .findById(new ProjectPointId(saved.getProjectId(), saved.getPointId()))
+                .orElseThrow().toDomain();
         assertEquals(longValue, found.getExtras().getFirst().value());
     }
 }

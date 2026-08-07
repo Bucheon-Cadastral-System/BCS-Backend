@@ -46,7 +46,7 @@ class ControlPointPersistenceAdapterTest {
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
                 new TraverseInfo("1", null, null, false)
-        , null, null, null);
+        , null, null);
     }
 
     @Test
@@ -57,7 +57,7 @@ class ControlPointPersistenceAdapterTest {
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                         new BigDecimal("545236.7712"), new BigDecimal("181840.9605")),
                 new GeoCoordinate(126.794623, 37.506423),
-                null, null, null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
         repository.flush();
 
         ControlPoint found = adapter.findById(saved.getId()).orElseThrow();
@@ -77,7 +77,7 @@ class ControlPointPersistenceAdapterTest {
                         new BigDecimal("545201.74"), new BigDecimal("181833.69")),
                 new GeoCoordinate(126.794541, 37.506107),
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
-                MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21), null, null, null, null));
+                MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21), null, null, null));
 
         // 이름으로 하나, 관리번호로 다른 하나 — 둘 다 걸린다
         List<ControlPoint> found =
@@ -131,7 +131,7 @@ class ControlPointPersistenceAdapterTest {
                 new GeoCoordinate(126.794541, 37.506107),
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21), null
-        , null, null, null);
+        , null, null);
 
         List<ControlPoint> saved = adapter.saveAll(List.of(csvRow1(), second));
 
@@ -160,14 +160,14 @@ class ControlPointPersistenceAdapterTest {
                         new BigDecimal("545201.74"), new BigDecimal("181833.69")),
                 new GeoCoordinate(126.794541, 37.506107),
                 null, null, null, null, null, null, null
-        , null, null, null)); // DOGEUN 2 — 같은 종류 다건이 합산되는지(종류별 1 반환 회귀 차단)
+        , null, null)); // DOGEUN 2 — 같은 종류 다건이 합산되는지(종류별 1 반환 회귀 차단)
         adapter.save(ControlPoint.register(
                 "41190A000000001", PointType.TRIANGULATION, "삼각1",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                         new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
                 null, null, null, null, null, null, null
-        , null, null, null));
+        , null, null));
 
         Map<PointType, Long> counts = adapter.countByType();
 

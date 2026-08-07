@@ -1,6 +1,7 @@
 package com.is.bcs.adapter.in.web.exception;
 
 import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
+import com.is.bcs.domain.controlpoint.exception.ControlPointModifiedException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
@@ -21,6 +22,7 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.*;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -181,6 +183,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
     }
 
+    @ExceptionHandler(ControlPointModifiedException.class)
+    public ProblemDetail handleControlPointModified(ControlPointModifiedException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_MODIFIED, e.getMessage());
+    }
+
+    /** 하이버네이트가 판 번호로 거절한 경우 — 사전 확인과 저장 사이에 끼어든 수정이다. 같은 답을 준다. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLocking(ObjectOptimisticLockingFailureException e) {
+        log.warn("낙관적 잠금 충돌", e);
+        return problem(ControlPointErrorCode.CONTROL_POINT_MODIFIED,
+                "다른 사람이 먼저 수정했습니다. 최신 내용을 다시 불러와 주세요.");
+    }
+
     @ExceptionHandler(ControlPointInUseException.class)
     public ProblemDetail handleControlPointInUse(ControlPointInUseException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_IN_USE, e.getMessage());
@@ -308,6 +323,27 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidControlPointImageException.class)
     public ProblemDetail handleInvalidControlPointImage(InvalidControlPointImageException e) {
         return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_INVALID, e.getMessage());
+    }
+
+    /**
+     * 페이지·커서 요청 오류 — 잘못 보낸 요청이라 400 이다.
+     *
+     * <p>핸들러가 없으면 아래 미처리 예외가 받아 500 으로 나간다. 그러면 클라이언트가 서버 장애로 보고
+     * 같은 값으로 한 번 더 두드리고, 서버 로그에도 평범한 입력 검증이 처리되지 않은 예외로 남는다.
+     *
+     * <p>detail 은 그대로 내보내지 않는다. "page는 0 이상이어야 합니다. 입력값=-1" 은 코드를 부르는
+     * 쪽에게 하는 말이지 사람에게 보일 문장이 아니다. 원문은 로그로 남긴다.
+     */
+    @ExceptionHandler(InvalidPageRequestException.class)
+    public ProblemDetail handleInvalidPageRequest(InvalidPageRequestException e) {
+        log.warn("잘못된 페이지 요청", e);
+        return problem(CommonErrorCode.PAGE_REQUEST_INVALID, "목록을 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
+    @ExceptionHandler(InvalidCursorException.class)
+    public ProblemDetail handleInvalidCursor(InvalidCursorException e) {
+        log.warn("잘못된 커서 요청", e);
+        return problem(CommonErrorCode.CURSOR_INVALID, "목록을 이어 불러올 수 없습니다. 화면을 새로고침해 주세요.");
     }
 
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
