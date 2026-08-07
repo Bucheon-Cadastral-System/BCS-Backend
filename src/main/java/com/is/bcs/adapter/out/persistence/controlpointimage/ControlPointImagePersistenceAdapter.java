@@ -4,6 +4,8 @@ import com.is.bcs.application.port.out.controlpointimage.DeleteControlPointImage
 import com.is.bcs.application.port.out.controlpointimage.LoadControlPointImagePort;
 import com.is.bcs.application.port.out.controlpointimage.SaveControlPointImagePort;
 import com.is.bcs.domain.controlpointimage.ControlPointImage;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +19,11 @@ public class ControlPointImagePersistenceAdapter
         implements LoadControlPointImagePort,
         SaveControlPointImagePort,
         DeleteControlPointImagePort {
+
+    // 연관을 껍데기 참조로 만들려면 EntityManager 가 필요하다
+    @PersistenceContext
+    private EntityManager entityManager;
+
 
     private final ControlPointImageJpaRepository repository;
 
@@ -60,7 +67,7 @@ public class ControlPointImagePersistenceAdapter
 
     @Override
     public ControlPointImage save(ControlPointImage image) {
-        ControlPointImageJpaEntity entity = ControlPointImageJpaEntity.fromDomain(image);
+        ControlPointImageJpaEntity entity = ControlPointImageJpaEntity.fromDomain(image, entityManager);
 
         ControlPointImageJpaEntity saved = repository.saveAndFlush(entity);
 

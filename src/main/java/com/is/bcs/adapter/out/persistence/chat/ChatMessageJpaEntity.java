@@ -1,21 +1,30 @@
 package com.is.bcs.adapter.out.persistence.chat;
 
 import com.is.bcs.adapter.out.persistence.common.BaseCreatedTime;
+import com.is.bcs.adapter.out.persistence.common.EntityReferences;
+import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.domain.chat.ChatMessage;
 import com.is.bcs.domain.chat.ChatRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Getter
 @Entity
@@ -34,8 +43,12 @@ public class ChatMessageJpaEntity extends BaseCreatedTime {
     @SequenceGenerator(name = "chat_messages_seq", sequenceName = "chat_messages_seq", schema = "bcs", allocationSize = 50)
     private Long id;
 
-    @Column(name = "member_id", nullable = false)
-    private Long memberId;
+    /** 대화 주인 — 업무 데이터와 달리 그 계정의 것이라 회원이 사라지면 함께 사라진다. */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "member_id", nullable = false,
+            foreignKey = @ForeignKey(name = "fk_chat_messages_member"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private MemberJpaEntity member;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
@@ -45,17 +58,19 @@ public class ChatMessageJpaEntity extends BaseCreatedTime {
     @Column(name = "text", nullable = false, columnDefinition = "text")
     private String text;
 
-    private ChatMessageJpaEntity(Long memberId, ChatRole role, String text) {
-        this.memberId = memberId;
+    private ChatMessageJpaEntity(MemberJpaEntity member, ChatRole role, String text) {
+        this.member = member;
         this.role = role;
         this.text = text;
     }
 
-    static ChatMessageJpaEntity from(ChatMessage message) {
-        return new ChatMessageJpaEntity(message.getMemberId(), message.getRole(), message.getText());
+    static ChatMessageJpaEntity from(ChatMessage message, EntityManager entityManager) {
+        return new ChatMessageJpaEntity(
+                EntityReferences.of(entityManager, MemberJpaEntity.class, message.getMemberId()),
+                message.getRole(), message.getText());
     }
 
     ChatMessage toDomain() {
-        return ChatMessage.restore(id, memberId, role, text, getCreatedAt());
+        return ChatMessage.restore(id, member.getId(), role, text, getCreatedAt());
     }
 }

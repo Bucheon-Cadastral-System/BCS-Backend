@@ -4,6 +4,8 @@ import com.is.bcs.application.port.out.chat.DeleteChatMessagePort;
 import com.is.bcs.application.port.out.chat.LoadChatMessagePort;
 import com.is.bcs.application.port.out.chat.SaveChatMessagePort;
 import com.is.bcs.domain.chat.ChatMessage;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
@@ -23,12 +25,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatPersistenceAdapter implements SaveChatMessagePort, LoadChatMessagePort, DeleteChatMessagePort {
 
+    // 연관을 껍데기 참조로 만들려면 EntityManager 가 필요하다 — 저장 경로가 상대 행을 읽지 않게 한다
+    @PersistenceContext
+    private EntityManager entityManager;
+
+
     private final ChatMessageJpaRepository chatMessageRepository;
 
     @Override
     @Transactional
     public void saveAll(List<ChatMessage> messages) {
-        chatMessageRepository.saveAll(messages.stream().map(ChatMessageJpaEntity::from).toList());
+        chatMessageRepository.saveAll(messages.stream().map(m -> ChatMessageJpaEntity.from(m, entityManager)).toList());
     }
 
     @Override

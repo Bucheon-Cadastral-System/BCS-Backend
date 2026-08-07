@@ -4,6 +4,8 @@ import com.is.bcs.application.port.out.survey.DeleteSurveyTargetPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyTargetPort;
 import com.is.bcs.domain.survey.SurveyTarget;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +20,11 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, SaveSurveyTargetPort, DeleteSurveyTargetPort {
+
+    // 연관을 껍데기 참조로 만들려면 EntityManager 가 필요하다 — 저장 경로가 상대 행을 읽지 않게 한다
+    @PersistenceContext
+    private EntityManager entityManager;
+
 
     private final SurveyTargetJpaRepository targetRepository;
 
@@ -46,12 +53,12 @@ public class SurveyTargetPersistenceAdapter implements LoadSurveyTargetPort, Sav
 
     @Override
     public SurveyTarget save(SurveyTarget target) {
-        return targetRepository.save(SurveyTargetJpaEntity.fromDomain(target)).toDomain();
+        return targetRepository.save(SurveyTargetJpaEntity.fromDomain(target, entityManager)).toDomain();
     }
 
     @Override
     public List<SurveyTarget> saveAll(List<SurveyTarget> targets) {
-        return targetRepository.saveAll(targets.stream().map(SurveyTargetJpaEntity::fromDomain).toList())
+        return targetRepository.saveAll(targets.stream().map(t -> SurveyTargetJpaEntity.fromDomain(t, entityManager)).toList())
                 .stream().map(SurveyTargetJpaEntity::toDomain).toList();
     }
 

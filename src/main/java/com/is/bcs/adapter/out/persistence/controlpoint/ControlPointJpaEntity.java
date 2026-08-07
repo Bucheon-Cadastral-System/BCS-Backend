@@ -1,6 +1,8 @@
 package com.is.bcs.adapter.out.persistence.controlpoint;
 
 import com.is.bcs.adapter.out.persistence.common.BaseTime;
+import com.is.bcs.adapter.out.persistence.common.EntityReferences;
+import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
@@ -11,6 +13,11 @@ import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
@@ -22,6 +29,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
@@ -117,8 +126,11 @@ public class ControlPointJpaEntity extends BaseTime {
     @Column(name = "last_surveyed_on")
     private LocalDate lastSurveyedOn;
 
-    @Column(name = "last_surveyed_by")
-    private Long lastSurveyedById;
+    /** 마지막으로 조사한 사람 — 회원이 지워져도 기준점은 남고 이 칸만 비운다. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "last_surveyed_by", foreignKey = @ForeignKey(name = "fk_control_points_last_surveyed_by"))
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private MemberJpaEntity lastSurveyor;
 
     private ControlPointJpaEntity(
             Long id, String pointNo, PointType type, String name,
@@ -126,7 +138,7 @@ public class ControlPointJpaEntity extends BaseTime {
             String regionCode, String regionName, String address,
             MarkerMaterial markerMaterial, InstallType installType, LocalDate installedDate,
             String traverseGrade, String traverseLineName, String traverseLineNo, Boolean traverseIntersection,
-            String lastSurveyResult, LocalDate lastSurveyedOn, Long lastSurveyedById
+            String lastSurveyResult, LocalDate lastSurveyedOn, MemberJpaEntity lastSurveyor
     ) {
         this.id = id;
         this.pointNo = pointNo;
@@ -149,10 +161,10 @@ public class ControlPointJpaEntity extends BaseTime {
         this.traverseIntersection = traverseIntersection;
         this.lastSurveyResult = lastSurveyResult;
         this.lastSurveyedOn = lastSurveyedOn;
-        this.lastSurveyedById = lastSurveyedById;
+        this.lastSurveyor = lastSurveyor;
     }
 
-    public static ControlPointJpaEntity fromDomain(ControlPoint point) {
+    public static ControlPointJpaEntity fromDomain(ControlPoint point, EntityManager entityManager) {
         TraverseInfo traverse = point.getTraverse();
         return new ControlPointJpaEntity(
                 point.getId(), point.getPointNo(), point.getType(), point.getName(),
@@ -164,7 +176,8 @@ public class ControlPointJpaEntity extends BaseTime {
                 traverse != null ? traverse.lineName() : null,
                 traverse != null ? traverse.lineNo() : null,
                 traverse != null ? traverse.intersection() : null,
-                point.getLastSurveyResult(), point.getLastSurveyedOn(), point.getLastSurveyedById()
+                point.getLastSurveyResult(), point.getLastSurveyedOn(),
+                EntityReferences.of(entityManager, MemberJpaEntity.class, point.getLastSurveyedById())
         );
     }
 
@@ -176,7 +189,7 @@ public class ControlPointJpaEntity extends BaseTime {
                 regionCode, regionName, address,
                 markerMaterial, installType, installedDate,
                 toTraverse(),
-                lastSurveyResult, lastSurveyedOn, lastSurveyedById
+                lastSurveyResult, lastSurveyedOn, lastSurveyor == null ? null : lastSurveyor.getId()
         );
     }
 
