@@ -31,3 +31,8 @@ alter table bcs.survey_records add constraint fk_survey_records_surveyed_by
 alter table bcs.control_points drop constraint if exists fk_control_points_last_surveyed_by;
 alter table bcs.control_points add constraint fk_control_points_last_surveyed_by
     foreign key (last_surveyed_by) references bcs.members (id) on delete set null;
+
+-- 대화는 업무 데이터가 아니라 그 계정의 것 — 회원이 사라지면 함께 사라진다(사람 칸만 비우는 위 셋과 다르다).
+alter table bcs.chat_messages drop constraint if exists fk_chat_messages_member;
+alter table bcs.chat_messages add constraint fk_chat_messages_member
+    foreign key (member_id) references bcs.members (id) on delete cascade;
