@@ -66,6 +66,8 @@ public class SurveyTargetJpaEntity extends BaseTime {
      * 고객사가 열을 더할 때마다 스키마를 고치지 않아도 되고, 파일에 적힌 순서도 그대로 남는다.
      */
     @ElementCollection(fetch = FetchType.LAZY)
+    // 대상이 사라지면 이 행들도 함께 사라진다 — 걸어 두지 않으면 프로젝트를 지울 때 대상 삭제가 이 외래키에 막힌다
+    @OnDelete(action = OnDeleteAction.CASCADE)
     @CollectionTable(
             name = "survey_target_extras",
             schema = "bcs",
