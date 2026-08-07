@@ -17,6 +17,15 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
 
     List<SurveyRecordJpaEntity> findByProjectId(Long projectId);
 
+    List<SurveyRecordJpaEntity> findByPointId(Long pointId);
+
+    /**
+     * 목록에 조사원 이름을 함께 그리는 경로 전용 — 조사원을 조인으로 함께 실어 온다.
+     * 이름을 따로 모아 다시 조회하면 문장이 하나 더 나가고, 연관을 그냥 두면 행마다 나간다.
+     */
+    @Query("select r from SurveyRecordJpaEntity r left join fetch r.surveyor where r.project.id = :projectId")
+    List<SurveyRecordJpaEntity> findByProjectIdWithSurveyor(@Param("projectId") Long projectId);
+
     Optional<SurveyRecordJpaEntity> findByProjectIdAndPointId(Long projectId, Long pointId);
 
     boolean existsByPointId(Long pointId);
@@ -62,8 +71,8 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
 
     // 진행률은 프로젝트 '대상' 점의 기록만 센다 — 대상 아닌 점의 기록이 조사됨에 섞여 완료가 오탐되지 않도록
     @Query("select r.result as result, count(r) as count from SurveyRecordJpaEntity r"
-            + " where r.projectId = :projectId"
-            + " and exists (select 1 from SurveyTargetJpaEntity t where t.projectId = r.projectId and t.pointId = r.pointId)"
+            + " where r.project.id = :projectId"
+            + " and exists (select 1 from SurveyTargetJpaEntity t where t.project.id = r.project.id and t.point.id = r.point.id)"
             + " group by r.result")
     List<ResultCount> countByResult(@Param("projectId") Long projectId);
 
@@ -75,9 +84,9 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
     }
 
     // 목록의 완료 표시용 일괄 집계 — 진행률과 같은 규칙으로 '대상'인 점의 기록만 센다
-    @Query("select r.projectId as projectId, count(r) as cnt from SurveyRecordJpaEntity r"
-            + " where exists (select 1 from SurveyTargetJpaEntity t where t.projectId = r.projectId and t.pointId = r.pointId)"
-            + " group by r.projectId")
+    @Query("select r.project.id as projectId, count(r) as cnt from SurveyRecordJpaEntity r"
+            + " where exists (select 1 from SurveyTargetJpaEntity t where t.project.id = r.project.id and t.point.id = r.point.id)"
+            + " group by r.project.id")
     List<ProjectCount> countSurveyedByProject();
 
     interface ProjectCount {

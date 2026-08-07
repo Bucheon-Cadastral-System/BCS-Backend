@@ -15,6 +15,7 @@ import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
 import com.is.bcs.application.port.in.survey.RecordSurveyUseCase;
 import com.is.bcs.application.port.in.survey.UpdateSurveyProjectUseCase;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
+import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyTargetPort;
@@ -41,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,6 +66,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
     private final SaveSurveyTargetPort saveSurveyTargetPort;
     private final DeleteSurveyTargetPort deleteSurveyTargetPort;
     private final LoadControlPointPort loadControlPointPort;
+    private final SaveControlPointPort saveControlPointPort;
     private final LoadMemberNamesPort loadMemberNamesPort;
     private final Clock clock;
 
@@ -188,6 +191,7 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
                 // 기록은 대상으로 지정한 점에만 — 비대상 기록을 허용하면 화면 밖 경로(직접 호출)로 진행률의 전제가 깨진다
                 .orElseThrow(() -> new SurveyTargetNotFoundException(
                         "프로젝트의 조사 대상이 아닌 기준점입니다: " + command.pointId()));
+        refreshLastSurvey(command.pointId());
         return withSurveyorName(written);
     }
 
@@ -198,19 +202,38 @@ public class SurveyService implements CreateSurveyProjectUseCase, UpdateSurveyPr
                         "조사기록을 찾을 수 없습니다: 프로젝트 " + projectId + ", 기준점 " + pointId));
 
         deleteSurveyRecordPort.deleteByProjectIdAndPointId(projectId, pointId);
+        refreshLastSurvey(pointId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<SurveyRecordSummary> getByProjectId(Long projectId) {
         requireProject(projectId);
-        List<SurveyRecord> records = loadSurveyRecordPort.findRecordsByProjectId(projectId);
-        Map<Long, String> names = loadMemberNamesPort.findNamesByIds(records.stream()
-                .map(SurveyRecord::getSurveyedById).filter(Objects::nonNull).collect(Collectors.toSet()));
-        return records.stream()
-                .map(record -> new SurveyRecordSummary(
-                        record, record.getSurveyedById() == null ? null : names.get(record.getSurveyedById())))
-                .toList();
+        // 기록과 조사원 이름을 한 문장으로 받는다 — 이름을 모아 다시 조회하던 두 번째 문장이 사라졌다
+        return loadSurveyRecordPort.findRecordSummariesByProjectId(projectId);
+    }
+
+    /**
+     * 기준점 마스터의 최종조사 요약을 다시 맞춘다.
+     *
+     * <p>이 점의 기록 중 가장 최근 것을 따른다. 조사 회차가 여럿이라 프로젝트 하나만 보고 정하면
+     * 지난 회차의 판정이 최근 것을 덮는다. 남은 기록이 없으면 세 칸을 비운다.
+     */
+    private void refreshLastSurvey(Long pointId) {
+        loadControlPointPort.findById(pointId).ifPresent(point -> {
+            SurveyRecord latest = loadSurveyRecordPort.findRecordsByPointId(pointId).stream()
+                    .max(Comparator.comparing(SurveyRecord::getSurveyedAt))
+                    .orElse(null);
+            if (latest == null) {
+                point.updateLastSurvey(null, null, null);
+            } else {
+                point.updateLastSurvey(
+                        latest.getResult().getDisplayName(),
+                        latest.getSurveyedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
+                        latest.getSurveyedById());
+            }
+            saveControlPointPort.save(point);
+        });
     }
 
     /** 한 건에 조사원 이름을 붙인다 — 기록 응답만으로 화면이 이름을 그릴 수 있게. */

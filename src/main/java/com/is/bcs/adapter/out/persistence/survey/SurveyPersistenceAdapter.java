@@ -7,8 +7,11 @@ import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.domain.survey.SurveyProject;
+import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
@@ -25,6 +28,11 @@ import java.util.stream.Collectors;
 public class SurveyPersistenceAdapter
         implements LoadSurveyProjectPort, SaveSurveyProjectPort, DeleteSurveyProjectPort,
         LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort {
+
+    // 연관을 껍데기 참조로 만들려면 EntityManager 가 필요하다 — 저장 경로가 상대 행을 읽지 않게 한다
+    @PersistenceContext
+    private EntityManager entityManager;
+
 
     private final SurveyProjectJpaRepository projectRepository;
     private final SurveyRecordJpaRepository recordRepository;
@@ -44,7 +52,7 @@ public class SurveyPersistenceAdapter
 
     @Override
     public SurveyProject save(SurveyProject project) {
-        return projectRepository.save(SurveyProjectJpaEntity.fromDomain(project)).toDomain();
+        return projectRepository.save(SurveyProjectJpaEntity.fromDomain(project, entityManager)).toDomain();
     }
 
     @Override
@@ -55,6 +63,21 @@ public class SurveyPersistenceAdapter
     @Override
     public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
         return recordRepository.findByProjectId(projectId).stream().map(SurveyRecordJpaEntity::toDomain).toList();
+    }
+
+    @Override
+    public List<SurveyRecord> findRecordsByPointId(Long pointId) {
+        return recordRepository.findByPointId(pointId).stream().map(SurveyRecordJpaEntity::toDomain).toList();
+    }
+
+    @Override
+    public List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
+        // 조사원을 조인으로 함께 실어 오므로 이름을 따로 모아 조회하지 않는다
+        return recordRepository.findByProjectIdWithSurveyor(projectId).stream()
+                .map(entity -> new SurveyRecordSummary(
+                        entity.toDomain(),
+                        entity.getSurveyor() == null ? null : entity.getSurveyor().getName()))
+                .toList();
     }
 
     @Override
@@ -72,12 +95,12 @@ public class SurveyPersistenceAdapter
 
     @Override
     public SurveyRecord save(SurveyRecord record) {
-        return recordRepository.save(SurveyRecordJpaEntity.fromDomain(record)).toDomain();
+        return recordRepository.save(SurveyRecordJpaEntity.fromDomain(record, entityManager)).toDomain();
     }
 
     @Override
     public List<SurveyRecord> saveAll(List<SurveyRecord> records) {
-        List<SurveyRecordJpaEntity> entities = records.stream().map(SurveyRecordJpaEntity::fromDomain).toList();
+        List<SurveyRecordJpaEntity> entities = records.stream().map(r -> SurveyRecordJpaEntity.fromDomain(r, entityManager)).toList();
         return recordRepository.saveAll(entities).stream().map(SurveyRecordJpaEntity::toDomain).toList();
     }
 

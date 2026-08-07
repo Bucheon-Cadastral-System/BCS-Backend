@@ -7,6 +7,7 @@ import com.is.bcs.application.dto.SurveyProjectSummary;
 import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.application.dto.UpdateSurveyProjectCommand;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
+import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.member.LoadMemberNamesPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.DeleteSurveyRecordPort;
@@ -70,7 +71,11 @@ class SurveyServiceTest {
     private final FakeMemberNames memberNames = new FakeMemberNames();
     private final SurveyService service = new SurveyService(
             store, store, store, store, store, store, targetStore, targetStore, targetStore,
-            pointStore, memberNames, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
+            pointStore, pointStore, memberNames, Clock.fixed(FIXED_INSTANT, TimeConfig.KST));
+
+    {
+        store.surveyorNames = memberNames.names;
+    }
 
     /** 대상 점을 등록소에 넣고 그 점들을 대상으로 프로젝트를 만든다 — 대상 없는 프로젝트는 만들 수 없다. */
     private SurveyProject sampleProject(Long... targetPointIds) {
@@ -443,6 +448,10 @@ class SurveyServiceTest {
     private static class FakeSurveyStore implements LoadSurveyProjectPort, SaveSurveyProjectPort,
             DeleteSurveyProjectPort, LoadSurveyRecordPort, SaveSurveyRecordPort, DeleteSurveyRecordPort {
 
+        // 실제 어댑터는 조인으로 이름을 함께 실어 온다 — 페이크는 회원 이름 페이크와 같은 표를 본다
+        Map<Long, String> surveyorNames = Map.of();
+
+
         private final Map<Long, SurveyProject> projects = new HashMap<>();
         private final Map<Long, SurveyRecord> records = new HashMap<>();
         // 진행률 집계가 대상 여부로 거른다 — 실제 쿼리의 exists 필터에 해당하는 참조
@@ -475,6 +484,19 @@ class SurveyServiceTest {
         @Override
         public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
             return records.values().stream().filter(r -> r.getProjectId().equals(projectId)).toList();
+        }
+
+        @Override
+        public List<SurveyRecord> findRecordsByPointId(Long pointId) {
+            return records.values().stream().filter(r -> r.getPointId().equals(pointId)).toList();
+        }
+
+        @Override
+        public List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
+            // 실제 어댑터는 조인으로 이름을 함께 실어 온다 — 페이크는 이름 없이 같은 목록을 돌려준다
+            return findRecordsByProjectId(projectId).stream()
+                    .map(record -> new SurveyRecordSummary(record, surveyorNames.get(record.getSurveyedById())))
+                    .toList();
         }
 
         @Override
@@ -647,9 +669,21 @@ class SurveyServiceTest {
     }
 
     /** 기준점 존재 확인용 페이크. */
-    private static class FakePointStore implements LoadControlPointPort {
+    private static class FakePointStore implements LoadControlPointPort, SaveControlPointPort {
 
         private final Map<Long, ControlPoint> points = new HashMap<>();
+
+        @Override
+        public ControlPoint save(ControlPoint point) {
+            points.put(point.getId(), point);
+            return point;
+        }
+
+        @Override
+        public List<ControlPoint> saveAll(List<ControlPoint> batch) {
+            batch.forEach(this::save);
+            return batch;
+        }
 
         void add(Long id) {
             points.put(id, ControlPoint.restore(

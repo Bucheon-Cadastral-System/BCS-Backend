@@ -74,6 +74,12 @@ public class ControlPointController {
     }
 
     /** 조사 데이터가 참조 중인지 — 화면이 삭제 확인 창을 물음/불가로 갈라 여는 데 쓴다. */
+    /** 최종조사원 — 점 하나를 고른 뒤에만 필요해서 목록과 따로 읽는다. */
+    @GetMapping("/{pointId}/last-surveyor")
+    public LastSurveyorResponse lastSurveyor(@PathVariable("pointId") Long pointId) {
+        return new LastSurveyorResponse(getControlPointsUseCase.getLastSurveyorName(pointId));
+    }
+
     @GetMapping("/{pointId}/usage")
     public ControlPointUsageResponse usage(@PathVariable("pointId") Long pointId) {
         return new ControlPointUsageResponse(deleteControlPointUseCase.isReferenced(pointId));

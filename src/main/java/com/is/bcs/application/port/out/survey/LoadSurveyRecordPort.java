@@ -1,5 +1,6 @@
 package com.is.bcs.application.port.out.survey;
 
+import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 
@@ -10,6 +11,12 @@ import java.util.Optional;
 public interface LoadSurveyRecordPort {
 
     List<SurveyRecord> findRecordsByProjectId(Long projectId);
+
+    /** 이 기준점의 모든 회차 기록 — 마스터 최종조사 요약을 다시 맞출 때 쓴다. */
+    List<SurveyRecord> findRecordsByPointId(Long pointId);
+
+    /** 기록과 조사원 표시명을 한 문장으로 가져온다 — 목록 화면 전용. */
+    List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId);
 
     Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId);
 

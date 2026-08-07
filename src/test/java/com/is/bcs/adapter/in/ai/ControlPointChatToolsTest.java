@@ -126,6 +126,11 @@ class ControlPointChatToolsTest {
         }
 
         @Override
+        public String getLastSurveyorName(Long pointId) {
+            return null;
+        }
+
+        @Override
         public ControlPointCountSummary getCountSummary() {
             return countSummary;
         }

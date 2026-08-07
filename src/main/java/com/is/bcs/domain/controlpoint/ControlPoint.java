@@ -125,6 +125,18 @@ public class ControlPoint {
         );
     }
 
+    /**
+     * 최종조사 요약을 앱 내 조사 기록으로 갱신한다.
+     *
+     * <p>파일 임포트가 채우던 자리를 앱에서 남긴 판정이 이어받는다.
+     * 기록을 지워 남은 것이 없으면 세 칸을 함께 비운다.
+     */
+    public void updateLastSurvey(String result, LocalDate surveyedOn, Long surveyedById) {
+        this.lastSurveyResult = result;
+        this.lastSurveyedOn = surveyedOn;
+        this.lastSurveyedById = surveyedById;
+    }
+
     private static String requireText(String value, String fieldName) {
         if (value == null || value.isBlank()) {
             throw new InvalidControlPointException(fieldName + "은(는) 필수입니다.");

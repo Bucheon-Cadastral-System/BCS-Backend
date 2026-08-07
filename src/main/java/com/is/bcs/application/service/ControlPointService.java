@@ -13,6 +13,7 @@ import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.geo.CoordinateTransformer;
+import com.is.bcs.application.port.out.member.LoadMemberNamesPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.application.service.ImportFileMapper.Row;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 
@@ -46,6 +48,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
     private final CoordinateTransformer coordinateTransformer;
     private final LoadSurveyTargetPort loadSurveyTargetPort;
     private final LoadSurveyRecordPort loadSurveyRecordPort;
+    private final LoadMemberNamesPort loadMemberNamesPort;
 
     /**
      * 한 점 등록도 파일 임포트와 같은 규칙을 쓴다 — 같은 이름·종류의 점이 있으면 새 점을 만들지 않고 그 점을 입력 값으로
@@ -164,5 +167,17 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
             total += count;
         }
         return new ControlPointCountSummary(total, countByType);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String getLastSurveyorName(Long pointId) {
+        ControlPoint point = loadControlPointPort.findById(pointId)
+                .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
+        Long surveyorId = point.getLastSurveyedById();
+        if (surveyorId == null) {
+            return null;
+        }
+        return loadMemberNamesPort.findNamesByIds(Set.of(surveyorId)).get(surveyorId);
     }
 }

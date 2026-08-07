@@ -42,7 +42,7 @@ class ControlPointServiceTest {
     private final FakeSurveyUsage surveyUsage = new FakeSurveyUsage();
     private final ControlPointService service = new ControlPointService(
             store, store, store, new ControlPointRegistrar(store, store), new Proj4jCoordinateTransformer(),
-            surveyUsage, surveyUsage);
+            surveyUsage, surveyUsage, ids -> Map.of());
 
     private static RegisterControlPointCommand csvRow1Command() {
         return new RegisterControlPointCommand(
@@ -360,6 +360,16 @@ class ControlPointServiceTest {
 
         @Override
         public List<SurveyRecord> findRecordsByProjectId(Long projectId) {
+            return List.of();
+        }
+
+        @Override
+        public List<SurveyRecord> findRecordsByPointId(Long pointId) {
+            return List.of();
+        }
+
+        @Override
+        public List<com.is.bcs.application.dto.SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
             return List.of();
         }
 
