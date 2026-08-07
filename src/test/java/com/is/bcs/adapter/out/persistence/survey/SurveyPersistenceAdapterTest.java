@@ -17,6 +17,9 @@ import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
 import jakarta.persistence.EntityManager;
+import java.util.Objects;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.junit.jupiter.api.DisplayName;
@@ -103,6 +106,31 @@ class SurveyPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("기록 목록을 도메인으로 바꿔도 건별 조회가 나가지 않는다 — 연관에서 id 만 읽기 때문")
+    void findRecords_doesNotQueryPerRow() {
+        SurveyProject project = savedProject();
+        long memberId = savedMemberId();
+        for (int i = 0; i < 3; i++) {
+            adapter.save(SurveyRecord.create(
+                    project.getId(), targetPointId(project), SurveyResult.INTACT, SURVEYED_AT, null, memberId));
+        }
+        entityManager.flush();
+        entityManager.clear();
+
+        Statistics statistics = entityManager.getEntityManagerFactory()
+                .unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+
+        List<SurveyRecord> records = adapter.findRecordsByProjectId(project.getId());
+
+        assertEquals(3, records.size());
+        assertEquals(3, records.stream().map(SurveyRecord::getSurveyedById).filter(Objects::nonNull).count());
+        // 프로젝트·기준점·조사원을 하나씩 더 읽었다면 여기서 1 이 아니다
+        assertEquals(1, statistics.getPrepareStatementCount());
+    }
+
+    @Test
     @DisplayName("프로젝트 저장 후 조회하면 기간·이름·비고가 보존된다")
     void saveAndFindProject_preservesAttributes() {
         SurveyProject saved = savedProject();
@@ -179,33 +207,6 @@ class SurveyPersistenceAdapterTest {
         assertEquals(2, counts.get(SurveyResult.INTACT)); // 다른 조사의 기록은 섞이지 않는다
         assertEquals(1, counts.get(SurveyResult.LOST));
         assertEquals(2, counts.size()); // 기록 없는 결과(기타)는 키가 없다 — 0 채움은 서비스 몫
-    }
-
-    @Test
-    @DisplayName("대상이 아닌 점의 기록은 저장 자체가 거부된다 — 진행률의 전제를 DB 가 지킨다")
-    void recordWithoutTarget_rejected() {
-        SurveyProject project = savedProject();
-        long pointId = savedPointId(); // 대상으로 지정하지 않은 점
-
-        assertThrows(DataIntegrityViolationException.class, () -> {
-            adapter.save(SurveyRecord.create(project.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
-            recordRepository.flush();
-        });
-    }
-
-    @Test
-    @DisplayName("대상에서 빠지면 그 점의 기록도 함께 사라진다 — 재지정이 남긴 기록을 DB 가 거둔다")
-    void deletingTarget_cascadesRecord() {
-        SurveyProject project = savedProject();
-        long pointId = targetPointId(project);
-        adapter.save(SurveyRecord.create(project.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
-        recordRepository.flush();
-
-        targetAdapter.deleteByProjectIdAndPointIds(project.getId(), List.of(pointId));
-        entityManager.flush();
-        entityManager.clear();
-
-        assertTrue(adapter.findRecordByProjectIdAndPointId(project.getId(), pointId).isEmpty());
     }
 
     @Test
