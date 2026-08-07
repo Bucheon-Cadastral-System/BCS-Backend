@@ -378,18 +378,4 @@ class SurveyApiTest {
         assertTrue(bodyOf(result).contains("\"code\":\"COMMON_INVALID_INPUT\""));
     }
 
-    @Test
-    @DisplayName("진행률 — 임포트한 프로젝트의 대상 49·조사 44·미조사 5, 완료 아님")
-    void getProgress_reportsTargetScopedCounts() throws Exception {
-        long projectId = importSample();
-
-        MvcResult result = mockMvc.perform(get("/api/survey-projects/" + projectId + "/progress"))
-                .andExpect(status().isOk())
-                .andReturn();
-        String body = bodyOf(result);
-        assertTrue(body.contains("\"totalPoints\":49"));
-        assertTrue(body.contains("\"surveyedPoints\":44"));
-        assertTrue(body.contains("\"notSurveyedPoints\":5"));
-        assertTrue(body.contains("\"complete\":false"));
-    }
 }

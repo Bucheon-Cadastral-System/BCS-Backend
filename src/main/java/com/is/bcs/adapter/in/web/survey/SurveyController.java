@@ -78,11 +78,6 @@ public class SurveyController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/{projectId}/progress")
-    public SurveyProgressResponse progress(@PathVariable("projectId") Long projectId) {
-        return SurveyProgressResponse.from(getSurveyRecordsUseCase.getProgress(projectId));
-    }
-
     /** 조사 대상 점 id 목록 — 화면이 지도·목록을 그 조사의 대상으로만 좁히는 데 쓴다. */
     @GetMapping("/{projectId}/targets")
     public ContentResponse<Long> listTargets(@PathVariable("projectId") Long projectId) {
