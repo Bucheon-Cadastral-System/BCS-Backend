@@ -1,6 +1,5 @@
-package com.is.bcs.iw;
+package com.is.bcs.adapter.in.security.oauth2.exception;
 
-import com.is.bcs.adapter.in.security.oauth2.exception.InvalidOAuth2UserInfoException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.core.OAuth2Error;
