@@ -28,9 +28,9 @@ public class SurveyChatTools {
 
     @Tool(description = """
             지정한 조사 프로젝트 하나의 진행 현황을 조회한다. projectId는 getSurveyProjects로 먼저 찾아 넣는다.
-            반환: 대상 전체(totalPoints) · 정상(intactPoints) · 망실(lostPoints) · 미조사(notSurveyedPoints) ·
-            조사한 수(surveyedPoints) · 진행률(progressPercent, %). 모두 계산되어 있으므로 그대로 쓴다.
-            조사 현황을 나누는 갈래는 정상 · 망실 · 미조사 셋뿐이다.""")
+            반환: 대상 전체(totalPoints) · 정상(intactPoints) · 망실(lostPoints) · 조사불가(unavailablePoints) ·
+            기타(etcPoints) · 미조사(notSurveyedPoints) · 조사한 수(surveyedPoints) · 진행률(progressPercent, %).
+            모두 계산되어 있으므로 그대로 쓴다. 조사 현황을 나누는 갈래는 정상 · 망실 · 조사불가 · 기타 · 미조사 다섯뿐이다.""")
     public SurveyProgressSummary getSurveyProgress(
             @ToolParam(description = "조사 프로젝트 id(정수) — getSurveyProjects 결과의 id 사용") Long projectId) {
         return SurveyProgressSummary.from(getSurveyRecordsUseCase.getProgress(projectId));
