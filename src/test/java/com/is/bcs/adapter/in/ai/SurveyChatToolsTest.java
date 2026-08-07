@@ -55,24 +55,24 @@ class SurveyChatToolsTest {
         assertEquals(5, progress.totalPoints());
         assertEquals(3, progress.surveyedPoints());
         assertEquals(2, progress.notSurveyedPoints());
-        // 조사완료는 조사한 점에서 망실을 뺀 값 — 모델이 직접 빼면 화면과 어긋나므로 여기서 계산해 넘긴다
-        assertEquals(2, progress.completedPoints());
+        // 정상은 조사한 점에서 망실을 뺀 값 — 모델이 직접 빼면 화면과 어긋나므로 여기서 계산해 넘긴다
+        assertEquals(2, progress.intactPoints());
         assertEquals(1, progress.lostPoints());
         assertEquals(60, progress.progressPercent()); // 3/5, 화면과 같은 반올림 규칙
     }
 
     @Test
-    @DisplayName("조사완료는 망실이 아닌 기록을 모두 합한 값이다 — 판정값별로 쪼개지 않는다")
+    @DisplayName("정상은 망실이 아닌 기록을 모두 합한 값이다 — 저장된 결과 이름으로 쪼개지 않는다")
     void getSurveyProgress_completedIncludesNonLostResults() {
         fake.progress = new SurveyProgress("굴착협의", 49, 44, 5, false,
                 Map.of(SurveyResult.INTACT, 40L, SurveyResult.LOST, 3L, SurveyResult.ETC, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
-        assertEquals(41, progress.completedPoints()); // 망실 아닌 기록 41건이 한 값으로 묶인다
+        assertEquals(41, progress.intactPoints()); // 망실 아닌 기록 41건이 정상 한 값으로 묶인다
         assertEquals(3, progress.lostPoints());
         assertEquals(90, progress.progressPercent()); // 44/49
-        // 판정값(완전·조사불가·기타)은 화면에 없는 어휘라 모델에 넘길 필드 자체가 없다
+        // 저장된 결과 이름(완전·조사불가·기타)은 화면에 없는 어휘라 모델에 넘길 필드 자체가 없다
         assertEquals(7, SurveyProgressSummary.class.getRecordComponents().length);
     }
 
@@ -85,7 +85,22 @@ class SurveyChatToolsTest {
 
         assertEquals(1L, fake.progressProjectId); // 전달받은 id를 그대로 유스케이스에 넘긴다
         assertEquals(0, progress.lostPoints());
-        assertEquals(1, progress.completedPoints());
+        assertEquals(1, progress.intactPoints());
+    }
+
+    @Test
+    @DisplayName("정상·망실·미조사는 겹치지 않고 더하면 대상 전체가 된다")
+    void getSurveyProgress_threeBucketsCoverTotal() {
+        fake.progress = new SurveyProgress("굴착협의", 46, 41, 5, false,
+                Map.of(SurveyResult.INTACT, 38L, SurveyResult.LOST, 3L));
+
+        SurveyProgressSummary progress = tools.getSurveyProgress(1L);
+
+        assertEquals(38, progress.intactPoints());
+        assertEquals(3, progress.lostPoints());
+        assertEquals(5, progress.notSurveyedPoints());
+        assertEquals(46, progress.intactPoints() + progress.lostPoints() + progress.notSurveyedPoints());
+        assertEquals(41, progress.surveyedPoints()); // 조사한 수는 정상과 망실의 합이라 셋과 함께 더하면 안 된다
     }
 
     @Test
