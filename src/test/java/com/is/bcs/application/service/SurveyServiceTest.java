@@ -493,11 +493,11 @@ class SurveyServiceTest {
             return records.values().stream().filter(r -> r.getPointId().equals(pointId)).toList();
         }
 
+        /** 조사 시각이 겹치면 나중에 담은 기록이 이긴다 — 실제 어댑터가 기록을 만든 시각으로 가르는 것과 같은 규칙이다. */
         @Override
         public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
             return findRecordsByPointId(pointId).stream()
-                    .max(Comparator.comparing(SurveyRecord::getSurveyedAt)
-                            .thenComparing(SurveyRecord::getProjectId));
+                    .reduce((older, newer) -> newer.getSurveyedAt().isBefore(older.getSurveyedAt()) ? older : newer);
         }
 
         @Override

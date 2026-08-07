@@ -125,13 +125,14 @@ class ControlPointServiceTest {
     }
 
     @Test
-    @DisplayName("조사 시각이 같으면 나중에 만든 조사의 판정을 따른다")
-    void getLastSurvey_sameInstant_prefersLaterProject() {
+    @DisplayName("조사 시각이 같으면 나중에 남긴 기록의 판정을 따른다 — 옛 회차에 붙은 기록이라도")
+    void getLastSurvey_sameInstant_prefersLaterRecord() {
         ControlPoint point = pointWithFileSurvey("정상", LocalDate.of(2025, 9, 8));
         OffsetDateTime same = OffsetDateTime.parse("2026-07-22T10:00:00+09:00");
-        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 서로 다른 회차가 같은 날짜를 적으면 시각이 완전히 겹친다
-        surveyUsage.records.add(SurveyRecord.restore(2L, point.getId(), SurveyResult.LOST, same, null, null));
-        surveyUsage.records.add(SurveyRecord.restore(1L, point.getId(), SurveyResult.INTACT, same, null, null));
+        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 서로 다른 회차가 같은 날짜를 적으면 시각이 완전히 겹친다.
+        // 나중에 담은 쪽이 더 앞선 회차(1번)라 프로젝트 번호로 가르면 순서가 뒤집힌다
+        surveyUsage.records.add(SurveyRecord.restore(2L, point.getId(), SurveyResult.INTACT, same, null, null));
+        surveyUsage.records.add(SurveyRecord.restore(1L, point.getId(), SurveyResult.LOST, same, null, null));
 
         assertEquals("망실", service.getLastSurvey(point.getId()).result());
     }
@@ -528,11 +529,11 @@ class ControlPointServiceTest {
 
         }
 
+        /** 조사 시각이 겹치면 나중에 담은 기록이 이긴다 — 실제 어댑터가 기록을 만든 시각으로 가르는 것과 같은 규칙이다. */
         @Override
         public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
             return findRecordsByPointId(pointId).stream()
-                    .max(Comparator.comparing(SurveyRecord::getSurveyedAt)
-                            .thenComparing(SurveyRecord::getProjectId));
+                    .reduce((older, newer) -> newer.getSurveyedAt().isBefore(older.getSurveyedAt()) ? older : newer);
         }
 
         @Override

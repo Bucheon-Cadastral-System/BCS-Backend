@@ -263,6 +263,48 @@ class SurveyPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("조사 시각이 겹치면 나중에 남긴 기록이 최신이다 — 그 기록이 앞선 회차에 붙어 있어도")
+    void findLatestRecordByPointId_sameInstant_prefersLaterWrite() {
+        // 회차를 먼저 만들어 번호를 앞뒤로 갈라 둔다. 기록은 그 반대 순서로 남긴다
+        SurveyProject earlier = savedProject();
+        SurveyProject later = savedProject();
+        long pointId = savedPointId();
+        targetAdapter.save(SurveyTarget.create(earlier.getId(), pointId));
+        targetAdapter.save(SurveyTarget.create(later.getId(), pointId));
+
+        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 두 회차가 같은 날짜를 적으면 시각이 완전히 겹친다
+        adapter.upsertForTarget(SurveyRecord.create(
+                later.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        adapter.upsertForTarget(SurveyRecord.create(
+                earlier.getId(), pointId, SurveyResult.LOST, SURVEYED_AT, null, null));
+        entityManager.clear();
+
+        SurveyRecord latest = adapter.findLatestRecordByPointId(pointId).orElseThrow();
+        // 프로젝트 번호로 가르면 나중에 만든 later 가 이겨 '정상'이 나온다
+        assertEquals(SurveyResult.LOST, latest.getResult());
+        assertEquals(earlier.getId(), latest.getProjectId());
+    }
+
+    @Test
+    @DisplayName("프로젝트별 기록 목록은 조사 시각 내림차순으로 온다 — 저장 순서와 무관하게")
+    void findRecordSummariesByProjectId_sortsBySurveyedAtDesc() {
+        SurveyProject project = savedProject();
+        long older = targetPointId(project);
+        long newer = targetPointId(project);
+
+        adapter.upsertForTarget(SurveyRecord.create(
+                project.getId(), older, SurveyResult.INTACT, SURVEYED_AT, null, null));
+        adapter.upsertForTarget(SurveyRecord.create(
+                project.getId(), newer, SurveyResult.LOST, SURVEYED_AT.plusDays(1), null, null));
+        entityManager.clear();
+
+        List<Long> order = adapter.findRecordSummariesByProjectId(project.getId()).stream()
+                .map(summary -> summary.record().getPointId())
+                .toList();
+        assertEquals(List.of(newer, older), order);
+    }
+
+    @Test
     @DisplayName("조사 대상에 보관한 열은 이름·값·순서가 그대로 돌아온다")
     void saveAndFindTarget_preservesExtraColumns() {
         SurveyProject project = savedProject();

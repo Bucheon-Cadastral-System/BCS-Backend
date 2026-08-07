@@ -28,16 +28,25 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
     /**
      * 그 점의 최신 기록 한 줄. 기본키가 (point_id, project_id) 라 앞자리로 바로 들어간다.
      * 한 점의 기록 수는 그 점을 대상으로 삼은 회차 수뿐이라 정렬 대상도 몇 줄이다.
+     *
+     * <p>조사 시각이 겹칠 때는 나중에 남긴 기록을 따른다. 파일로 들어온 기록은 조사일의 자정을
+     * 시각으로 쓰므로 서로 다른 회차가 같은 날짜를 적으면 시각이 완전히 겹친다.
+     * 프로젝트 id 로 가르면 나중에 만든 기록이 옛 회차에 붙었을 때 순서가 뒤집히므로
+     * 기록을 만든 시각으로 가른다. 마지막 자리는 그 시각마저 같을 때를 위한 못이다.
      */
     @Query("select r from SurveyRecordJpaEntity r where r.id.pointId = :pointId"
-            + " order by r.surveyedAt desc, r.id.projectId desc limit 1")
+            + " order by r.surveyedAt desc, r.createdAt desc, r.id.projectId desc limit 1")
     Optional<SurveyRecordJpaEntity> findLatestByPointId(@Param("pointId") Long pointId);
 
     /**
      * 목록에 조사원 이름을 함께 그리는 경로 전용 — 조사원을 조인으로 함께 실어 온다.
      * 이름을 따로 모아 다시 조회하면 문장이 하나 더 나가고, 연관을 그냥 두면 행마다 나간다.
+     *
+     * <p>정렬을 적어 두지 않으면 DB 가 돌려주는 순서가 그대로 응답 순서가 된다.
+     * 그 순서는 갱신·진공 뒤에 바뀌므로 같은 조사를 두 번 열면 줄 차례가 달라진다.
      */
-    @Query("select r from SurveyRecordJpaEntity r left join fetch r.surveyor where r.id.projectId = :projectId")
+    @Query("select r from SurveyRecordJpaEntity r left join fetch r.surveyor where r.id.projectId = :projectId"
+            + " order by r.surveyedAt desc, r.id.pointId asc")
     List<SurveyRecordJpaEntity> findByProjectIdWithSurveyor(@Param("projectId") Long projectId);
 
     boolean existsByIdPointId(Long pointId);
