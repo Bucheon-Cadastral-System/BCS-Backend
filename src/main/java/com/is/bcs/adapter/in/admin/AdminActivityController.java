@@ -27,7 +27,7 @@ public class AdminActivityController {
 
     @Operation(summary = "관리자 활동 로그 조회")
     @GetMapping
-    public ResponseEntity<CursorPageResponse<AdminActivityResponse>> getActivities(
+    public ResponseEntity<KeysetPageResponse<AdminActivityResponse>> getActivities(
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) AdminActivityType activityType) {
@@ -57,7 +57,7 @@ public class AdminActivityController {
         );
 
         return ResponseEntity.ok(
-                new CursorPageResponse<>(
+                new KeysetPageResponse<>(
                         content,
                         nextCursor,
                         result.hasNext(),

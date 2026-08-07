@@ -3,7 +3,7 @@ package com.is.bcs.adapter.in.web.controlpointimage;
 import com.is.bcs.adapter.in.security.CurrentMemberIdResolver;
 import com.is.bcs.adapter.in.web.exception.InvalidPageRequestException;
 import com.is.bcs.application.port.in.controlpointimage.GetControlPointImagesUseCase;
-import com.is.bcs.domain.page.PageResponse;
+import com.is.bcs.adapter.in.web.common.OffsetPageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +31,7 @@ public class ControlPointImageQueryController {
      * 실제 촬영시각 최신순으로 조회한다.
      */
     @GetMapping("/api/control-points/{pointId}/images")
-    public PageResponse<ControlPointImageResponse> listByPoint(
+    public OffsetPageResponse<ControlPointImageResponse> listByPoint(
             @PathVariable("pointId") Long pointId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -41,7 +41,7 @@ public class ControlPointImageQueryController {
 
         Pageable pageable = pageable(page, size);
 
-        return PageResponse.from(getControlPointImagesUseCase
+        return OffsetPageResponse.from(getControlPointImagesUseCase
                         .getByPointId(pointId, requesterId, pageable)
                         .map(image -> ControlPointImageResponse.from(image)));
     }
@@ -51,7 +51,7 @@ public class ControlPointImageQueryController {
      * 실제 촬영시각 최신순으로 조회한다.
      */
     @GetMapping("/api/survey-projects/{projectId}/images")
-    public PageResponse<ControlPointImageResponse> listByProject(
+    public OffsetPageResponse<ControlPointImageResponse> listByProject(
             @PathVariable("projectId") Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -61,7 +61,7 @@ public class ControlPointImageQueryController {
 
         Pageable pageable = pageable(page, size);
 
-        return PageResponse.from(
+        return OffsetPageResponse.from(
                 getControlPointImagesUseCase
                         .getByProjectId(projectId, requesterId, pageable)
                         .map(image -> ControlPointImageResponse.from(image)));
@@ -71,7 +71,7 @@ public class ControlPointImageQueryController {
      * 전체 현장 이미지를 실제 촬영시각 최신순으로 조회한다.
      */
     @GetMapping("/api/control-point-images")
-    public PageResponse<ControlPointImageResponse> listAll(
+    public OffsetPageResponse<ControlPointImageResponse> listAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication
@@ -80,7 +80,7 @@ public class ControlPointImageQueryController {
 
         Pageable pageable = pageable(page, size);
 
-        return PageResponse.from(
+        return OffsetPageResponse.from(
                 getControlPointImagesUseCase
                         .getAll(requesterId, pageable)
                         .map(image -> ControlPointImageResponse.from(image)));

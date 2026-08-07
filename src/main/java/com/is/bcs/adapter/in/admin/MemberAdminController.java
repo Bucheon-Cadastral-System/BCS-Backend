@@ -5,7 +5,7 @@ import com.is.bcs.adapter.in.security.oauth2.BcsOAuth2Principal;
 import com.is.bcs.adapter.in.web.exception.InvalidPageRequestException;
 import com.is.bcs.application.port.in.admin.*;
 import com.is.bcs.domain.member.*;
-import com.is.bcs.domain.page.PageResponse;
+import com.is.bcs.adapter.in.web.common.OffsetPageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,7 +38,7 @@ public class MemberAdminController {
 
     @Operation(summary = "전체 회원 조회")
     @GetMapping
-    public ResponseEntity<PageResponse<MemberAdminResponse>> getMembers(
+    public ResponseEntity<OffsetPageResponse<MemberAdminResponse>> getMembers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "name") String sortBy,
@@ -72,7 +72,7 @@ public class MemberAdminController {
                 .getMembers(pageable, command)
                 .map(result -> MemberAdminResponse.from(result));
 
-        return ResponseEntity.ok(PageResponse.from(response));
+        return ResponseEntity.ok(OffsetPageResponse.from(response));
     }
 
 
