@@ -265,7 +265,7 @@ class SurveyPersistenceAdapterTest {
     @Test
     @DisplayName("조사 시각이 겹치면 나중에 남긴 기록이 최신이다 — 그 기록이 앞선 회차에 붙어 있어도")
     void findLatestRecordByPointId_sameInstant_prefersLaterWrite() {
-        // 회차를 먼저 만들어 번호를 앞뒤로 갈라 둔다. 기록은 그 반대 순서로 남긴다
+        // 회차를 먼저 만들어 번호를 앞뒤로 갈라 둔다
         SurveyProject earlier = savedProject();
         SurveyProject later = savedProject();
         long pointId = savedPointId();
@@ -277,12 +277,27 @@ class SurveyPersistenceAdapterTest {
                 later.getId(), pointId, SurveyResult.INTACT, SURVEYED_AT, null, null));
         adapter.upsertForTarget(SurveyRecord.create(
                 earlier.getId(), pointId, SurveyResult.LOST, SURVEYED_AT, null, null));
+        // 기록한 시각을 직접 갈라 놓는다. 연달아 부른 두 문장의 시각 차이에 기대면
+        // 저장소가 같은 마이크로초로 잘라 넣을 때 어느 쪽이 이길지 시험이 정하지 못한다
+        setCreatedAt(earlier.getId(), pointId, SURVEYED_AT.plusHours(1));
+        setCreatedAt(later.getId(), pointId, SURVEYED_AT);
         entityManager.clear();
 
         SurveyRecord latest = adapter.findLatestRecordByPointId(pointId).orElseThrow();
-        // 프로젝트 번호로 가르면 나중에 만든 later 가 이겨 '정상'이 나온다
+        // 프로젝트 번호로 가르면 번호가 큰 later 가 이겨 '정상'이 나온다
         assertEquals(SurveyResult.LOST, latest.getResult());
         assertEquals(earlier.getId(), latest.getProjectId());
+    }
+
+    /** 감사 시각은 저장 경로가 찍으므로 시험에서 갈라 놓으려면 저장된 행을 직접 고쳐야 한다. */
+    private void setCreatedAt(Long projectId, Long pointId, OffsetDateTime createdAt) {
+        entityManager.createNativeQuery(
+                        "update bcs.survey_records set created_at = :createdAt"
+                                + " where project_id = :projectId and point_id = :pointId")
+                .setParameter("createdAt", createdAt)
+                .setParameter("projectId", projectId)
+                .setParameter("pointId", pointId)
+                .executeUpdate();
     }
 
     @Test
