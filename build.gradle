@@ -15,6 +15,12 @@ java {
     }
 }
 
+jacoco {
+    // 그레이들이 딸려 주는 판이 JDK 를 못 따라오면 클래스 파일을 못 읽어 커버리지가 0 으로 잡힌다.
+    // 툴 버전은 그레이들과 따로 올릴 수 있으므로 여기서 직접 못을 박는다.
+    toolVersion = '0.8.15'
+}
+
 repositories {
     mavenCentral()
 }
