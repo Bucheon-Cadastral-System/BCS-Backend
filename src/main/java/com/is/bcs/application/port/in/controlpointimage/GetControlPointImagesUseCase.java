@@ -12,4 +12,6 @@ public interface GetControlPointImagesUseCase {
 
     Page<ControlPointImage> getAll(Long requesterId, Pageable pageable);
 
+    ControlPointImage getByProjectIdAndPointId(Long projectId, Long pointId, Long requesterId);
+
 }

@@ -50,6 +50,27 @@ public class ControlPointImageQueryController {
      * 조사 프로젝트에 등록된 모든 기준점 이미지를
      * 실제 촬영시각 최신순으로 조회한다.
      */
+    @GetMapping("/api/survey-projects/{projectId}/control-points/{pointId}/image")
+    public ControlPointImageResponse getByProjectAndPoint(
+            @PathVariable Long projectId,
+            @PathVariable Long pointId,
+            Authentication authentication
+    ) {
+        Long requesterId = currentMemberIdResolver.resolve(authentication);
+
+        return ControlPointImageResponse.from(
+                getControlPointImagesUseCase.getByProjectIdAndPointId(
+                        projectId,
+                        pointId,
+                        requesterId
+                )
+        );
+    }
+
+    /**
+     * 조사 프로젝트에 등록된 해당 기준점 이미지를
+     * 실제 촬영시각 최신순으로 조회한다.
+     */
     @GetMapping("/api/survey-projects/{projectId}/images")
     public OffsetPageResponse<ControlPointImageResponse> listByProject(
             @PathVariable("projectId") Long projectId,

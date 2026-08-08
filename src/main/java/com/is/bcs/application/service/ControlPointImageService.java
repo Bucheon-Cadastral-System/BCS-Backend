@@ -190,6 +190,13 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
         return loadControlPointImagePort.findAll(pageable);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ControlPointImage getByProjectIdAndPointId(Long projectId, Long pointId, Long requesterId) {
+        requireActiveMember(requesterId);
+        return loadControlPointImagePort.findByProjectIdAndPointId(projectId, pointId)
+                .orElseThrow( () ->  new ControlPointImageNotFoundException(projectId, pointId));
+    }
 
     private static String toDownloadFileName(String storedFileName) {
         Matcher matcher = STORED_FILE_NAME_PATTERN.matcher(storedFileName);
