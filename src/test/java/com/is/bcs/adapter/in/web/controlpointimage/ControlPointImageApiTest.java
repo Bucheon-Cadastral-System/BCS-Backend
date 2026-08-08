@@ -20,6 +20,7 @@ import com.is.bcs.domain.member.Position;
 import com.is.bcs.domain.member.Team;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyTarget;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -42,14 +44,17 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -158,30 +163,24 @@ class ControlPointImageApiTest {
         return project.getId();
     }
 
-    private MvcResult upload(long projectId, long pointId, long uploaderId, String result, String capturedAt)
+    private ResultActions upload(long projectId, long pointId, long uploaderId, String result, String capturedAt)
             throws Exception {
         MockMultipartFile image = new MockMultipartFile("image", "field.webp", "image/webp", webp(800, 600));
         return mockMvc.perform(MockMvcRequestBuilders
-                        .multipart("/api/survey-projects/{projectId}/control-points/{pointId}/image", projectId, pointId)
-                        .file(image)
-                        .param("capturedAt", capturedAt)
-                        .param("result", result)
-                        .with(request -> {
-                            request.setMethod("PUT");
-                            return request;
-                        })
-                        .with(as(uploaderId)))
-                .andReturn();
+                .multipart("/api/survey-projects/{projectId}/control-points/{pointId}/image", projectId, pointId)
+                .file(image)
+                .param("capturedAt", capturedAt)
+                .param("result", result)
+                .with(request -> {
+                    request.setMethod("PUT");
+                    return request;
+                })
+                .with(as(uploaderId)));
     }
 
-    private String bodyOf(MvcResult result) throws Exception {
-        return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-    }
-
-    private long extractId(String body) {
-        Matcher m = Pattern.compile("\"id\":(\\d+)").matcher(body);
-        assertTrue(m.find(), body);
-        return Long.parseLong(m.group(1));
+    private long idOf(MvcResult result) throws Exception {
+        Number id = JsonPath.read(result.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.id");
+        return id.longValue();
     }
 
     @Test
@@ -191,13 +190,16 @@ class ControlPointImageApiTest {
         long projectId = projectWithTarget(pointId);
         long uploaderId = memberId();
 
-        MvcResult created = upload(projectId, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00");
-        MvcResult replaced = upload(projectId, pointId, uploaderId, "LOST", "2026-08-02T10:30:00+09:00");
+        upload(projectId, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.projectId", is((int) projectId)))
+                .andExpect(jsonPath("$.controlPointId", is((int) pointId)))
+                // 크기는 서버가 파일 앞머리에서 읽은 값이다 — 클라이언트가 알려 온 값이 아니다
+                .andExpect(jsonPath("$.width", is(800)))
+                .andExpect(jsonPath("$.height", is(600)));
 
-        assertEquals(201, created.getResponse().getStatus());
-        assertEquals(200, replaced.getResponse().getStatus());
-        assertTrue(bodyOf(created).contains("\"width\":800"));
-        assertTrue(bodyOf(created).contains("\"height\":600"));
+        upload(projectId, pointId, uploaderId, "LOST", "2026-08-02T10:30:00+09:00")
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -208,28 +210,30 @@ class ControlPointImageApiTest {
         long secondProject = projectWithTarget(pointId);
         long uploaderId = memberId();
 
-        upload(firstProject, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00");
-        upload(secondProject, pointId, uploaderId, "LOST", "2026-08-05T10:30:00+09:00");
+        upload(firstProject, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00")
+                .andExpect(status().isCreated());
+        upload(secondProject, pointId, uploaderId, "LOST", "2026-08-05T10:30:00+09:00")
+                .andExpect(status().isCreated());
 
-        long first = extractId(bodyOf(mockMvc.perform(
+        long first = idOf(mockMvc.perform(
                         get("/api/survey-projects/{projectId}/control-points/{pointId}/image", firstProject, pointId)
                                 .with(as(uploaderId)))
                 .andExpect(status().isOk())
-                .andReturn()));
-        long second = extractId(bodyOf(mockMvc.perform(
+                .andReturn());
+        long second = idOf(mockMvc.perform(
                         get("/api/survey-projects/{projectId}/control-points/{pointId}/image", secondProject, pointId)
                                 .with(as(uploaderId)))
                 .andExpect(status().isOk())
-                .andReturn()));
+                .andReturn());
 
         // 회차가 다르면 다른 사진이다 — 이 점의 사진이 한 장으로 합쳐지면 앞 회차의 현장이 사라진다
-        assertTrue(first != second);
+        assertNotEquals(first, second);
+
         // 점으로 모아 보면 두 장이 함께 나온다
-        String byPoint = bodyOf(mockMvc.perform(get("/api/control-points/{pointId}/images", pointId)
-                        .with(as(uploaderId)))
+        mockMvc.perform(get("/api/control-points/{pointId}/images", pointId).with(as(uploaderId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        assertTrue(byPoint.contains("\"totalElements\":2"), byPoint);
+                .andExpect(jsonPath("$.totalElements", is(2)))
+                .andExpect(jsonPath("$.content[*].projectId", hasItems((int) firstProject, (int) secondProject)));
     }
 
     @Test
@@ -249,18 +253,18 @@ class ControlPointImageApiTest {
         long pointId = pointId();
         long projectId = projectWithTarget(pointId);
         long uploaderId = memberId();
-        upload(projectId, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00");
+        upload(projectId, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00")
+                .andExpect(status().isCreated());
 
-        String byProject = bodyOf(mockMvc.perform(get("/api/survey-projects/{projectId}/images", projectId)
-                        .with(as(uploaderId)))
+        mockMvc.perform(get("/api/survey-projects/{projectId}/images", projectId).with(as(uploaderId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        String all = bodyOf(mockMvc.perform(get("/api/control-point-images").with(as(uploaderId)))
-                .andExpect(status().isOk())
-                .andReturn());
+                .andExpect(jsonPath("$.totalElements", is(1)))
+                .andExpect(jsonPath("$.content[0].controlPointId", is((int) pointId)));
 
-        assertTrue(byProject.contains("\"totalElements\":1"), byProject);
-        assertTrue(all.contains("field.webp"), all);
+        mockMvc.perform(get("/api/control-point-images").with(as(uploaderId)))
+                .andExpect(status().isOk())
+                // 올린 사람이 고른 이름은 메타데이터로만 남는다 — 저장 파일명은 따로다
+                .andExpect(jsonPath("$.content[*].originalFileName", hasItem("field.webp")));
     }
 
     @Test
@@ -269,7 +273,9 @@ class ControlPointImageApiTest {
         long pointId = pointId();
         long projectId = projectWithTarget(pointId);
         long uploaderId = memberId();
-        long imageId = extractId(bodyOf(upload(projectId, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00")));
+        long imageId = idOf(upload(projectId, pointId, uploaderId, "INTACT", "2026-08-01T10:30:00+09:00")
+                .andExpect(status().isCreated())
+                .andReturn());
 
         MvcResult view = mockMvc.perform(get("/api/control-point-images/{imageId}/file", imageId)
                         .with(as(uploaderId)))
