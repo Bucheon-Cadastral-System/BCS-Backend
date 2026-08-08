@@ -256,14 +256,14 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
     }
 
     /**
-     * 촬영 시각이 앞날이면 거부한다.
+     * 촬영 일시가 미래면 거부한다.
      *
-     * <p>EXIF 가 없는 사진은 사용자가 직접 시각을 적어 올린다. 앞날을 적으면 그 기록이 최종조사 자리를
+     * <p>EXIF 가 없는 사진은 사용자가 직접 시각을 적어 올린다. 미래 시각을 적으면 그 기록이 최종조사 자리를
      * 영구히 차지해 그 뒤의 진짜 조사가 아무리 쌓여도 밀려나지 않는다. 되돌리려면 그 기록을 지우는 수밖에 없다.
      */
     private void requireNotFuture(OffsetDateTime capturedAt) {
         if (capturedAt.isAfter(OffsetDateTime.now(clock))) {
-            throw new InvalidControlPointImageException("촬영 시각을 앞날로 적을 수 없습니다.");
+            throw new InvalidControlPointImageException("촬영 일시를 미래로 지정할 수 없습니다. 다시 확인해 주세요.");
         }
     }
 

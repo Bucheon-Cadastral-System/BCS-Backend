@@ -53,8 +53,8 @@ import static org.mockito.Mockito.when;
 /**
  * 현장 사진과 판정이 한 트랜잭션인지 검증한다 — DB 필요(bcs/docker-compose).
  *
- * <p>파일 저장은 대역으로 세운다. 실제 저장은 외부 명령(webpinfo)으로 WebP 를 확인하는데,
- * 여기서 보려는 것은 사진 바이트가 아니라 사진 행과 조사기록이 함께 남고 함께 사라지는가다.
+ * <p>파일 저장은 대역으로 세운다. 여기서 보려는 것은 사진 바이트가 아니라 사진 행과 조사기록이
+ * 함께 남고 함께 사라지는가다. 저장 자체의 왕복은 {@code LocalControlPointImageStorageAdapterTest} 가 본다.
  */
 @SpringBootTest
 @Transactional
@@ -191,7 +191,7 @@ class ControlPointImageSurveyRecordTest {
     }
 
     @Test
-    @DisplayName("앞날을 촬영 시각으로 적으면 거부한다 — 최종조사 자리를 영구히 차지한다")
+    @DisplayName("촬영 일시가 미래면 거부한다 — 그 기록이 최종조사 자리를 영구히 차지한다")
     void upload_rejectsFutureCapturedAt() {
         long pointId = savedPointId();
         long uploaderId = savedMemberId();
