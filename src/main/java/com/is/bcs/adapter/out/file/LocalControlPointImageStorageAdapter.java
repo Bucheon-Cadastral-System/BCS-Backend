@@ -183,36 +183,9 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
             throw new InvalidControlPointImageException("WebP 이미지만 등록할 수 있습니다.");
         }
 
-        validateWebpSignature(content);
+        // 파일 내용이 정말 WebP 인지는 WebpHeader 가 크기를 읽으면서 함께 판정한다
     }
 
-    /**
-     * WebP는 RIFF 컨테이너이며 처음 12바이트가 다음 형식이어야 한다.
-     *
-     * 0~3: RIFF
-     * 4~7: 파일 크기 정보
-     * 8~11: WEBP
-     */
-    private static void validateWebpSignature(byte[] content) {
-        if (content.length < 12
-                || content[0] != 'R'
-                || content[1] != 'I'
-                || content[2] != 'F'
-                || content[3] != 'F'
-                || content[8] != 'W'
-                || content[9] != 'E'
-                || content[10] != 'B'
-                || content[11] != 'P') {
-            throw new InvalidControlPointImageException("올바른 WebP 파일이 아닙니다.");
-        }
-    }
-
-    /**
-     * 파일 앞머리에서 가로·세로를 읽는다.
-     *
-     * <p>임시 파일을 만들기 전에 메모리에서 읽으므로, 크기가 어긋나는 사진은 디스크를 건드리지 않고 거절된다.
-     * 읽을 자리가 없으면 WebP 가 아니라는 뜻이라 이 한 번이 형식 검사도 겸한다.
-     */
     private static ImageDimensions readDimensions(byte[] content) {
         WebpHeader.Dimensions dimensions = WebpHeader.read(content);
         return new ImageDimensions(dimensions.width(), dimensions.height());
