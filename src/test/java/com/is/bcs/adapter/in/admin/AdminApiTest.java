@@ -27,6 +27,8 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsInRelativeOrder;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -66,10 +68,20 @@ class AdminApiTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
-    /** 그 회원으로 로그인한 것처럼 요청한다 — 실제 토큰 발급 경로는 이 검증의 관심이 아니다. */
+    /** 관리자로 로그인한 것처럼 요청한다 — 실제 토큰 발급 경로는 이 검증의 관심이 아니다. */
     private RequestPostProcessor as(long memberId) {
+        return as(memberId, MemberRole.ADMIN);
+    }
+
+    /**
+     * 권한까지 정해 로그인한 것처럼 요청한다.
+     *
+     * <p>내 정보 계열은 일반 회원으로 부른다. 여기서도 관리자 클레임을 실으면, 그 API 가 어쩌다
+     * 관리자 전용이 되어도 이 검증은 초록불로 남는다.
+     */
+    private RequestPostProcessor as(long memberId, MemberRole role) {
         AccessTokenClaims claims =
-                new AccessTokenClaims(memberId, MemberRole.ADMIN, Instant.now(), Instant.now().plusSeconds(900));
+                new AccessTokenClaims(memberId, role, Instant.now(), Instant.now().plusSeconds(900));
         return authentication(new UsernamePasswordAuthenticationToken(claims, "n/a", List.of()));
     }
 
@@ -89,22 +101,48 @@ class AdminApiTest {
     }
 
     @Test
-    @DisplayName("회원 목록을 상태·권한으로 걸러 정렬해 돌려준다")
-    void getMembers_filtersAndSorts() throws Exception {
+    @DisplayName("회원 목록을 이름순으로 정렬해 돌려준다 — 방향을 뒤집으면 차례도 뒤집힌다")
+    void getMembers_sorts() throws Exception {
+        long adminId = member("관리자", true).getId();
         member("김활성", true);
         member("박대기", false);
 
+        // 한 방향만 보면 만든 차례와 우연히 같아 정렬을 안 해도 통과한다. 뒤집어 봐야 실제로 정렬한 것이다
         mockMvc.perform(get("/api/admin/members")
-                        .param("sortBy", "name").param("direction", "ASC").with(as(member("관리자", true).getId())))
+                        .param("sortBy", "name").param("direction", "ASC").param("size", "100").with(as(adminId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[*].name", hasItem("김활성")));
+                .andExpect(jsonPath("$.content[*].name", containsInRelativeOrder("김활성", "박대기")));
 
         mockMvc.perform(get("/api/admin/members")
-                        .param("status", "PENDING").with(as(member("관리자2", true).getId())))
+                        .param("sortBy", "name").param("direction", "DESC").param("size", "100").with(as(adminId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name", containsInRelativeOrder("박대기", "김활성")));
+    }
+
+    @Test
+    @DisplayName("회원 목록을 상태와 권한으로 걸러 돌려준다")
+    void getMembers_filters() throws Exception {
+        long adminId = member("관리자", true).getId();
+        long activeId = member("김활성", true).getId();
+        member("박대기", false);
+
+        mockMvc.perform(get("/api/admin/members")
+                        .param("status", "PENDING").param("size", "100").with(as(adminId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[*].name", hasItem("박대기")))
                 // 걸러 보기가 실제로 좁히는지 — 활성 회원이 대기 목록에 섞이면 그 조건이 안 걸린 것이다
                 .andExpect(jsonPath("$.content[*].name", not(hasItem("김활성"))));
+
+        // 승격 대상은 활성 회원이다 — 대기 회원을 올리려 하면 422 다
+        mockMvc.perform(patch("/api/admin/members/{id}/role/admin", activeId).with(as(adminId)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/admin/members")
+                        .param("role", "ADMIN").param("size", "100").with(as(adminId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[*].name", hasItem("김활성")))
+                .andExpect(jsonPath("$.content[*].role", everyItem(is("ADMIN"))))
+                .andExpect(jsonPath("$.content[*].name", not(hasItem("박대기"))));
     }
 
     @Test
@@ -257,14 +295,17 @@ class AdminApiTest {
     }
 
     @Test
-    @DisplayName("내 정보 조회와 프로필 수정이 인증 주체를 따른다")
+    @DisplayName("내 정보 조회와 프로필 수정이 인증 주체를 따른다 — 일반 회원으로 부른다")
     void myProfile() throws Exception {
         long memberId = member("김활성", true).getId();
+        // 이 셋은 자기 것을 보고 고치는 길이라 일반 회원이 지나가야 한다
+        RequestPostProcessor asMember = as(memberId, MemberRole.USER);
 
-        mockMvc.perform(get("/api/members/me").with(as(memberId)))
+        mockMvc.perform(get("/api/members/me").with(asMember))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is((int) memberId)))
-                .andExpect(jsonPath("$.name", is("김활성")));
+                .andExpect(jsonPath("$.name", is("김활성")))
+                .andExpect(jsonPath("$.role", is("USER")));
 
         mockMvc.perform(patch("/api/members/me/update")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -272,15 +313,15 @@ class AdminApiTest {
                                 {"phone": "01055556666", "district": "OJEONG",
                                  "team": "CADASTRAL_INFORMATION", "position": "TEAM_LEADER"}
                                 """)
-                        .with(as(memberId)))
+                        .with(asMember))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/members/me").with(as(memberId)))
+        mockMvc.perform(get("/api/members/me").with(asMember))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.phone", is("01055556666")))
                 .andExpect(jsonPath("$.district", is("OJEONG")));
 
-        mockMvc.perform(get("/api/members/me/state").with(as(memberId)))
+        mockMvc.perform(get("/api/members/me/state").with(asMember))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("ACTIVE")));
     }
