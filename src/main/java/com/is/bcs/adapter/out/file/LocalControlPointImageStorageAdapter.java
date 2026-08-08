@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -17,11 +16,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.text.Normalizer;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,17 +27,6 @@ import java.util.regex.Pattern;
 public class LocalControlPointImageStorageAdapter implements ControlPointImageFileStoragePort {
 
     private static final String WEBP_CONTENT_TYPE = "image/webp";
-
-    private static final Duration WEBP_INFO_TIMEOUT = Duration.ofSeconds(10);
-
-    private static final Pattern CANVAS_SIZE_PATTERN =
-            Pattern.compile("Canvas size\\s+(\\d+)\\s*x\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
-
-    private static final Pattern WIDTH_PATTERN =
-            Pattern.compile("Width:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
-
-    private static final Pattern HEIGHT_PATTERN =
-            Pattern.compile("Height:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern UNSAFE_ORIGINAL_FILE_NAME =
             Pattern.compile("[\\p{Cntrl}]");
@@ -62,6 +48,14 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
             byte[] content
     ) {
         validateBasicFile(contentType, declaredFileSize, content);
+
+        /*
+         * 크기 확인을 디스크보다 먼저 한다. 종전에는 임시 파일을 만든 뒤 그 파일을 외부 명령에 물려
+         * 크기를 읽었으므로, 너무 큰 사진도 일단 디스크에 한 번 쓰이고 나서 거절됐다.
+         */
+        ImageDimensions dimensions = readDimensions(content);
+
+        validateDimensions(dimensions);
 
         String safeOriginalFileName = sanitizeOriginalFileName(originalFileName);
 
@@ -92,10 +86,6 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
                     StandardOpenOption.CREATE_NEW,
                     StandardOpenOption.WRITE
             );
-
-            ImageDimensions dimensions = validateWithWebpInfo(temporaryPath);
-
-            validateDimensions(dimensions);
 
             moveToFinalPath(
                     temporaryPath,
@@ -217,113 +207,15 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
         }
     }
 
-    private ImageDimensions validateWithWebpInfo(Path temporaryImagePath) {
-        Path outputPath = null;
-        Process process = null;
-
-        try {
-            outputPath = Files.createTempFile(
-                    temporaryImagePath.getParent(),
-                    ".webpinfo-",
-                    ".log"
-            );
-
-            process = new ProcessBuilder(
-                    properties.webpInfoCommand(),
-                    temporaryImagePath.toString()
-            )
-                    .redirectErrorStream(true)
-                    .redirectOutput(outputPath.toFile())
-                    .start();
-
-            boolean finished = process.waitFor(WEBP_INFO_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-
-            if (!finished) {
-                terminateAndWait(process);
-                throw new ControlPointImageStorageException("WebP 파일 검사 시간이 초과되었습니다.");
-            }
-
-            String output = Files.readString(outputPath, StandardCharsets.UTF_8);
-
-            if (process.exitValue() != 0) {
-                throw new InvalidControlPointImageException("손상되었거나 올바르지 않은 WebP 파일입니다.");
-            }
-
-            return parseDimensions(output);
-        } catch (InterruptedException exception) {
-            if (process != null && process.isAlive()) {
-                terminateAndWait(process);
-            }
-
-            Thread.currentThread().interrupt();
-
-            throw new ControlPointImageStorageException("WebP 파일 검사가 중단되었습니다.", exception);
-
-        } catch (IOException exception) {
-            if (process != null && process.isAlive()) {
-                terminateAndWait(process);
-            }
-
-            throw new ControlPointImageStorageException("WebP 검사 도구를 실행하거나 결과를 읽을 수 없습니다.", exception);
-
-        } finally {
-            deleteTemporaryFileQuietly(outputPath);
-        }
-    }
-
-    private static void terminateAndWait(Process process) {
-        process.destroyForcibly();
-
-        boolean interrupted = false;
-
-        try {
-            while (process.isAlive()) {
-                try {
-                    if (!process.waitFor(5, TimeUnit.SECONDS)) {
-                        throw new ControlPointImageStorageException("WebP 검사 프로세스를 종료할 수 없습니다.");
-                    }
-                } catch (InterruptedException exception) {
-                    /*
-                     * 프로세스 정리를 끝낸 후 현재 스레드의 인터럽트 상태를
-                     * 복원하기 위해 우선 종료 대기를 계속한다.
-                     */
-                    interrupted = true;
-                }
-            }
-        } finally {
-            if (interrupted) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
-    private static ImageDimensions parseDimensions(String output) {
-        Matcher canvasMatcher = CANVAS_SIZE_PATTERN.matcher(output);
-
-        if (canvasMatcher.find()) {
-            return new ImageDimensions(parseDimension(canvasMatcher.group(1)), parseDimension(canvasMatcher.group(2)));
-        }
-
-        Matcher widthMatcher = WIDTH_PATTERN.matcher(output);
-
-        Matcher heightMatcher = HEIGHT_PATTERN.matcher(output);
-
-        if (widthMatcher.find() && heightMatcher.find()) {
-            return new ImageDimensions(
-                    parseDimension(widthMatcher.group(1)),
-                    parseDimension(heightMatcher.group(1))
-            );
-        }
-
-        throw new InvalidControlPointImageException("WebP 이미지 크기를 확인할 수 없습니다.");
-    }
-
-    private static int parseDimension(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException exception) {
-            throw new InvalidControlPointImageException("WebP 이미지 크기가 올바르지 않습니다.");
-        }
+    /**
+     * 파일 앞머리에서 가로·세로를 읽는다.
+     *
+     * <p>임시 파일을 만들기 전에 메모리에서 읽으므로, 크기가 어긋나는 사진은 디스크를 건드리지 않고 거절된다.
+     * 읽을 자리가 없으면 WebP 가 아니라는 뜻이라 이 한 번이 형식 검사도 겸한다.
+     */
+    private static ImageDimensions readDimensions(byte[] content) {
+        WebpHeader.Dimensions dimensions = WebpHeader.read(content);
+        return new ImageDimensions(dimensions.width(), dimensions.height());
     }
 
     private void validateDimensions(ImageDimensions dimensions) {

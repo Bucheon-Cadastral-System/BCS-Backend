@@ -11,8 +11,7 @@ public record ImageUploadProperties(
         String rootDirectory,
         DataSize maxFileSize,
         int maxWidth,
-        int maxHeight,
-        String webpInfoCommand
+        int maxHeight
 ) {
 
     public ImageUploadProperties {
@@ -31,10 +30,6 @@ public record ImageUploadProperties(
 
         if (maxWidth <= 0 || maxHeight <= 0) {
             throw new IllegalArgumentException("이미지 최대 가로·세로 크기는 0보다 커야 합니다.");
-        }
-
-        if (webpInfoCommand == null || webpInfoCommand.isBlank()) {
-            throw new IllegalArgumentException("webpinfo 명령어는 필수입니다.");
         }
     }
 
