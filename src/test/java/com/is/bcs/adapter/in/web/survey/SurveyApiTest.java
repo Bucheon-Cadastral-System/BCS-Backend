@@ -62,12 +62,16 @@ class SurveyApiTest {
 
     /** 대상 없는 프로젝트는 만들 수 없으므로 등록해 둔 점 하나를 대상으로 넣는다. */
     private long createProject(long targetPointId) throws Exception {
+        return createProject(targetPointId, "2026 일제조사", "2026-07-01");
+    }
+
+    private long createProject(long targetPointId, String name, String startedOn) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/survey-projects")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name": "2026 일제조사", "startedOn": "2026-07-01", "note": "정기 조사",
+                                {"name": "%s", "startedOn": "%s", "note": "정기 조사",
                                  "targetPointIds": [%d]}
-                                """.formatted(targetPointId)))
+                                """.formatted(name, startedOn, targetPointId)))
                 .andExpect(status().isCreated())
                 .andReturn();
         return extractId(bodyOf(result));
@@ -371,4 +375,41 @@ class SurveyApiTest {
         assertTrue(bodyOf(result).contains("\"code\":\"COMMON_INVALID_INPUT\""));
     }
 
+
+    @Test
+    @DisplayName("최근 회차를 지우면 기준점의 최종조사가 그 이전 조사로 되돌아간다")
+    void deleteProject_lastSurveyFallsBackToPreviousRound() throws Exception {
+        long pointId = registerPoint();
+        long older = createProject(pointId, "2025 정기조사", "2025-09-01");
+        long newer = createProject(pointId, "2026 정기조사", "2026-07-01");
+
+        // 조사 시각은 서버가 찍는다 — 나중에 남긴 기록이 늦은 시각을 갖는다
+        record(older, pointId, "INTACT");
+        record(newer, pointId, "LOST");
+        assertLastSurveyResult(pointId, "\"result\":\"망실\"");
+
+        // 최근 회차를 지우면 그 회차의 기록도 함께 사라진다. 최종조사는 저장된 값이 아니라
+        // 볼 때 계산하는 값이라 남은 기록 중 가장 늦은 것으로 저절로 돌아간다
+        mockMvc.perform(delete("/api/survey-projects/" + newer)).andExpect(status().isNoContent());
+        assertLastSurveyResult(pointId, "\"result\":\"정상\"");
+
+        // 남은 회차까지 지우면 기록이 하나도 없다 — 파일이 적어 온 시드 조사도 없으므로 칸이 빈다
+        mockMvc.perform(delete("/api/survey-projects/" + older)).andExpect(status().isNoContent());
+        assertLastSurveyResult(pointId, "\"result\":null");
+    }
+
+    private void record(long projectId, long pointId, String result) throws Exception {
+        mockMvc.perform(put("/api/survey-projects/" + projectId + "/records/" + pointId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"result\": \"%s\"}".formatted(result)))
+                .andExpect(status().isOk());
+    }
+
+    private void assertLastSurveyResult(long pointId, String expected) throws Exception {
+        MvcResult found = mockMvc.perform(get("/api/control-points/" + pointId + "/last-survey"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String body = bodyOf(found);
+        assertTrue(body.contains(expected), body);
+    }
 }
