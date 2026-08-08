@@ -52,7 +52,20 @@ services:
     depends_on:
       - prometheus
 
+  loki:
+    image: grafana/loki:3.5.5
+    container_name: bcs-loki
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/loki/loki-config.yml"
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+
 volumes:
   postgres18_data:
   prometheus_data:
   grafana_data:
+  loki_data:
