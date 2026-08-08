@@ -64,8 +64,33 @@ services:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
 
+  alloy:
+    image: grafana/alloy:v1.9.2
+    container_name: bcs-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+
+      # Docker 컨테이너 로그 접근
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+      # Docker 메타데이터 접근
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # 어디까지 읽었는지 표기
+      - alloy_data:/var/lib/alloy
+
+    depends_on:
+      - loki
+
+
+
 volumes:
   postgres18_data:
   prometheus_data:
   grafana_data:
   loki_data:
+  alloy_data:
