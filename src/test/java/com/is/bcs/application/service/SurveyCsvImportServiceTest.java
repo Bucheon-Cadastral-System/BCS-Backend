@@ -25,6 +25,7 @@ import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.SurveyTarget;
+import com.is.bcs.support.FakeControlPointStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -49,6 +50,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -62,8 +64,9 @@ class SurveyCsvImportServiceTest {
     private final FakeTargetStore targetStore = new FakeTargetStore();
     // 변환기는 입출력이 없는 순수 계산이라 실제 구현을 쓴다 — 파생된 경위도가 실제 값인지까지 확인된다
     private final SurveyCsvImportService service = new SurveyCsvImportService(
-            pointStore, pointStore, surveyStore, surveyStore, targetStore,
-            new SpreadsheetTableExtractor(), new Proj4jCoordinateTransformer(), directTransaction(),
+            surveyStore, surveyStore, targetStore, new SpreadsheetTableExtractor(),
+            new SurveyTargetMapper(new Proj4jCoordinateTransformer()),
+            new ControlPointRegistrar(pointStore, pointStore), directTransaction(),
             Clock.fixed(Instant.parse("2026-07-22T09:00:00Z"), TimeConfig.KST));
 
     /** 페이크 저장소에는 트랜잭션이 없다 — 경계만 통과시키고 커밋·롤백은 하지 않는다. */
@@ -95,7 +98,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("임포트 — 조사 프로젝트가 생기고 기준점 49개 등록, 기존조사 44건이 기록된다")
     void importCsv_createsProjectPointsAndRecords() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, "정기 조사", sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, "정기 조사", sampleCsv()));
 
         assertEquals(49, result.totalRows());
         assertEquals(49, result.newPoints());
@@ -115,7 +118,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("조사기록의 시각은 기존조사일의 KST 자정이고 결과·비고가 보존된다")
     void importCsv_recordUsesPriorSurveyDate() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         ControlPoint row1Point = pointStore.findByPointNo("41192D000001265").orElseThrow();
         SurveyRecord record = surveyStore.records.values().stream()
@@ -124,17 +127,17 @@ class SurveyCsvImportServiceTest {
 
         assertEquals(SurveyResult.INTACT, record.getResult());
         assertEquals(OffsetDateTime.parse("2025-09-08T00:00:00+09:00"), record.getSurveyedAt());
-        assertEquals("대상", record.getNote());
+        assertNull(record.getNote()); // 조사대상여부 값이 비고로 새어 들어오지 않는다
         assertEquals(result.projectId(), record.getProjectId());
     }
 
     @Test
     @DisplayName("재임포트하면 기준점은 전부 기존으로 집계되고 마스터는 다시 만들지 않는다")
     void importCsv_again_reusesExistingPoints() throws Exception {
-        service.importCsv(new ImportSurveyCsvCommand("1차", STARTED, null, null, sampleCsv()));
+        service.importCsv(new ImportSurveyCsvCommand(null, "1차", STARTED, null, null, sampleCsv()));
 
         SurveyCsvImportResult second = service.importCsv(
-                new ImportSurveyCsvCommand("2차", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2차", STARTED, null, null, sampleCsv()));
 
         assertEquals(0, second.newPoints());
         assertEquals(49, second.existingPoints());
@@ -153,9 +156,9 @@ class SurveyCsvImportServiceTest {
                 new GeoCoordinate(126.744200, 37.511900),
                 "10900", "상동", "부천시 상동 529-2",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
-                new TraverseInfo("2", "ㅁ", "78", false)));
+                new TraverseInfo("2", "ㅁ", "78", false), null, null));
 
-        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+        SurveyCsvImportResult result = service.importCsv(new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
         assertEquals(1, result.updatedPoints()); // 시드 쌍둥이 1건만 갱신
         assertEquals(48, result.newPoints());    // 나머지 48건은 신규
 
@@ -187,10 +190,10 @@ class SurveyCsvImportServiceTest {
                 new GeoCoordinate(126.744000, 37.511000),
                 "10900", "상동", "부천시 상동 529-2",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.parse("2020-07-27"),
-                new TraverseInfo("2", "ㅁ", "78", false)));
+                new TraverseInfo("2", "ㅁ", "78", false), null, null));
 
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         assertEquals(1, result.updatedPoints()); // 관리번호가 같아도 성과가 달라 갱신
         ControlPoint merged = pointStore.points.values().stream()
@@ -206,7 +209,7 @@ class SurveyCsvImportServiceTest {
             basicCsv = in.readAllBytes();
         }
 
-        service.importCsv(new ImportSurveyCsvCommand("기본 양식 조사", STARTED, null, null, basicCsv));
+        service.importCsv(new ImportSurveyCsvCommand(null, "기본 양식 조사", STARTED, null, null, basicCsv));
 
         ControlPoint first = pointStore.findByPointNo("41192D000001265").orElseThrow();
         // 기준값은 경위도 열이 덧붙은 확장 양식(/survey-target-sample.csv)의 같은 행에 적힌 값이다
@@ -218,7 +221,7 @@ class SurveyCsvImportServiceTest {
     @DisplayName("임포트하면 모든 행이 프로젝트의 조사 대상으로 등록된다")
     void importCsv_registersAllRowsAsTargets() throws Exception {
         SurveyCsvImportResult result = service.importCsv(
-                new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+                new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         assertEquals(49, targetStore.targets.size());
         assertTrue(targetStore.targets.stream().allMatch(t -> t.getProjectId().equals(result.projectId())));
@@ -232,13 +235,13 @@ class SurveyCsvImportServiceTest {
     @DisplayName("같은 기준점이 두 번 있는 파일은 저장을 시작하기 전에 거부한다")
     void importCsv_duplicatePointInFile_rejectsWholeFile() {
         byte[] csv = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
-                41192D000000001,도근점,1465공,세계,545236.77,181840.96
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,대상
                 41192D000000002,도근점,1465공,세계,545000.00,181000.00
                 """.getBytes(StandardCharsets.UTF_8);
 
         assertThrows(InvalidControlPointException.class, () -> service.importCsv(
-                new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
+                new ImportSurveyCsvCommand(null, "중복 조사", STARTED, null, null, csv)));
 
         // 매퍼가 행 오류로 걸러 트랜잭션에 들어가기 전에 거부하므로 저장이 아예 시작되지 않는다
         assertTrue(pointStore.points.isEmpty());
@@ -252,14 +255,14 @@ class SurveyCsvImportServiceTest {
         // 행 번호는 오류 메시지와 같게 헤더를 1행으로 센다.
         // 3행은 관리번호가 2행과 겹쳐 거부되고, 4행은 그 3행과 이름만 같을 뿐 관리번호가 고유하다.
         byte[] csv = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
-                41192D000000001,도근점,1465공,세계,545236.77,181840.96
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,대상
                 41192D000000001,도근점,1466공,세계,545100.00,181100.00
-                41192D000000002,도근점,1466공,세계,545200.00,181200.00
+                41192D000000002,도근점,1466공,세계,545200.00,181200.00,대상
                 """.getBytes(StandardCharsets.UTF_8);
 
         InvalidControlPointException thrown = assertThrows(InvalidControlPointException.class,
-                () -> service.importCsv(new ImportSurveyCsvCommand("중복 조사", STARTED, null, null, csv)));
+                () -> service.importCsv(new ImportSurveyCsvCommand(null, "중복 조사", STARTED, null, null, csv)));
 
         // 거부는 3행 하나뿐이어야 한다 — 4행까지 '같은 기준점'으로 걸리면 담당자가 멀쩡한 행을 고치게 된다
         assertTrue(thrown.getMessage().contains("3행"), thrown.getMessage());
@@ -273,15 +276,15 @@ class SurveyCsvImportServiceTest {
                 "41192D000000001", PointType.DOGEUN, "다른이름",
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
-                null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         byte[] csv = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
-                41192D000000001,도근점,1465공,세계,545236.77,181840.96
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부
+                41192D000000001,도근점,1465공,세계,545236.77,181840.96,대상
                 """.getBytes(StandardCharsets.UTF_8);
 
         DuplicateControlPointException thrown = assertThrows(DuplicateControlPointException.class,
-                () -> service.importCsv(new ImportSurveyCsvCommand("충돌 조사", STARTED, null, null, csv)));
+                () -> service.importCsv(new ImportSurveyCsvCommand(null, "충돌 조사", STARTED, null, null, csv)));
 
         assertTrue(thrown.getMessage().contains("41192D000000001"), thrown.getMessage());
     }
@@ -289,7 +292,7 @@ class SurveyCsvImportServiceTest {
     @Test
     @DisplayName("기본 양식에 없어 기준점으로 옮기지 못한 열은 조사 대상에 그대로 보관된다")
     void importCsv_keepsUnrecognizedColumnsOnTarget() throws Exception {
-        service.importCsv(new ImportSurveyCsvCommand("2026 일제조사", STARTED, null, null, sampleCsv()));
+        service.importCsv(new ImportSurveyCsvCommand(null, "2026 일제조사", STARTED, null, null, sampleCsv()));
 
         ControlPoint row1Point = pointStore.findByPointNo("41192D000001265").orElseThrow();
         SurveyTarget target = targetStore.targets.stream()
@@ -299,85 +302,13 @@ class SurveyCsvImportServiceTest {
         assertEquals(List.of(new ExtraColumn("순번", "131"), new ExtraColumn("field_20", null)), target.getExtras());
     }
 
-    /** 기준점 포트 페이크. */
-    private static class FakeControlPointStore implements LoadControlPointPort, SaveControlPointPort {
-
-        final Map<Long, ControlPoint> points = new HashMap<>();
-        private long sequence = 0;
-
-        @Override
-        public Optional<ControlPoint> findById(Long id) {
-            return Optional.ofNullable(points.get(id));
-        }
-
-        @Override
-        public Optional<ControlPoint> findByPointNo(String pointNo) {
-            return points.values().stream().filter(p -> p.getPointNo().equals(pointNo)).findFirst();
-        }
-
-        @Override
-        public Optional<ControlPoint> findByNameAndType(String name, PointType type) {
-            return points.values().stream()
-                    .filter(p -> p.getName().equals(name) && p.getType() == type)
-                    .findFirst();
-        }
-
-        @Override
-        public List<ControlPoint> findAllByNameInOrPointNoIn(
-                Collection<String> names, Collection<String> pointNos) {
-            return points.values().stream()
-                    .filter(p -> names.contains(p.getName()) || pointNos.contains(p.getPointNo()))
-                    .toList();
-        }
-
-        @Override
-        public List<ControlPoint> findAll() {
-            return new ArrayList<>(points.values());
-        }
-
-        @Override
-        public boolean existsByPointNo(String pointNo) {
-            return findByPointNo(pointNo).isPresent();
-        }
-
-        @Override
-        public long count() {
-            return points.size();
-        }
-
-        @Override
-        public Map<PointType, Long> countByType() {
-            Map<PointType, Long> counts = new HashMap<>();
-            points.values().forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
-            return counts;
-        }
-
-        @Override
-        public ControlPoint save(ControlPoint point) {
-            long id = point.getId() != null ? point.getId() : ++sequence;
-            ControlPoint saved = ControlPoint.restore(
-                    id, point.getPointNo(), point.getType(), point.getName(),
-                    point.getTm(), point.getGeo(),
-                    point.getRegionCode(), point.getRegionName(), point.getAddress(),
-                    point.getMarkerMaterial(), point.getInstallType(), point.getInstalledDate(),
-                    point.getTraverse());
-            points.put(id, saved);
-            return saved;
-        }
-
-        @Override
-        public List<ControlPoint> saveAll(List<ControlPoint> list) {
-            return list.stream().map(this::save).toList();
-        }
-    }
-
     /** 조사 포트 페이크. */
     private static class FakeSurveyStore implements SaveSurveyProjectPort, SaveSurveyRecordPort {
 
         final Map<Long, SurveyProject> projects = new HashMap<>();
-        final Map<Long, SurveyRecord> records = new HashMap<>();
+        // 기록의 식별자는 (프로젝트, 기준점)이다 — 저장소도 같은 열쇠로 잡는다
+        final Map<List<Long>, SurveyRecord> records = new HashMap<>();
         private long projectSeq = 0;
-        private long recordSeq = 0;
 
         @Override
         public SurveyProject save(SurveyProject project) {
@@ -389,17 +320,18 @@ class SurveyCsvImportServiceTest {
 
         @Override
         public SurveyRecord save(SurveyRecord record) {
-            long id = record.getId() != null ? record.getId() : ++recordSeq;
-            SurveyRecord saved = SurveyRecord.restore(
-                    id, record.getProjectId(), record.getPointId(),
-                    record.getResult(), record.getSurveyedAt(), record.getNote());
-            records.put(id, saved);
-            return saved;
+            records.put(List.of(record.getProjectId(), record.getPointId()), record);
+            return record;
         }
 
         @Override
         public List<SurveyRecord> saveAll(List<SurveyRecord> list) {
             return list.stream().map(this::save).toList();
+        }
+
+        @Override
+        public java.util.Optional<SurveyRecord> upsertForTarget(SurveyRecord record) {
+            throw new UnsupportedOperationException("파일 임포트는 일괄 생성만 한다");
         }
     }
 
@@ -407,14 +339,11 @@ class SurveyCsvImportServiceTest {
     private static class FakeTargetStore implements SaveSurveyTargetPort {
 
         final List<SurveyTarget> targets = new ArrayList<>();
-        private long sequence = 0;
 
         @Override
         public SurveyTarget save(SurveyTarget target) {
-            SurveyTarget saved = SurveyTarget.restore(
-                    ++sequence, target.getProjectId(), target.getPointId(), target.getExtras());
-            targets.add(saved);
-            return saved;
+            targets.add(target);
+            return target;
         }
 
         @Override

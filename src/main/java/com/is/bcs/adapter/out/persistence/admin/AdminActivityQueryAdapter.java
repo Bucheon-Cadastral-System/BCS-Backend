@@ -92,10 +92,12 @@ public class AdminActivityQueryAdapter implements GetAdminActivityPort {
     ) {
         return new GetAdminActivityUseCase.Result(
                 entity.getId(),
-                entity.getActorAdminId(),
-                entity.getTargetMemberId(),
+                entity.getActorAdmin().getId(),
+                entity.getTargetMember().getId(),
                 entity.getActivityType(),
                 entity.getMessage(),
+                entity.getActorName(),
+                entity.getTargetName(),
                 entity.getCreatedAt()
         );
     }

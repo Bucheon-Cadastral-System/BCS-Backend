@@ -1,6 +1,8 @@
 package com.is.bcs.adapter.out.persistence.controlpoint;
 
 import com.is.bcs.adapter.out.persistence.common.BaseTime;
+import com.is.bcs.adapter.out.persistence.common.EntityReferences;
+import com.is.bcs.adapter.out.persistence.member.MemberJpaEntity;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
@@ -11,6 +13,11 @@ import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
@@ -19,9 +26,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
@@ -66,10 +76,10 @@ public class ControlPointJpaEntity extends BaseTime {
     private CoordinateSystem crs;
 
     // 성과 좌표는 오차 없는 보존을 위해 numeric — 소수 3자리(mm)까지
-    @Column(name = "tm_northing", nullable = false, precision = 12, scale = 3)
+    @Column(name = "tm_northing", nullable = false, precision = 12, scale = TmCoordinate.SCALE)
     private BigDecimal tmNorthing;
 
-    @Column(name = "tm_easting", nullable = false, precision = 12, scale = 3)
+    @Column(name = "tm_easting", nullable = false, precision = 12, scale = TmCoordinate.SCALE)
     private BigDecimal tmEasting;
 
     @Column(name = "lng", nullable = false)
@@ -110,12 +120,26 @@ public class ControlPointJpaEntity extends BaseTime {
     @Column(name = "traverse_intersection")
     private Boolean traverseIntersection;
 
+    // 시드 조사 — 이 시스템에 올라오기 전까지의 총정리라 임포트만 쓴다. 조사원은 파일에 없다.
+    // 파일 문구 그대로 — 어휘를 강제하면 "망실,안보임" 같은 실제 값이 거부되고, 길이를 자르면 보존이 깨진다
+    @Column(name = "last_survey_result", columnDefinition = "text")
+    private String lastSurveyResult;
+
+    @Column(name = "last_surveyed_on")
+    private LocalDate lastSurveyedOn;
+
+    /** 저장할 때마다 오르는 판 번호 — 앞선 수정을 덮어쓰지 못하게 막는다(낙관적 잠금). */
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
     private ControlPointJpaEntity(
             Long id, String pointNo, PointType type, String name,
             CoordinateSystem crs, BigDecimal tmNorthing, BigDecimal tmEasting, double lng, double lat,
             String regionCode, String regionName, String address,
             MarkerMaterial markerMaterial, InstallType installType, LocalDate installedDate,
-            String traverseGrade, String traverseLineName, String traverseLineNo, Boolean traverseIntersection
+            String traverseGrade, String traverseLineName, String traverseLineNo, Boolean traverseIntersection,
+            String lastSurveyResult, LocalDate lastSurveyedOn, long version
     ) {
         this.id = id;
         this.pointNo = pointNo;
@@ -136,9 +160,12 @@ public class ControlPointJpaEntity extends BaseTime {
         this.traverseLineName = traverseLineName;
         this.traverseLineNo = traverseLineNo;
         this.traverseIntersection = traverseIntersection;
+        this.lastSurveyResult = lastSurveyResult;
+        this.lastSurveyedOn = lastSurveyedOn;
+        this.version = version;
     }
 
-    public static ControlPointJpaEntity fromDomain(ControlPoint point) {
+    public static ControlPointJpaEntity fromDomain(ControlPoint point, EntityManager entityManager) {
         TraverseInfo traverse = point.getTraverse();
         return new ControlPointJpaEntity(
                 point.getId(), point.getPointNo(), point.getType(), point.getName(),
@@ -149,7 +176,8 @@ public class ControlPointJpaEntity extends BaseTime {
                 traverse != null ? traverse.grade() : null,
                 traverse != null ? traverse.lineName() : null,
                 traverse != null ? traverse.lineNo() : null,
-                traverse != null ? traverse.intersection() : null
+                traverse != null ? traverse.intersection() : null,
+                point.getLastSurveyResult(), point.getLastSurveyedOn(), point.getVersion()
         );
     }
 
@@ -160,7 +188,8 @@ public class ControlPointJpaEntity extends BaseTime {
                 new GeoCoordinate(lng, lat),
                 regionCode, regionName, address,
                 markerMaterial, installType, installedDate,
-                toTraverse()
+                toTraverse(),
+                lastSurveyResult, lastSurveyedOn, version
         );
     }
 

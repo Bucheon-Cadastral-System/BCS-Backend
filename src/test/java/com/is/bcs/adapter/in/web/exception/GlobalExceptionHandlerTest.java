@@ -54,6 +54,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("페이지·커서 요청 오류 — 400 으로 매핑되고 서버 문장이 아니라 안내 문구가 실린다")
+    void pagingExceptions() {
+        // 받는 핸들러가 없으면 미처리 예외로 새어 500 이 된다. 잘못 보낸 요청이므로 400 이어야 한다
+        assertMapped(handler.handleInvalidPageRequest(new InvalidPageRequestException("page는 0 이상이어야 합니다. 입력값=-1")),
+                HttpStatus.BAD_REQUEST, CommonErrorCode.PAGE_REQUEST_INVALID,
+                "목록을 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+        assertMapped(handler.handleInvalidCursor(new InvalidCursorException()),
+                HttpStatus.BAD_REQUEST, CommonErrorCode.CURSOR_INVALID,
+                "목록을 이어 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
+    @Test
     @DisplayName("토큰·교환코드 예외 — 각각의 보안 코드로 매핑된다")
     void tokenExceptions() {
         assertMapped(handler.handleExpiredToken(new ExpiredTokenException("만료", new IllegalStateException())),
@@ -116,11 +128,22 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("중복이 아닌 제약 위반은 500 이다 — 도메인 검증이 빠진 자리를 정상 응답으로 감추지 않는다")
-    void otherIntegrityViolation() {
+    @DisplayName("참조 제약 위반은 409 다 — 사전 검증 뒤 참조 대상이 바뀐 경합이라 다시 시도하면 풀린다")
+    void foreignKeyViolation() {
         // 23503 = foreign_key_violation
         ProblemDetail problem = handler.handleDataIntegrityViolation(new DataIntegrityViolationException(
                 "fk_survey_targets_project 위반", new SQLException("no referenced row", "23503")));
+
+        assertMapped(problem, HttpStatus.CONFLICT, CommonErrorCode.COMMON_CONFLICT,
+                "다른 작업과 겹쳐 처리하지 못했습니다. 다시 시도해 주세요.");
+    }
+
+    @Test
+    @DisplayName("중복·참조가 아닌 제약 위반은 500 이다 — 도메인 검증이 빠진 자리를 정상 응답으로 감추지 않는다")
+    void otherIntegrityViolation() {
+        // 23502 = not_null_violation — 필수값이 비었다는 건 경합이 아니라 검증 누락이다
+        ProblemDetail problem = handler.handleDataIntegrityViolation(new DataIntegrityViolationException(
+                "not-null 위반", new SQLException("null value in column", "23502")));
 
         assertMapped(problem, HttpStatus.INTERNAL_SERVER_ERROR, CommonErrorCode.COMMON_INTERNAL_ERROR,
                 "서버 내부 오류가 발생했습니다");

@@ -40,7 +40,9 @@ public class DeactivateMemberAdminService implements DeactivateMemberAdminUseCas
                                 actorAdminId,
                                 targetMember.getName(),
                                 targetMemberId
-                        )
+                        ),
+                actorAdmin.getName(),
+                targetMember.getName()
         );
     }
 

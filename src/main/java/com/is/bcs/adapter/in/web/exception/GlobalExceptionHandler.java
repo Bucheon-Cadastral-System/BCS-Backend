@@ -1,12 +1,17 @@
 package com.is.bcs.adapter.in.web.exception;
 
+import com.is.bcs.domain.controlpoint.exception.ControlPointInUseException;
+import com.is.bcs.domain.controlpoint.exception.ControlPointModifiedException;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpoint.exception.DuplicateControlPointException;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
+import com.is.bcs.domain.controlpointimage.exception.ControlPointImageNotFoundException;
+import com.is.bcs.domain.controlpointimage.exception.InvalidControlPointImageException;
 import com.is.bcs.domain.member.exception.*;
 import com.is.bcs.domain.survey.exception.InvalidSurveyException;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyRecordNotFoundException;
+import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import com.is.bcs.domain.token.exception.ExpiredOAuthExchangeCodeException;
 import com.is.bcs.domain.token.exception.ExpiredTokenException;
 import com.is.bcs.domain.token.exception.InvalidOAuthExchangeCodeException;
@@ -17,6 +22,7 @@ import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.*;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -177,9 +183,29 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(ControlPointErrorCode.CONTROL_POINT_DUPLICATE, e.getMessage());
     }
 
+    @ExceptionHandler(ControlPointModifiedException.class)
+    public ProblemDetail handleControlPointModified(ControlPointModifiedException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_MODIFIED, e.getMessage());
+    }
+
+    /** 하이버네이트가 판 번호로 거절한 경우 — 사전 확인과 저장 사이에 끼어든 수정이다. 같은 답을 준다. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLocking(ObjectOptimisticLockingFailureException e) {
+        log.warn("낙관적 잠금 충돌", e);
+        return problem(ControlPointErrorCode.CONTROL_POINT_MODIFIED,
+                "다른 사람이 먼저 수정했습니다. 최신 내용을 다시 불러와 주세요.");
+    }
+
+    @ExceptionHandler(ControlPointInUseException.class)
+    public ProblemDetail handleControlPointInUse(ControlPointInUseException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IN_USE, e.getMessage());
+    }
+
     /**
-     * 저장 제약 위반 — 중복만 409 로 알린다.
-     * 외래키·필수값·CHECK 위반까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
+     * 저장 제약 위반 — 중복과 참조(외래키)만 409 로 알린다.
+     * 중복은 같은 값을 두 곳에서 넣은 것이고, 참조 위반은 사전 검증을 통과한 뒤 그 사이에 다른 작업이
+     * 참조 대상을 바꾼 경합의 정상 결말이라 재시도로 풀린다. 필수값·CHECK 위반은 여전히 500 —
+     * 그것까지 409 로 뭉개면 도메인 검증이 빠진 자리를 정상 응답처럼 감춘다.
      * 제약 이름·SQL 은 사용자에게 뜻이 없고 노출하면 스키마가 드러나므로 어느 쪽이든 로그로만 남긴다.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -188,22 +214,28 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             log.warn("중복 저장 시도", e);
             return problem(CommonErrorCode.COMMON_CONFLICT, "이미 등록된 값이라 저장할 수 없습니다.");
         }
+        if (hasSqlState(e, FOREIGN_KEY_VIOLATION)) {
+            log.warn("참조 제약과 겹친 저장 시도", e);
+            return problem(CommonErrorCode.COMMON_CONFLICT, "다른 작업과 겹쳐 처리하지 못했습니다. 다시 시도해 주세요.");
+        }
         log.error("저장 제약 위반", e);
         return problem(CommonErrorCode.COMMON_INTERNAL_ERROR, "서버 내부 오류가 발생했습니다");
     }
 
-    /** SQL 표준의 unique_violation. 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
+    /** SQL 표준의 unique_violation / foreign_key_violation. 제약 이름 규칙에 기대지 않으려 상태 코드로 판단한다. */
     private static final String UNIQUE_VIOLATION = "23505";
+    private static final String FOREIGN_KEY_VIOLATION = "23503";
 
     /**
      * 중복 저장으로 실패한 것인지.
      * 원인 예외가 없는 DuplicateKeyException 은 상태 코드를 볼 수 없으므로 타입으로 먼저 가른다.
-     * 배치로 묶어 저장하면 진짜 원인이 cause 가 아니라 SQLException 의 다음 예외 사슬에 담기므로 둘 다 훑는다.
      */
     private static boolean isUniqueViolation(DataIntegrityViolationException e) {
-        if (e instanceof DuplicateKeyException) {
-            return true;
-        }
+        return e instanceof DuplicateKeyException || hasSqlState(e, UNIQUE_VIOLATION);
+    }
+
+    /** 배치로 묶어 저장하면 진짜 원인이 cause 가 아니라 SQLException 의 다음 예외 사슬에 담기므로 둘 다 훑는다. */
+    private static boolean hasSqlState(DataIntegrityViolationException e, String sqlState) {
         Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         Deque<Throwable> pending = new ArrayDeque<>(List.of(e));
         while (!pending.isEmpty()) {
@@ -212,7 +244,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 continue; // 예외가 서로를 가리켜도 멈춘다
             }
             if (current instanceof SQLException sql) {
-                if (UNIQUE_VIOLATION.equals(sql.getSQLState())) {
+                if (sqlState.equals(sql.getSQLState())) {
                     return true;
                 }
                 pushIfPresent(pending, sql.getNextException());
@@ -236,6 +268,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(SurveyRecordNotFoundException.class)
     public ProblemDetail handleSurveyRecordNotFound(SurveyRecordNotFoundException e) {
         return problem(SurveyErrorCode.SURVEY_RECORD_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(SurveyTargetNotFoundException.class)
+    public ProblemDetail handleSurveyTargetNotFound(SurveyTargetNotFoundException e) {
+        return problem(SurveyErrorCode.SURVEY_TARGET_NOT_FOUND, e.getMessage());
     }
 
     @ExceptionHandler(InvalidSurveyException.class)
@@ -278,6 +315,37 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(SecurityErrorCode.AUTHENTICATION_REQUIRED, e.getMessage());
     }
 
+    @ExceptionHandler(ControlPointImageNotFoundException.class)
+    public ProblemDetail handleControlPointImageNotFound(ControlPointImageNotFoundException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(InvalidControlPointImageException.class)
+    public ProblemDetail handleInvalidControlPointImage(InvalidControlPointImageException e) {
+        return problem(ControlPointErrorCode.CONTROL_POINT_IMAGE_INVALID, e.getMessage());
+    }
+
+    /**
+     * 페이지·커서 요청 오류 — 잘못 보낸 요청이라 400 이다.
+     *
+     * <p>핸들러가 없으면 아래 미처리 예외가 받아 500 으로 나간다. 그러면 클라이언트가 서버 장애로 보고
+     * 같은 값으로 한 번 더 두드리고, 서버 로그에도 평범한 입력 검증이 처리되지 않은 예외로 남는다.
+     *
+     * <p>detail 은 그대로 내보내지 않는다. "page는 0 이상이어야 합니다. 입력값=-1" 은 코드를 부르는
+     * 쪽에게 하는 말이지 사람에게 보일 문장이 아니다. 원문은 로그로 남긴다.
+     */
+    @ExceptionHandler(InvalidPageRequestException.class)
+    public ProblemDetail handleInvalidPageRequest(InvalidPageRequestException e) {
+        log.warn("잘못된 페이지 요청", e);
+        return problem(CommonErrorCode.PAGE_REQUEST_INVALID, "목록을 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
+    @ExceptionHandler(InvalidCursorException.class)
+    public ProblemDetail handleInvalidCursor(InvalidCursorException e) {
+        log.warn("잘못된 커서 요청", e);
+        return problem(CommonErrorCode.CURSOR_INVALID, "목록을 이어 불러올 수 없습니다. 화면을 새로고침해 주세요.");
+    }
+
     /** 예상하지 못한 예외 — 원인은 서버 로그에만 남기고 일반 메시지로 응답한다. */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception e) {
@@ -299,6 +367,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 ? CommonErrorCode.COMMON_INTERNAL_ERROR.code()
                 : CommonErrorCode.COMMON_BAD_REQUEST.code();
     }
+
 
 
 }

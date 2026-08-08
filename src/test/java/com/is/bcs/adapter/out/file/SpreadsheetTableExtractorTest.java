@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -189,6 +190,36 @@ class SpreadsheetTableExtractorTest {
             workbook.write(out);
             return out.toByteArray();
         }
+    }
+
+    @Test
+    @DisplayName("맥에서 저장한 자모 분리형(NFD) 한글은 결합형(NFC)으로 맞춰 읽는다 — CSV")
+    void extract_normalizesNfdHangul_csv() {
+        // 화면에는 같은 글자로 보이지만 문자열은 다르다 — 파일명(fileBaseName)과 같은 문제를 파일 내용에서 재현
+        String nfd = Normalizer.normalize("기준점명,소재지\n1465공,춘의동\n", Normalizer.Form.NFD);
+
+        Table table = extractor.extract(nfd.getBytes(StandardCharsets.UTF_8));
+
+        assertEquals(List.of("기준점명", "소재지"), table.headers()); // NFC 리터럴과 그대로 일치해야 한다
+        assertEquals(List.of("1465공", "춘의동"), table.rows().getFirst());
+    }
+
+    @Test
+    @DisplayName("맥에서 저장한 자모 분리형(NFD) 한글은 결합형(NFC)으로 맞춰 읽는다 — XLSX")
+    void extract_normalizesNfdHangul_xlsx() throws Exception {
+        byte[] xlsx = workbookBytes(sheet -> {
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue(Normalizer.normalize("기준점명", Normalizer.Form.NFD));
+            header.createCell(1).setCellValue(Normalizer.normalize("소재지", Normalizer.Form.NFD));
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue(Normalizer.normalize("1465공", Normalizer.Form.NFD));
+            row.createCell(1).setCellValue(Normalizer.normalize("춘의동", Normalizer.Form.NFD));
+        });
+
+        Table table = extractor.extract(xlsx);
+
+        assertEquals(List.of("기준점명", "소재지"), table.headers());
+        assertEquals(List.of("1465공", "춘의동"), table.rows().getFirst());
     }
 
     @Test

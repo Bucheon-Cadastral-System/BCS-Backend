@@ -1,13 +1,14 @@
 package com.is.bcs.application.port.in.survey;
 
 import com.is.bcs.application.dto.SurveyProgress;
-import com.is.bcs.domain.survey.SurveyRecord;
+import com.is.bcs.application.dto.SurveyRecordSummary;
 
 import java.util.List;
 
 public interface GetSurveyRecordsUseCase {
 
-    List<SurveyRecord> getByProjectId(Long projectId);
+    /** 조사원 표시명을 동봉한다 — 점 상세가 '누가 조사했는지'를 그린다. */
+    List<SurveyRecordSummary> getByProjectId(Long projectId);
 
     SurveyProgress getProgress(Long projectId);
 

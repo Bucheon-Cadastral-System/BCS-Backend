@@ -33,19 +33,21 @@ public class UpdateMemberProfileAdminService implements UpdateMemberProfileAdmin
                 .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + actorAdminId));
 
         Member targetMember = loadMemberPort.findById(targetMemberId)
-                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + actorAdminId));
+                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다. memberId=" + targetMemberId));
 
         recordAdminActivityPort.record(
                 actorAdminId,
                 targetMemberId,
                 AdminActivityType.MEMBER_PROFILE_UPDATED,
-                "%s님(ID: %d)이 %s 회원(ID: %d)을 회원의 정보를 업데이트했습니다."
+                "%s님(ID: %d)이 %s 회원(ID: %d)의 정보를 업데이트했습니다."
                         .formatted(
                                 actorAdmin.getName(),
                                 actorAdminId,
                                 targetMember.getName(),
                                 targetMemberId
-                        )
+                        ),
+                actorAdmin.getName(),
+                targetMember.getName()
         );
     }
 }

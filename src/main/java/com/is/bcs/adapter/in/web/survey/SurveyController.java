@@ -1,15 +1,20 @@
 package com.is.bcs.adapter.in.web.survey;
 
 import com.is.bcs.adapter.in.web.common.ContentResponse;
+import com.is.bcs.adapter.in.web.common.OptionalMemberId;
 import com.is.bcs.application.port.in.survey.CancelSurveyUseCase;
 import com.is.bcs.application.port.in.survey.CreateSurveyProjectUseCase;
+import com.is.bcs.application.port.in.survey.DeleteSurveyProjectUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyProjectsUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
 import com.is.bcs.application.port.in.survey.RecordSurveyUseCase;
+import com.is.bcs.application.port.in.survey.UpdateSurveyProjectUseCase;
 import com.is.bcs.domain.survey.SurveyProject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,7 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 
 @RestController
 @RequiredArgsConstructor
@@ -27,34 +31,45 @@ import java.net.URI;
 public class SurveyController {
 
     private final CreateSurveyProjectUseCase createSurveyProjectUseCase;
+    private final UpdateSurveyProjectUseCase updateSurveyProjectUseCase;
+    private final DeleteSurveyProjectUseCase deleteSurveyProjectUseCase;
     private final GetSurveyProjectsUseCase getSurveyProjectsUseCase;
     private final RecordSurveyUseCase recordSurveyUseCase;
     private final CancelSurveyUseCase cancelSurveyUseCase;
     private final GetSurveyRecordsUseCase getSurveyRecordsUseCase;
+    private final OptionalMemberId optionalMemberId;
 
     @PostMapping
-    public ResponseEntity<SurveyProjectResponse> create(@Valid @RequestBody CreateSurveyProjectRequest request) {
-        SurveyProject project = createSurveyProjectUseCase.create(request.toCommand());
-        return ResponseEntity
-                .created(URI.create("/api/survey-projects/" + project.getId()))
-                .body(SurveyProjectResponse.from(project));
+    public ResponseEntity<SurveyProjectResponse> create(
+            @Valid @RequestBody CreateSurveyProjectRequest request,
+            Authentication authentication
+    ) {
+        SurveyProject project = createSurveyProjectUseCase.create(
+                request.toCommand(optionalMemberId.of(authentication)));
+        // Location 은 두지 않는다 — 가리킬 단건 조회 경로가 없다. 만든 조사는 이 응답 본문에 그대로 실려 있다
+        return ResponseEntity.status(HttpStatus.CREATED).body(SurveyProjectResponse.from(project));
     }
 
+    /** 목록은 요약으로 내린다 — 행마다 완료 표시·작성자를 그리는 화면이 진행률을 건별로 다시 묻지 않게. */
     @GetMapping
-    public ContentResponse<SurveyProjectResponse> list() {
-        return new ContentResponse<>(getSurveyProjectsUseCase.getAll().stream()
-                .map(SurveyProjectResponse::from)
+    public ContentResponse<SurveyProjectSummaryResponse> list() {
+        return new ContentResponse<>(getSurveyProjectsUseCase.getSummaries().stream()
+                .map(SurveyProjectSummaryResponse::from)
                 .toList());
     }
 
-    @GetMapping("/{projectId}")
-    public SurveyProjectResponse getById(@PathVariable("projectId") Long projectId) {
-        return SurveyProjectResponse.from(getSurveyProjectsUseCase.getById(projectId));
+    @PutMapping("/{projectId}")
+    public SurveyProjectResponse update(
+            @PathVariable("projectId") Long projectId,
+            @Valid @RequestBody UpdateSurveyProjectRequest request
+    ) {
+        return SurveyProjectResponse.from(updateSurveyProjectUseCase.update(request.toCommand(projectId)));
     }
 
-    @GetMapping("/{projectId}/progress")
-    public SurveyProgressResponse progress(@PathVariable("projectId") Long projectId) {
-        return SurveyProgressResponse.from(getSurveyRecordsUseCase.getProgress(projectId));
+    @DeleteMapping("/{projectId}")
+    public ResponseEntity<Void> delete(@PathVariable("projectId") Long projectId) {
+        deleteSurveyProjectUseCase.delete(projectId);
+        return ResponseEntity.noContent().build();
     }
 
     /** 조사 대상 점 id 목록 — 화면이 지도·목록을 그 조사의 대상으로만 좁히는 데 쓴다. */
@@ -74,9 +89,11 @@ public class SurveyController {
     public SurveyRecordResponse record(
             @PathVariable("projectId") Long projectId,
             @PathVariable("pointId") Long pointId,
-            @Valid @RequestBody RecordSurveyRequest request
+            @Valid @RequestBody RecordSurveyRequest request,
+            Authentication authentication
     ) {
-        return SurveyRecordResponse.from(recordSurveyUseCase.record(request.toCommand(projectId, pointId)));
+        return SurveyRecordResponse.from(recordSurveyUseCase.record(
+                request.toCommand(projectId, pointId, optionalMemberId.of(authentication))));
     }
 
     @DeleteMapping("/{projectId}/records/{pointId}")

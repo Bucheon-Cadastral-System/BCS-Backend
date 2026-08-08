@@ -84,7 +84,6 @@ public class AuthController {
         OAuthCodeExchangeResponse responseBody =
                 new OAuthCodeExchangeResponse(
                         result.accessToken(),
-                        "Bearer",
                         result.accessTokenExpiresAt()
                 );
 
@@ -124,7 +123,6 @@ public class AuthController {
                 .body(
                         new RefreshTokenResponse(
                                 result.accessToken(),
-                                "Bearer",
                                 result.accessTokenExpiresAt()
                         )
                 );
@@ -159,9 +157,9 @@ public class AuthController {
     ) {
     }
 
+    /** tokenType 은 싣지 않는다 — 언제나 Bearer 라 받는 쪽이 그 값에서 알 수 있는 것이 없다. */
     public record OAuthCodeExchangeResponse(
             String accessToken,
-            String tokenType,
             Instant expiresAt
     ) {
     }
@@ -186,7 +184,6 @@ public class AuthController {
 
     public record RefreshTokenResponse(
             String accessToken,
-            String tokenType,
             Instant expiresAt
     ) {
     }

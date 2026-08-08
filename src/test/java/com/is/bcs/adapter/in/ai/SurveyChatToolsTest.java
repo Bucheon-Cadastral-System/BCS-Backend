@@ -1,10 +1,10 @@
 package com.is.bcs.adapter.in.ai;
 
 import com.is.bcs.application.dto.SurveyProgress;
+import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.application.port.in.survey.GetSurveyProjectsUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import java.time.LocalDate;
@@ -44,7 +44,7 @@ class SurveyChatToolsTest {
     }
 
     @Test
-    @DisplayName("조사 현황 — 유스케이스 진행 현황을 결과별 개수 필드로 펼쳐 준다")
+    @DisplayName("조사 현황 — 화면과 같은 두 축(상태·결과)으로 펼쳐 준다")
     void getSurveyProgress_flattensCounts() {
         fake.progress = new SurveyProgress("2026 일제조사", 5, 3, 2, false,
                 Map.of(SurveyResult.INTACT, 2L, SurveyResult.LOST, 1L, SurveyResult.ETC, 0L));
@@ -55,22 +55,67 @@ class SurveyChatToolsTest {
         assertEquals(5, progress.totalPoints());
         assertEquals(3, progress.surveyedPoints());
         assertEquals(2, progress.notSurveyedPoints());
+        // 정상은 조사한 점에서 망실을 뺀 값 — 모델이 직접 빼면 화면과 어긋나므로 여기서 계산해 넘긴다
         assertEquals(2, progress.intactPoints());
         assertEquals(1, progress.lostPoints());
-        assertEquals(0, progress.etcPoints());
+        assertEquals(60, progress.progressPercent()); // 3/5, 화면과 같은 반올림 규칙
     }
 
     @Test
-    @DisplayName("결과 유형이 빠진 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
+    @DisplayName("정상은 조사한 점에서 망실·조사불가·기타를 뺀 값이다")
+    void getSurveyProgress_intactExcludesOtherResults() {
+        fake.progress = new SurveyProgress("굴착협의", 50, 45, 5, false,
+                Map.of(SurveyResult.INTACT, 40L, SurveyResult.LOST, 3L, SurveyResult.UNAVAILABLE, 1L, SurveyResult.ETC, 1L));
+
+        SurveyProgressSummary progress = tools.getSurveyProgress(1L);
+
+        assertEquals(40, progress.intactPoints()); // 조사불가·기타는 정상에 섞이지 않는다
+        assertEquals(3, progress.lostPoints());
+        assertEquals(1, progress.unavailablePoints());
+        assertEquals(1, progress.etcPoints());
+        assertEquals(90, progress.progressPercent()); // 45/50
+        // 화면이 쓰는 다섯 갈래(정상·망실·조사불가·기타·미조사)를 모두 필드로 두므로 아홉 개다
+        assertEquals(9, SurveyProgressSummary.class.getRecordComponents().length);
+    }
+
+    @Test
+    @DisplayName("망실 기록이 없는 현황도 0으로 펼친다 — 매핑 경계 방어(NPE 차단)")
     void getSurveyProgress_missingResultKeys_defaultZero() {
         fake.progress = new SurveyProgress("2026 일제조사", 3, 1, 2, false, Map.of(SurveyResult.INTACT, 1L));
 
         SurveyProgressSummary progress = tools.getSurveyProgress(1L);
 
         assertEquals(1L, fake.progressProjectId); // 전달받은 id를 그대로 유스케이스에 넘긴다
-        assertEquals(1, progress.intactPoints());
         assertEquals(0, progress.lostPoints());
-        assertEquals(0, progress.etcPoints());
+        assertEquals(1, progress.intactPoints());
+    }
+
+    @Test
+    @DisplayName("정상·망실·조사불가·기타·미조사는 겹치지 않고 더하면 대상 전체가 된다")
+    void getSurveyProgress_fiveBucketsCoverTotal() {
+        fake.progress = new SurveyProgress("굴착협의", 48, 43, 5, false,
+                Map.of(SurveyResult.INTACT, 36L, SurveyResult.LOST, 3L, SurveyResult.UNAVAILABLE, 2L, SurveyResult.ETC, 2L));
+
+        SurveyProgressSummary progress = tools.getSurveyProgress(1L);
+
+        assertEquals(36, progress.intactPoints());
+        assertEquals(3, progress.lostPoints());
+        assertEquals(2, progress.unavailablePoints());
+        assertEquals(2, progress.etcPoints());
+        assertEquals(5, progress.notSurveyedPoints());
+        assertEquals(
+                48,
+                progress.intactPoints() + progress.lostPoints() + progress.unavailablePoints()
+                        + progress.etcPoints() + progress.notSurveyedPoints());
+        assertEquals(43, progress.surveyedPoints()); // 조사한 수는 넷의 합이라 미조사까지 함께 더하면 안 된다
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 진행률은 0이다 — 0으로 나누지 않는다")
+    void getSurveyProgress_noTarget_zeroPercent() {
+        fake.progress = new SurveyProgress("빈 조사", 0, 0, 0, false, Map.of());
+
+        assertEquals(0, tools.getSurveyProgress(1L).progressPercent());
     }
 
     @Test
@@ -93,6 +138,11 @@ class SurveyChatToolsTest {
         }
 
         @Override
+        public List<com.is.bcs.application.dto.SurveyProjectSummary> getSummaries() {
+            throw new UnsupportedOperationException("챗봇 도구는 목록 요약을 쓰지 않는다");
+        }
+
+        @Override
         public SurveyProject getById(Long id) {
             SurveyProject project = projects.get(id);
             if (project == null) {
@@ -102,7 +152,7 @@ class SurveyChatToolsTest {
         }
 
         @Override
-        public List<SurveyRecord> getByProjectId(Long projectId) {
+        public List<SurveyRecordSummary> getByProjectId(Long projectId) {
             return List.of();
         }
 

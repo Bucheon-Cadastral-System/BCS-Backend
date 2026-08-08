@@ -1,6 +1,7 @@
 package com.is.bcs.adapter.in.ai;
 
 import com.is.bcs.application.dto.ControlPointCountSummary;
+import com.is.bcs.application.dto.LastSurveySummary;
 import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
@@ -40,7 +41,7 @@ class ControlPointChatToolsTest {
                 new GeoCoordinate(126.794623, 37.506423),
                 "10300", "춘의동", "경기도 부천시 춘의동 102-16",
                 MarkerMaterial.STEEL, InstallType.INSTALLED, LocalDate.of(2018, 2, 21),
-                new TraverseInfo("1", null, null, false));
+                new TraverseInfo("1", null, null, false), null, null);
     }
 
     @Test
@@ -73,8 +74,8 @@ class ControlPointChatToolsTest {
         assertEquals("1465공", p.name());
         assertEquals("지적도근점", p.type());
         assertEquals("중부원점(세계측지계)", p.crs());
-        assertEquals(new BigDecimal("545236.77"), p.northing());
-        assertEquals(new BigDecimal("181840.96"), p.easting());
+        assertEquals(0, new BigDecimal("545236.77").compareTo(p.northing()));
+        assertEquals(0, new BigDecimal("181840.96").compareTo(p.easting()));
         assertEquals(126.794623, p.longitude());
         assertEquals(37.506423, p.latitude());
         assertEquals("춘의동", p.regionName());
@@ -92,7 +93,7 @@ class ControlPointChatToolsTest {
                 new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
                         new BigDecimal("545000.00"), new BigDecimal("181000.00")),
                 new GeoCoordinate(126.79, 37.50),
-                null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null));
 
         ControlPointDetail p = tools.getControlPointByNo("41192D000001266");
 
@@ -123,6 +124,11 @@ class ControlPointChatToolsTest {
             return points.stream().filter(p -> p.getPointNo().equals(pointNo)).findFirst()
                     .orElseThrow(() -> new ControlPointNotFoundException(
                             "기준점을 찾을 수 없습니다: " + pointNo));
+        }
+
+        @Override
+        public LastSurveySummary getLastSurvey(Long pointId) {
+            return new LastSurveySummary(null, null, null, null);
         }
 
         @Override

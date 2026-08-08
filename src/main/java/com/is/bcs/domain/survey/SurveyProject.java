@@ -20,8 +20,8 @@ public class SurveyProject {
     private final Long authorId;
 
     private String name;
-    private final LocalDate startedOn;
-    private final LocalDate endedOn; // 진행 중이면 비어 있다
+    private LocalDate startedOn;
+    private LocalDate endedOn; // 진행 중이면 비어 있다
     private String note; // 협의 문서번호 등 자유 비고
 
     private SurveyProject(Long id, Long authorId, String name, LocalDate startedOn, LocalDate endedOn, String note) {
@@ -33,8 +33,9 @@ public class SurveyProject {
         this.note = note;
     }
 
-    public static SurveyProject create(String name, LocalDate startedOn, LocalDate endedOn, String note) {
-        return new SurveyProject(null, null, name, startedOn, endedOn, note);
+    /** authorId 는 인증 주체다 — 인증이 없는 호출(개발용 개방 구간)에서는 null 로 만든다. */
+    public static SurveyProject create(Long authorId, String name, LocalDate startedOn, LocalDate endedOn, String note) {
+        return new SurveyProject(null, authorId, name, startedOn, endedOn, note);
     }
 
     /** DB 데이터를 도메인 객체로 복원한다. */
@@ -45,6 +46,17 @@ public class SurveyProject {
 
     public void rename(String name) {
         this.name = requireText(name, "조사명");
+    }
+
+    /** 값 전체 교체 — 생성과 같은 검증을 거친다. 종료일·비고는 비울 수 있는 값이라 null 이 곧 지움이다. */
+    public void update(String name, LocalDate startedOn, LocalDate endedOn, String note) {
+        // 검증을 모두 통과한 뒤에 대입한다 — 거부된 수정이 일부 값만 바꿔 놓으면 안 된다
+        String newName = requireText(name, "조사명");
+        LocalDate newStartedOn = requirePeriod(startedOn, endedOn);
+        this.name = newName;
+        this.startedOn = newStartedOn;
+        this.endedOn = endedOn;
+        this.note = note;
     }
 
     private static LocalDate requirePeriod(LocalDate startedOn, LocalDate endedOn) {

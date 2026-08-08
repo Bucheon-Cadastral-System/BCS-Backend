@@ -11,6 +11,8 @@ public record AdminActivityResponse(
         Long targetMemberId,
         AdminActivityType activityType,
         String message,
+        String actorName,
+        String targetName,
         OffsetDateTime createdAt
 ) {
 
@@ -23,6 +25,8 @@ public record AdminActivityResponse(
                 result.targetMemberId(),
                 result.activityType(),
                 result.message(),
+                result.actorName(),
+                result.targetName(),
                 result.createdAt()
         );
     }

@@ -1,7 +1,12 @@
 package com.is.bcs.adapter.in.web.chat;
 
+import com.is.bcs.adapter.in.security.CurrentMemberIdResolver;
+import com.is.bcs.adapter.in.security.jwt.AccessTokenAuthenticationFilter;
+import com.is.bcs.adapter.in.web.common.OptionalMemberId;
 import com.is.bcs.adapter.in.web.exception.ErrorDetailResolver;
 import com.is.bcs.application.port.in.chat.AskChatBotUseCase;
+import com.is.bcs.application.port.in.chat.ClearChatHistoryUseCase;
+import com.is.bcs.application.port.in.chat.GetChatHistoryUseCase;
 import com.is.bcs.config.TimeConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,20 +14,39 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
+import org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /** 챗봇 API 계약 검증 — 모델 없이 유스케이스 페이크로 컨트롤러·검증만 본다. */
-@WebMvcTest(ChatController.class)
-@Import({ChatApiTest.FakeChatBot.class, ErrorDetailResolver.class, TimeConfig.class})
+// 인증은 이 조각의 관심사가 아니다 — 컨트롤러 조각은 서블릿 필터·보안 설정을 함께 세우는데,
+// 그 판이 서려면 토큰 검증기부터 OAuth 클라이언트까지 딸려 와야 해서 컨트롤러를 보기도 전에 무너진다.
+// 인증이 붙은 실제 사슬은 전체를 띄우는 API 시험(SurveyApiTest 등)이 본다.
+@WebMvcTest(controllers = ChatController.class, excludeAutoConfiguration = {
+        SecurityAutoConfiguration.class,
+        ServletWebSecurityAutoConfiguration.class,
+        OAuth2ClientAutoConfiguration.class,
+        OAuth2ClientWebSecurityAutoConfiguration.class
+}, excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE, classes = AccessTokenAuthenticationFilter.class))
+@Import({ChatApiTest.FakeChatBot.class, ErrorDetailResolver.class, TimeConfig.class,
+        OptionalMemberId.class, CurrentMemberIdResolver.class})
 class ChatApiTest {
 
     @Autowired
@@ -62,13 +86,41 @@ class ChatApiTest {
         assertTrue(body.contains("질문은 필수입니다"));
     }
 
-    /** 유스케이스 페이크 — 질문이 컨트롤러를 통과해 그대로 전달되는지만 본다. */
+    @Test
+    @DisplayName("인증 없이 이력을 물으면 200과 빈 목록 — 대화는 계정에 딸리므로 남는 것이 없다")
+    void messages_withoutMember_returnsEmpty() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/chat/messages")).andReturn();
+
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals("[]", bodyOf(result));
+    }
+
+    @Test
+    @DisplayName("이력 비우기는 204 — 계정이 없으면 지울 것도 없다")
+    void clearMessages_returns204() throws Exception {
+        MvcResult result = mockMvc.perform(delete("/api/chat/messages")).andReturn();
+
+        assertEquals(204, result.getResponse().getStatus());
+    }
+
+    /** 유스케이스 페이크 — 질문·이력이 컨트롤러를 통과하는지만 본다(계정 해석은 인증 사슬 몫이라 여기선 항상 없음). */
     @TestConfiguration
     static class FakeChatBot {
 
         @Bean
         AskChatBotUseCase askChatBotUseCase() {
-            return question -> "질문 받음: " + question;
+            return (question, memberId) -> "질문 받음: " + question;
+        }
+
+        @Bean
+        GetChatHistoryUseCase getChatHistoryUseCase() {
+            return memberId -> List.of();
+        }
+
+        @Bean
+        ClearChatHistoryUseCase clearChatHistoryUseCase() {
+            return memberId -> {
+            };
         }
     }
 }

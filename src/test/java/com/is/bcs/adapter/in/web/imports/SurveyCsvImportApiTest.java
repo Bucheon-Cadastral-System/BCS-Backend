@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -48,7 +49,7 @@ class SurveyCsvImportApiTest {
     }
 
     @Test
-    @DisplayName("미리보기 — 200과 건수·열 매핑을 돌려주고 아무것도 등록하지 않는다")
+    @DisplayName("미리보기 — 200과 건수·오류 목록을 돌려주고 아무것도 등록하지 않는다")
     void preview_readsWithoutImporting() throws Exception {
         MvcResult result = mockMvc.perform(multipart("/api/imports/survey-csv/preview").file(sampleFile()))
                 .andExpect(status().isOk())
@@ -56,14 +57,40 @@ class SurveyCsvImportApiTest {
 
         String body = bodyOf(result);
         assertTrue(body.contains("\"totalRows\":49"), body);
-        assertTrue(body.contains("\"기존조사내\":\"기존조사내용\""), body);
         assertTrue(body.contains("\"errors\":[]"), body);
+        // 열 대응표는 화면이 쓰지 않아 응답에서 뺐다 — 파일이 제대로 읽혔다는 것은 건수와 오류 없음이 말한다
+        assertFalse(body.contains("recognizedColumns"), body);
 
         // 미리보기는 조사 프로젝트를 만들지 않는다
         MvcResult projects = mockMvc.perform(get("/api/survey-projects")).andExpect(status().isOk()).andReturn();
         assertTrue(bodyOf(projects).contains("\"content\":[]"), bodyOf(projects));
     }
 
+    @Test
+    @DisplayName("기준점만 업로드 — 201과 등록 건수를 돌려주고 조사는 만들지 않는다")
+    void importControlPoints_withoutProject() throws Exception {
+        MvcResult result = mockMvc.perform(multipart("/api/imports/control-points").file(sampleFile()))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String body = bodyOf(result);
+        assertTrue(body.contains("\"totalRows\":49"), body);
+        assertTrue(body.contains("\"newPoints\":49"), body);
+
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects")).andExpect(status().isOk()).andReturn();
+        assertTrue(bodyOf(projects).contains("\"content\":[]"), bodyOf(projects));
+    }
+
+
+    @Test
+    @DisplayName("같은 기준점 파일을 다시 올리면 새 점이 없어 200으로 끝난다")
+    void importControlPointsTwice_secondReturns200() throws Exception {
+        mockMvc.perform(multipart("/api/imports/control-points").file(sampleFile()))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(multipart("/api/imports/control-points").file(sampleFile()))
+                .andExpect(status().isOk());
+    }
     @Test
     @DisplayName("실파일 업로드 — 201과 요약(49점·조사 44건), 프로젝트·기준점·기록이 조회된다")
     void importRealFile_endToEnd() throws Exception {
@@ -84,13 +111,13 @@ class SurveyCsvImportApiTest {
         Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(body);
         assertTrue(m.find());
         String projectId = m.group(1);
-        assertEquals("/api/survey-projects/" + projectId, result.getResponse().getHeader("Location"));
 
-        // 임포트 결과가 실제로 조회 API에 반영됐는지
-        MvcResult project = mockMvc.perform(get("/api/survey-projects/" + projectId))
+        // 임포트 결과가 실제로 조회 API에 반영됐는지 — 목록에서 그 조사를 찾아 본다
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects"))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"startedOn\":\"2026-07-01\""));
+        assertTrue(bodyOf(projects).contains("\"id\":" + projectId));
+        assertTrue(bodyOf(projects).contains("\"startedOn\":\"2026-07-01\""));
 
         MvcResult points = mockMvc.perform(get("/api/control-points"))
                 .andExpect(status().isOk())
@@ -133,10 +160,11 @@ class SurveyCsvImportApiTest {
 
         Matcher m = Pattern.compile("\"projectId\":(\\d+)").matcher(bodyOf(typed));
         assertTrue(m.find());
-        MvcResult project = mockMvc.perform(get("/api/survey-projects/" + m.group(1)))
+        MvcResult projects = mockMvc.perform(get("/api/survey-projects"))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertTrue(bodyOf(project).contains("\"startedOn\":\"2026-07-01\""));
+        assertTrue(bodyOf(projects).contains("\"id\":" + m.group(1)));
+        assertTrue(bodyOf(projects).contains("\"startedOn\":\"2026-07-01\""));
     }
 
     @Test

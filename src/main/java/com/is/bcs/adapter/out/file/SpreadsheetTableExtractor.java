@@ -4,6 +4,7 @@ import com.is.bcs.application.port.out.file.Table;
 import com.is.bcs.application.port.out.file.TableExtractor;
 import com.is.bcs.domain.controlpoint.exception.InvalidControlPointException;
 import org.apache.poi.EncryptedDocumentException;
+import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -21,6 +22,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,6 +44,12 @@ public class SpreadsheetTableExtractor implements TableExtractor {
     /** 제목 행은 보통 한 칸만 채워져 있어, 두 칸 이상 채워진 첫 행을 헤더로 본다. */
     private static final int HEADER_MIN_FILLED_CELLS = 2;
 
+    static {
+        // xlsx는 zip이라 작은 파일이 수 GB로 풀리는 압축 폭탄이 가능하다.
+        // POI의 비율 방어(기본 1:100)에 절대 상한을 더해, 업로드 상한(20MB)짜리 파일이 힙을 다 먹기 전에 끊는다.
+        ZipSecureFile.setMaxEntrySize(64L * 1024 * 1024);
+    }
+
     @Override
     public Table extract(byte[] content) {
         if (content == null || content.length == 0) {
@@ -51,6 +59,15 @@ public class SpreadsheetTableExtractor implements TableExtractor {
         // 서명만 보고 옛 형식이라 단정하면 "암호를 푸세요" 대신 엉뚱한 안내가 나간다
         boolean workbook = startsWith(content, ZIP_MAGIC) || startsWith(content, OLE2_MAGIC);
         return workbook ? fromWorkbook(content) : fromCsv(decode(content));
+    }
+
+    /**
+     * 맥에서 저장한 파일은 한글이 자모 분리형(NFD)일 수 있다 — 화면에는 결합형과 똑같이 보이지만 문자열이 달라
+     * 헤더 인식·이름/종류 매칭·검색이 조용히 어긋난다(파일명 fileBaseName 을 NFC 로 맞춘 것과 같은 이유).
+     * 문자가 들어오는 길목(CSV 디코딩·셀 읽기)에서 결합형(NFC)으로 맞춰, 표에 실리는 문자열은 전부 NFC 가 되게 한다.
+     */
+    private static String nfc(String text) {
+        return Normalizer.normalize(text, Normalizer.Form.NFC);
     }
 
     private static boolean startsWith(byte[] content, byte[] magic) {
@@ -67,16 +84,19 @@ public class SpreadsheetTableExtractor implements TableExtractor {
 
     /** UTF-8 로 읽히면 UTF-8, 깨지면 CP949 로 본다. 한글이 CP949 로 저장되면 UTF-8 디코딩에서 반드시 실패한다. */
     private static String decode(byte[] content) {
+        String text;
         try {
             String decoded = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(content))
                     .toString();
-            return decoded.startsWith(UTF8_BOM) ? decoded.substring(1) : decoded;
+            text = decoded.startsWith(UTF8_BOM) ? decoded.substring(1) : decoded;
         } catch (CharacterCodingException e) {
-            return new String(content, CP949);
+            // CP949 에는 결합형 음절만 있어 아래 정규화가 건드릴 것이 없다 — 해도 무해해서 경로를 가르지 않는다
+            text = new String(content, CP949);
         }
+        return nfc(text);
     }
 
     private static Table fromCsv(String text) {
@@ -155,7 +175,7 @@ public class SpreadsheetTableExtractor implements TableExtractor {
         }
         CellType type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
         return switch (type) {
-            case STRING -> cell.getStringCellValue().trim();
+            case STRING -> nfc(cell.getStringCellValue()).trim();
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
                     ? cell.getLocalDateTimeCellValue().toLocalDate().toString()

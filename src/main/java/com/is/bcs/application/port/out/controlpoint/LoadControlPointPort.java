@@ -23,6 +23,9 @@ public interface LoadControlPointPort {
      */
     List<ControlPoint> findAllByNameInOrPointNoIn(Collection<String> names, Collection<String> pointNos);
 
+    /** id 목록 일괄 조회 — 대상 지정처럼 여러 점을 한 번에 검증할 때 쓴다(행마다 찾으면 질의가 목록 크기만큼 늘어난다). */
+    List<ControlPoint> findAllByIds(Collection<Long> ids);
+
     List<ControlPoint> findAll();
 
     boolean existsByPointNo(String pointNo);
