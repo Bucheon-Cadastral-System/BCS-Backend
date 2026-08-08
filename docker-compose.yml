@@ -7,6 +7,31 @@ services:
     image: postgres:18.4-alpine
     container_name: bcs-postgres
     restart: unless-stopped
+    # 느린 문장을 추적하는 두 모듈. shared_preload_libraries 는 기동 시에만 읽히므로
+    # 나중에 붙일 수 없고 여기서 못을 박아야 한다(자세한 내용은 docs/observability.md).
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements,auto_explain
+      # 어떤 문장이 총 시간을 얼마나 먹었는지 누적한다. 개별로는 빨라도 자주 불리는 문장은 여기서만 잡힌다
+      - -c
+      - pg_stat_statements.max=5000
+      - -c
+      - pg_stat_statements.track=top
+      # 임계값을 넘긴 문장의 실행 계획을 서버 로그에 남긴다. 우리 엔드포인트는 한 자릿수 ms 라 200ms 면 충분히 드물다
+      - -c
+      - auto_explain.log_min_duration=200ms
+      - -c
+      - auto_explain.log_analyze=on
+      - -c
+      - auto_explain.log_buffers=on
+      # 노드별 시각 측정은 느린 문장만이 아니라 모든 문장에 붙는 비용이다.
+      # 총 소요 시간과 실제 행 수는 이것 없이도 나오므로 평소에는 꺼 두고, 파고들 때만 켠다
+      - -c
+      - auto_explain.log_timing=off
+      # 하이버네이트가 보내는 문장은 대개 최상위지만 함수·트리거 안쪽도 함께 본다
+      - -c
+      - auto_explain.log_nested_statements=on
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres_admin
@@ -18,11 +43,29 @@ services:
       - "127.0.0.1:15432:5432"
     volumes:
       - postgres18_data:/var/lib/postgresql
+      # 볼륨이 비어 있을 때 한 번만 돈다. 이미 만들어진 볼륨에는 docs/observability.md 의 한 줄을 직접 실행할 것
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres_admin -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 10
 
+  # 지표 수집기 — 기본으로는 뜨지 않는다. 필요할 때만 `docker compose --profile obs up -d`.
+  # 앱은 로컬에서 bootRun 으로 도는 것을 전제로 host.docker.internal:8081 을 긁는다.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: bcs-prometheus
+    profiles: ["obs"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   postgres18_data:
+  prometheus_data:

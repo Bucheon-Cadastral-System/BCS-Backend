@@ -5,11 +5,16 @@ import com.is.bcs.adapter.in.security.oauth2.CustomOAuth2UserService;
 import com.is.bcs.adapter.in.security.oauth2.OAuth2LoginFailureHandler;
 import com.is.bcs.adapter.in.security.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -29,6 +34,30 @@ public class SecurityConfig {
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final AccessTokenAuthenticationFilter accessTokenAuthenticationFilter;
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
+
+    /**
+     * 관리 엔드포인트(/actuator) 전용 체인 — 아래 본 체인보다 먼저 걸린다.
+     *
+     * <p>액추에이터는 management.server.port 로 갈라 둔 별도 포트에서만 뜬다. 그 포트는 도커 compose 에서
+     * publish 하지 않으므로 바깥에서는 닿지 않고, 같은 네트워크에 있는 수집기(Prometheus)만 긁는다.
+     * 여기서 인증을 걸지 않는 이유가 그것이다 — 스크레이퍼는 우리 JWT 를 붙일 수단이 없다.
+     * 반대로 8080 으로 들어온 /actuator 요청은 이 matcher 가 잡지 않고(다른 포트다) 본 체인으로 넘어간다.
+     *
+     * <p>본 체인을 나중에 닫을 때 이 체인을 함께 손볼 필요는 없다. 오히려 이 체인이 없으면
+     * 본 체인의 anyRequest().authenticated() 가 관리 포트까지 덮어 수집이 401 로 끊긴다.
+     */
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public SecurityFilterChain managementSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher(EndpointRequest.toAnyEndpoint())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                // 수집기는 GET 만 보내고 세션도 쿠키도 쓰지 않는다
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .build();
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

@@ -1,0 +1,13 @@
+# 로컬 확인용 수집 설정. 운영 수집기는 서버 쪽 compose 에 있고 target 만 bcs-api:8081 로 다르다.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: bcs
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # 앱은 bootRun 으로 호스트에서 돌고, 관리 포트만 8081 로 갈라져 있다
+      - targets: ["host.docker.internal:8081"]
+        labels:
+          env: local

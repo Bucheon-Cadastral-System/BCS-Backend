@@ -116,6 +116,48 @@ logging:
     org.hibernate.orm.jdbc.bind: info
     root: info
 
+# 운영 지표.
+#
+# 관리 엔드포인트는 서비스 포트에서 갈라 둔다. 8081 은 도커 compose 에서 publish 하지 않으므로
+# 바깥에서는 닿지 않고 같은 네트워크에 있는 수집기만 긁는다. 인증을 걸지 않는 것도 그래서다
+# (SecurityConfig.managementSecurityFilterChain) — 스크레이퍼는 우리 JWT 를 붙일 수단이 없다.
+management:
+  server:
+    port: 8081
+
+  endpoints:
+    web:
+      exposure:
+        # 기본값은 health 하나뿐이라 적어 두지 않으면 /actuator/prometheus 가 404 다
+        include: health,metrics,prometheus
+
+  endpoint:
+    health:
+      # 관리 포트가 내부 전용이라 상세를 가릴 이유가 없다. 서비스 포트로 옮긴다면 이 줄부터 다시 볼 것
+      show-details: always
+
+  metrics:
+    tags:
+      application: bcs
+
+    distribution:
+      # 버킷째로 내보낸다. 앱이 미리 계산한 분위수(distribution.percentiles)를 쓰지 않는 이유는 두 가지다.
+      # 하나는 그 값이 인스턴스마다 따로 계산된 것이라 여러 대를 합칠 수 없다는 것이고,
+      # 다른 하나는 Prometheus 노출 형식상 히스토그램과 분위수가 한 지표에 같이 실리지 못한다는 것이다
+      # (히스토그램을 켜면 분위수 쪽이 조용히 버려진다). p95 는 수집기에서 histogram_quantile 로 센다.
+      percentiles-histogram:
+        http.server.requests: true
+
+      # 버킷은 이 범위 안에서만 만든다 — 못을 박지 않으면 나노초부터 분 단위까지 깔려 시계열이 불어난다
+      minimum-expected-value:
+        http.server.requests: 5ms
+      maximum-expected-value:
+        http.server.requests: 10s
+
+      # 이 경계들의 버킷이 정확히 그 값에 하나씩 더 생긴다. "1초 안에 답한 비율" 같은 목표를 세울 자리다
+      slo:
+        http.server.requests: 100ms, 300ms, 1s, 3s
+
 app:
   frontend-base-url: ${FRONTEND_BASE_URL:https://bcs.inwoohub.com}
   backend-base-url: ${BACKEND_BASE_URL:https://bcs.inwoohub.com}
