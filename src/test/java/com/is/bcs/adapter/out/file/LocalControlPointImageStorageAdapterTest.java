@@ -73,8 +73,9 @@ class LocalControlPointImageStorageAdapterTest {
     }
 
     @Test
-    @DisplayName("한도를 넘는 크기는 디스크를 건드리지 않고 거절한다")
-    void store_rejectsOversizeWithoutTouchingDisk(@TempDir Path root) {
+    @DisplayName("픽셀 치수가 한도를 넘으면 디스크를 건드리지 않고 거절한다")
+    void store_rejectsOversizeDimensionsWithoutTouchingDisk(@TempDir Path root) {
+        // 파일 크기 한도는 5MB 그대로다 — 여기서 800×600 이 걸리는 이유는 오직 치수다
         LocalControlPointImageStorageAdapter adapter = new LocalControlPointImageStorageAdapter(
                 new ImageUploadProperties(root.toString(), DataSize.ofMegabytes(5), 400, 400),
                 new ControlPointImageFileNameGenerator());
@@ -84,6 +85,32 @@ class LocalControlPointImageStorageAdapterTest {
                 1L, 2L, "P1465", CAPTURED_AT, "field.webp", "image/webp", content.length, content));
 
         // 거절된 사진은 임시 파일도 남기지 않는다 — 폴더 자체가 만들어지지 않는다
+        assertTrue(Files.notExists(root.resolve("control-points")));
+    }
+
+    @Test
+    @DisplayName("파일 크기가 한도를 넘으면 앞머리를 읽기도 전에 거절한다")
+    void store_rejectsOversizeFile(@TempDir Path root) {
+        // 이번엔 반대로 치수는 넉넉하고 파일 크기 한도만 이 파일(30바이트) 아래로 낮춘다
+        LocalControlPointImageStorageAdapter adapter = new LocalControlPointImageStorageAdapter(
+                new ImageUploadProperties(root.toString(), DataSize.ofBytes(20), 12000, 12000),
+                new ControlPointImageFileNameGenerator());
+        byte[] content = webp(800, 600);
+
+        assertThrows(InvalidControlPointImageException.class, () -> adapter.store(
+                1L, 2L, "P1465", CAPTURED_AT, "field.webp", "image/webp", content.length, content));
+
+        assertTrue(Files.notExists(root.resolve("control-points")));
+    }
+
+    @Test
+    @DisplayName("멀티파트가 알려 온 크기와 실제 바이트 수가 다르면 거절한다")
+    void store_rejectsDeclaredSizeMismatch(@TempDir Path root) {
+        byte[] content = webp(800, 600);
+
+        assertThrows(InvalidControlPointImageException.class, () -> adapterAt(root).store(
+                1L, 2L, "P1465", CAPTURED_AT, "field.webp", "image/webp", content.length + 1, content));
+
         assertTrue(Files.notExists(root.resolve("control-points")));
     }
 

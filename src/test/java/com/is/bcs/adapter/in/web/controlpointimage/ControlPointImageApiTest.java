@@ -88,12 +88,19 @@ class ControlPointImageApiTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
-    /** 크기를 읽는 데 필요한 자리만 채운 최소 WebP. */
+    /**
+     * 손실 압축 WebP 최소본.
+     *
+     * <p>우리 리더는 컨테이너 길이와 청크 길이를 읽지 않지만 여기서는 실제 바이트 수에 맞춰 채운다.
+     * 성공 경로의 표본이 명세를 어기고 있으면, 나중에 그 길이를 보게 됐을 때 멀쩡한 검증이 먼저 깨진다.
+     */
     private static byte[] webp(int width, int height) {
         byte[] file = new byte[30];
-        System.arraycopy("RIFF".getBytes(StandardCharsets.US_ASCII), 0, file, 0, 4);
-        System.arraycopy("WEBP".getBytes(StandardCharsets.US_ASCII), 0, file, 8, 4);
-        System.arraycopy("VP8 ".getBytes(StandardCharsets.US_ASCII), 0, file, 12, 4);
+        ascii(file, 0, "RIFF");
+        little32(file, 4, file.length - 8);
+        ascii(file, 8, "WEBP");
+        ascii(file, 12, "VP8 ");
+        little32(file, 16, file.length - 20);
         file[23] = (byte) 0x9D;
         file[24] = (byte) 0x01;
         file[25] = (byte) 0x2A;
@@ -102,6 +109,17 @@ class ControlPointImageApiTest {
         file[28] = (byte) (height & 0xFF);
         file[29] = (byte) ((height >> 8) & 0xFF);
         return file;
+    }
+
+    private static void ascii(byte[] file, int at, String value) {
+        System.arraycopy(value.getBytes(StandardCharsets.US_ASCII), 0, file, at, 4);
+    }
+
+    private static void little32(byte[] file, int at, int value) {
+        file[at] = (byte) (value & 0xFF);
+        file[at + 1] = (byte) ((value >> 8) & 0xFF);
+        file[at + 2] = (byte) ((value >> 16) & 0xFF);
+        file[at + 3] = (byte) ((value >> 24) & 0xFF);
     }
 
     private RequestPostProcessor as(long memberId) {

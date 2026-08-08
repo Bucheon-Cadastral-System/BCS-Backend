@@ -164,6 +164,12 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
         }
     }
 
+    /**
+     * 파일 자체의 조건만 본다 — 비어 있지 않은지, 한도 안인지, 선언한 크기와 맞는지, Content-Type 이 WebP 인지.
+     *
+     * <p>내용이 정말 WebP 인지는 여기서 보지 않는다. {@link WebpHeader} 가 크기를 읽으면서 함께 판정하므로
+     * 형식 검사를 두 벌로 두지 않는다.
+     */
     private void validateBasicFile(String contentType, long declaredFileSize, byte[] content) {
         if (content == null || content.length == 0) {
             throw new InvalidControlPointImageException("빈 이미지 파일은 등록할 수 없습니다.");
@@ -182,8 +188,6 @@ public class LocalControlPointImageStorageAdapter implements ControlPointImageFi
         if (contentType == null || !WEBP_CONTENT_TYPE.equals(contentType.toLowerCase(Locale.ROOT))) {
             throw new InvalidControlPointImageException("WebP 이미지만 등록할 수 있습니다.");
         }
-
-        // 파일 내용이 정말 WebP 인지는 WebpHeader 가 크기를 읽으면서 함께 판정한다
     }
 
     private static ImageDimensions readDimensions(byte[] content) {

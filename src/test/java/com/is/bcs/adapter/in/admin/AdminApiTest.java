@@ -7,6 +7,7 @@ import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.MemberRole;
 import com.is.bcs.domain.member.Position;
 import com.is.bcs.domain.member.Team;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,20 +26,24 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 어드민 회원 관리·활동 로그 API 계약 검증 — DB 필요(bcs/docker-compose). */
+/**
+ * 어드민 회원 관리·활동 로그 API 계약 검증 — DB 필요(bcs/docker-compose).
+ *
+ * <p>응답은 본문 문자열의 부분 일치가 아니라 jsonPath 로 본다. 부분 일치는 값이 엉뚱한 필드에 실려 와도
+ * 통과하고, 없어야 할 것을 확인할 때는 응답이 통째로 비어도 통과하기 때문이다.
+ */
 @SpringBootTest
 @Transactional
 class AdminApiTest {
@@ -83,31 +88,23 @@ class AdminApiTest {
         return result.getResponse().getContentAsString(StandardCharsets.UTF_8);
     }
 
-    private String pick(String body, String field) {
-        Matcher m = Pattern.compile("\"" + field + "\":\"?([^,\"}]+)").matcher(body);
-        assertTrue(m.find(), field + " 가 응답에 없다: " + body);
-        return m.group(1);
-    }
-
     @Test
     @DisplayName("회원 목록을 상태·권한으로 걸러 정렬해 돌려준다")
     void getMembers_filtersAndSorts() throws Exception {
         member("김활성", true);
         member("박대기", false);
 
-        MvcResult all = mockMvc.perform(get("/api/admin/members")
+        mockMvc.perform(get("/api/admin/members")
                         .param("sortBy", "name").param("direction", "ASC").with(as(member("관리자", true).getId())))
                 .andExpect(status().isOk())
-                .andReturn();
-        MvcResult pending = mockMvc.perform(get("/api/admin/members")
+                .andExpect(jsonPath("$.content[*].name", hasItem("김활성")));
+
+        mockMvc.perform(get("/api/admin/members")
                         .param("status", "PENDING").with(as(member("관리자2", true).getId())))
                 .andExpect(status().isOk())
-                .andReturn();
-
-        assertTrue(bodyOf(all).contains("김활성"));
-        assertTrue(bodyOf(pending).contains("박대기"));
-        // 걸러 보기가 실제로 좁히는지 — 활성 회원이 대기 목록에 섞이면 그 조건이 안 걸린 것이다
-        assertFalse(bodyOf(pending).contains("김활성"));
+                .andExpect(jsonPath("$.content[*].name", hasItem("박대기")))
+                // 걸러 보기가 실제로 좁히는지 — 활성 회원이 대기 목록에 섞이면 그 조건이 안 걸린 것이다
+                .andExpect(jsonPath("$.content[*].name", not(hasItem("김활성"))));
     }
 
     @Test
@@ -126,7 +123,7 @@ class AdminApiTest {
     }
 
     @Test
-    @DisplayName("승인·거절·비활성화·활성화·승격·강등이 상태와 권한에 반영된다")
+    @DisplayName("승인·거절·비활성화·활성화가 상태에 반영된다")
     void memberStateTransitions() throws Exception {
         long adminId = member("관리자", true).getId();
         long pendingId = member("박대기", false).getId();
@@ -140,16 +137,31 @@ class AdminApiTest {
                 .andExpect(status().isNoContent());
         mockMvc.perform(patch("/api/admin/members/{id}/activate", pendingId).with(as(adminId)))
                 .andExpect(status().isNoContent());
-        mockMvc.perform(patch("/api/admin/members/{id}/role/admin", pendingId).with(as(adminId)))
-                .andExpect(status().isNoContent());
-        mockMvc.perform(patch("/api/admin/members/{id}/role/user", pendingId).with(as(adminId)))
-                .andExpect(status().isNoContent());
 
-        String body = bodyOf(mockMvc.perform(get("/api/admin/members")
-                        .param("status", "ACTIVE").param("size", "100").with(as(adminId)))
+        mockMvc.perform(get("/api/admin/members").param("size", "100").with(as(adminId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        assertTrue(body.contains("박대기"));
+                .andExpect(jsonPath("$.content[?(@.id == " + pendingId + ")].status", hasItem("ACTIVE")))
+                .andExpect(jsonPath("$.content[?(@.id == " + rejectedId + ")].status", not(hasItem("ACTIVE"))));
+    }
+
+    @Test
+    @DisplayName("승격·강등이 권한에 반영된다")
+    void memberRoleTransitions() throws Exception {
+        long adminId = member("관리자", true).getId();
+        long targetId = member("김활성", true).getId();
+
+        mockMvc.perform(patch("/api/admin/members/{id}/role/admin", targetId).with(as(adminId)))
+                .andExpect(status().isNoContent());
+        // 승격이 실제로 반영됐는지 먼저 본다 — 두 번 호출하고 마지막만 보면 둘 다 안 먹어도 통과한다
+        mockMvc.perform(get("/api/admin/members").param("size", "100").with(as(adminId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == " + targetId + ")].role", hasItem("ADMIN")));
+
+        mockMvc.perform(patch("/api/admin/members/{id}/role/user", targetId).with(as(adminId)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/admin/members").param("size", "100").with(as(adminId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id == " + targetId + ")].role", hasItem("USER")));
     }
 
     @Test
@@ -167,12 +179,11 @@ class AdminApiTest {
                         .with(as(adminId)))
                 .andExpect(status().isNoContent());
 
-        String body = bodyOf(mockMvc.perform(get("/api/admin/members")
-                        .param("size", "100").with(as(adminId)))
+        mockMvc.perform(get("/api/admin/members").param("size", "100").with(as(adminId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        assertTrue(body.contains("김고침"));
-        assertTrue(body.contains("fixed@example.com"));
+                .andExpect(jsonPath("$.content[?(@.id == " + targetId + ")].name", hasItem("김고침")))
+                .andExpect(jsonPath("$.content[?(@.id == " + targetId + ")].email", hasItem("fixed@example.com")))
+                .andExpect(jsonPath("$.content[?(@.id == " + targetId + ")].district", hasItem("SOSA")));
     }
 
     @Test
@@ -181,48 +192,55 @@ class AdminApiTest {
         long adminId = member("관리자", true).getId();
         long first = member("첫째", false).getId();
         long second = member("둘째", false).getId();
-        mockMvc.perform(patch("/api/admin/members/{id}/approve", first).with(as(adminId)));
-        mockMvc.perform(patch("/api/admin/members/{id}/approve", second).with(as(adminId)));
+        // 준비 단계도 상태를 본다 — 여기서 실패하면 활동이 안 생겨 아래 단정이 엉뚱한 자리에서 깨진다
+        mockMvc.perform(patch("/api/admin/members/{id}/approve", first).with(as(adminId)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(patch("/api/admin/members/{id}/approve", second).with(as(adminId)))
+                .andExpect(status().isNoContent());
 
         String page = bodyOf(mockMvc.perform(get("/api/admin/activities")
                         .param("size", "1").with(as(adminId)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].activityType", is("MEMBER_APPROVED")))
+                // 기록 시점의 이름이 함께 실린다 — 나중에 이름을 고쳐도 그때의 로그는 그대로여야 한다
+                .andExpect(jsonPath("$.content[0].actorName", is("관리자")))
+                .andExpect(jsonPath("$.content[0].targetName", is("둘째")))
+                .andExpect(jsonPath("$.hasNext", is(true)))
                 .andReturn());
 
-        // 기록 시점의 이름이 함께 실린다 — 나중에 이름을 고쳐도 그때의 로그는 그대로여야 한다
-        assertTrue(page.contains("MEMBER_APPROVED"));
-        assertTrue(page.contains("\"actorName\":\"관리자\""));
-        assertTrue(page.contains("\"hasNext\":true"));
-
-        String cursor = pick(page, "nextCursor");
+        String cursor = JsonPath.read(page, "$.nextCursor");
         assertNotNull(cursor);
 
-        String next = bodyOf(mockMvc.perform(get("/api/admin/activities")
+        // 이어 받은 쪽은 앞 쪽과 다른 줄이다 — 커서가 안 먹으면 같은 줄이 다시 온다
+        mockMvc.perform(get("/api/admin/activities")
                         .param("size", "1").param("cursor", cursor).with(as(adminId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        // 이어 받은 쪽은 앞 쪽과 다른 줄이다 — 커서가 안 먹으면 같은 줄이 다시 온다
-        assertFalse(next.equals(page));
+                .andExpect(jsonPath("$.content[0].targetName", is("첫째")));
     }
 
     @Test
     @DisplayName("활동 로그를 종류로 걸러 볼 수 있다")
     void activities_filterByType() throws Exception {
         long adminId = member("관리자", true).getId();
-        long targetId = member("박대기", false).getId();
-        mockMvc.perform(patch("/api/admin/members/{id}/approve", targetId).with(as(adminId)));
+        long approvedId = member("박대기", false).getId();
+        long rejectedId = member("최거절", false).getId();
+        mockMvc.perform(patch("/api/admin/members/{id}/approve", approvedId).with(as(adminId)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(patch("/api/admin/members/{id}/reject", rejectedId).with(as(adminId)))
+                .andExpect(status().isNoContent());
 
-        String approved = bodyOf(mockMvc.perform(get("/api/admin/activities")
+        // 두 종류를 다 만들어 두고 양쪽에서 본다 — 한쪽만 보면 응답이 통째로 비어도 통과한다
+        mockMvc.perform(get("/api/admin/activities")
                         .param("activityType", "MEMBER_APPROVED").with(as(adminId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        String rejected = bodyOf(mockMvc.perform(get("/api/admin/activities")
+                .andExpect(jsonPath("$.content[*].activityType", hasItem("MEMBER_APPROVED")))
+                .andExpect(jsonPath("$.content[*].activityType", not(hasItem("MEMBER_REJECTED"))));
+
+        mockMvc.perform(get("/api/admin/activities")
                         .param("activityType", "MEMBER_REJECTED").with(as(adminId)))
                 .andExpect(status().isOk())
-                .andReturn());
-
-        assertTrue(approved.contains("MEMBER_APPROVED"));
-        assertFalse(rejected.contains("MEMBER_APPROVED"));
+                .andExpect(jsonPath("$.content[*].activityType", hasItem("MEMBER_REJECTED")))
+                .andExpect(jsonPath("$.content[*].activityType", not(hasItem("MEMBER_APPROVED"))));
     }
 
     @Test
@@ -243,10 +261,10 @@ class AdminApiTest {
     void myProfile() throws Exception {
         long memberId = member("김활성", true).getId();
 
-        String profile = bodyOf(mockMvc.perform(get("/api/members/me").with(as(memberId)))
+        mockMvc.perform(get("/api/members/me").with(as(memberId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        assertTrue(profile.contains("김활성"));
+                .andExpect(jsonPath("$.id", is((int) memberId)))
+                .andExpect(jsonPath("$.name", is("김활성")));
 
         mockMvc.perform(patch("/api/members/me/update")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -257,9 +275,13 @@ class AdminApiTest {
                         .with(as(memberId)))
                 .andExpect(status().isNoContent());
 
-        String state = bodyOf(mockMvc.perform(get("/api/members/me/state").with(as(memberId)))
+        mockMvc.perform(get("/api/members/me").with(as(memberId)))
                 .andExpect(status().isOk())
-                .andReturn());
-        assertEquals(true, state.contains("ACTIVE"));
+                .andExpect(jsonPath("$.phone", is("01055556666")))
+                .andExpect(jsonPath("$.district", is("OJEONG")));
+
+        mockMvc.perform(get("/api/members/me/state").with(as(memberId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("ACTIVE")));
     }
 }

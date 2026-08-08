@@ -116,11 +116,23 @@ class WebpHeaderTest {
     }
 
     @Test
-    @DisplayName("머리가 잘려 있으면 거부한다")
+    @DisplayName("머리가 잘려 있으면 세 형식 모두 거부한다")
     void rejectsTruncated() {
-        byte[] file = container("VP8 ", (byte) 0x00, (byte) 0x00);
+        // 청크 종류까지는 읽히지만 크기가 적힌 자리가 오기 전에 파일이 끝난다
+        byte[] lossy = container("VP8 ", (byte) 0x00, (byte) 0x00);
+        byte[] lossless = container("VP8L", (byte) 0x2F, (byte) 0x00, (byte) 0x00);
+        byte[] extended = container("VP8X", (byte) 0x10, (byte) 0, (byte) 0, (byte) 0, (byte) 0, (byte) 0);
 
-        assertThrows(InvalidControlPointImageException.class, () -> WebpHeader.read(file));
+        assertThrows(InvalidControlPointImageException.class, () -> WebpHeader.read(lossy));
+        assertThrows(InvalidControlPointImageException.class, () -> WebpHeader.read(lossless));
+        assertThrows(InvalidControlPointImageException.class, () -> WebpHeader.read(extended));
+    }
+
+    @Test
+    @DisplayName("내용이 없으면 거부한다 — null 도 빈 배열도 읽을 자리가 없다")
+    void rejectsEmpty() {
+        assertThrows(InvalidControlPointImageException.class, () -> WebpHeader.read(null));
+        assertThrows(InvalidControlPointImageException.class, () -> WebpHeader.read(new byte[0]));
     }
 
     @Test
