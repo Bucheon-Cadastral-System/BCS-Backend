@@ -191,7 +191,7 @@ services:
       - auto_explain.log_nested_statements=on
 
   prometheus:
-    image: prom/prometheus:v3.1.0
+    image: prom/prometheus:v3.13.2
     restart: unless-stopped
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
