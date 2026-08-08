@@ -126,7 +126,6 @@ app:
     max-file-size: ${BCS_IMAGE_MAX_SIZE:5MB}
     max-width: ${BCS_IMAGE_MAX_WIDTH:12000}
     max-height: ${BCS_IMAGE_MAX_HEIGHT:12000}
-    webp-info-command: ${BCS_WEBPINFO_COMMAND:webpinfo}
 
   jwt:
     secret: ${JWT_SECRET}

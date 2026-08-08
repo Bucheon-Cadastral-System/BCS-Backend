@@ -15,15 +15,18 @@ import com.is.bcs.application.port.out.controlpointimage.SaveControlPointImagePo
 import com.is.bcs.application.port.out.member.LoadMemberPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
+import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.exception.ControlPointNotFoundException;
 import com.is.bcs.domain.controlpointimage.ControlPointImage;
 import com.is.bcs.domain.controlpointimage.exception.ControlPointImageNotFoundException;
 import com.is.bcs.domain.controlpointimage.exception.ControlPointImageStorageException;
+import com.is.bcs.domain.controlpointimage.exception.InvalidControlPointImageException;
 import com.is.bcs.domain.member.Member;
 import com.is.bcs.domain.member.MemberStatus;
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
+import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import com.is.bcs.domain.survey.exception.SurveyTargetNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,6 +61,11 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
 
     private final ControlPointImageFileStoragePort fileStoragePort;
 
+    /** 사진과 함께 온 판정을 같은 트랜잭션에서 남긴다 — 둘 중 하나만 남는 상태를 만들지 않는다. */
+    private final SaveSurveyRecordPort saveSurveyRecordPort;
+
+    private final Clock clock;
+
     private static final Pattern STORED_FILE_NAME_PATTERN =
             Pattern.compile(
                     "^(.+)_"
@@ -75,6 +85,8 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
         lockTarget(command.projectId(), command.pointId());
 
         requireActiveMember(command.uploaderId());
+
+        requireNotFuture(command.capturedAt());
 
         ControlPointImage existing = loadControlPointImagePort
                 .findByProjectIdAndPointId(command.projectId(), command.pointId())
@@ -124,6 +136,23 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
                     );
 
             ControlPointImage saved = saveControlPointImagePort.save(newImage);
+
+            /*
+             * 판정도 같은 트랜잭션 안에서 남긴다.
+             *
+             * 조사 시각은 서버가 받은 시각이 아니라 사진을 찍은 시각이다. 조사가 일어난 때는
+             * 현장에 서 있던 그때이고, 사무실에 돌아와 올린 시각이 아니다. 최종조사 계산이
+             * 이 값을 날짜로 견주므로 여기서 어긋나면 회차 차례가 뒤집힌다.
+             *
+             * upsertForTarget 은 대상 확인과 쓰기가 한 문장이지만, 위에서 이미 대상 행을 잠갔으므로
+             * 여기서 empty 가 돌아올 일은 없다. 그래도 계약대로 받아 둔다 —
+             * 잠금 없이 부르는 경로가 나중에 생기면 조용히 빠지는 것보다 낫다.
+             */
+            saveSurveyRecordPort.upsertForTarget(SurveyRecord.create(
+                            command.projectId(), command.pointId(), command.result(),
+                            command.capturedAt(), command.note(), command.uploaderId()))
+                    .orElseThrow(() -> new SurveyTargetNotFoundException(
+                            "프로젝트의 조사 대상이 아닌 기준점입니다: " + command.pointId()));
 
             registerFileCleanup(
                     storedFile.storagePath(),
@@ -223,6 +252,18 @@ public class ControlPointImageService implements UploadControlPointImageUseCase,
 
         if (!lock) {
             throw new SurveyTargetNotFoundException("프로젝트의 조사 대상이 아닌 기준점입니다: " + pointId);
+        }
+    }
+
+    /**
+     * 촬영 일시가 미래면 거부한다.
+     *
+     * <p>EXIF 가 없는 사진은 사용자가 직접 시각을 적어 올린다. 미래 시각을 적으면 그 기록이 최종조사 자리를
+     * 영구히 차지해 그 뒤의 진짜 조사가 아무리 쌓여도 밀려나지 않는다. 되돌리려면 그 기록을 지우는 수밖에 없다.
+     */
+    private void requireNotFuture(OffsetDateTime capturedAt) {
+        if (capturedAt.isAfter(OffsetDateTime.now(clock))) {
+            throw new InvalidControlPointImageException("촬영 일시를 미래로 지정할 수 없습니다. 다시 확인해 주세요.");
         }
     }
 
