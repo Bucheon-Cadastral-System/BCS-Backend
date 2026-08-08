@@ -12,11 +12,11 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - "bcs-api:8080"
+          - "bcs-api:8081"
         labels:
           environment: prod
 
       - targets:
-          - "host.docker.internal:8080" # MAC에서 실행중인 Spring
+          - "host.docker.internal:8081" # MAC에서 실행중인 Spring
         labels:
           environment: local
