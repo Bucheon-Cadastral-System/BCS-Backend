@@ -70,6 +70,11 @@ dependencies {
     // Spring AI (챗봇: ChatClient + 도구 호출) — 모델은 Gemini(OpenAI 호환 엔드포인트)라 OpenAI 스타터 사용
     implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
+
+    // Monitoring
+    implementation 'org.springframework.boot:spring-boot-starter-actuator' // HTTP, JVM, HikariCP 등의 운영 지표 생성
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'// Micrometer 지표를 Prometheus 형식으로 변환
+
 }
 
 dependencyManagement {

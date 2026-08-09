@@ -1,0 +1,52 @@
+// Docker 컨테이너 목록 조회
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+
+discovery.relabel "docker_logs" {
+
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex = "/(.*)"
+    target_label = "container"
+  }
+}
+
+
+// Docker 컨테이너 로그 수집
+loki.source.docker "docker_logs" {
+
+  host = "unix:///var/run/docker.sock"
+
+  targets = discovery.docker.containers.targets
+
+  // Docker container name → container label
+  relabel_rules = discovery.relabel.docker_logs.rules
+
+  forward_to = [
+    loki.process.docker_logs.receiver,
+  ]
+}
+
+
+// 로그 가공
+loki.process "docker_logs" {
+
+  stage.docker {}
+
+  forward_to = [
+    loki.write.default.receiver,
+  ]
+}
+
+
+// Loki로 전송
+loki.write "default" {
+
+  endpoint {
+    url = "http://bcs-loki:3100/loki/api/v1/push"
+  }
+}

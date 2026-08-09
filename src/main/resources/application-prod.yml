@@ -140,3 +140,26 @@ app:
 
     oauth:
       exchange-code-ttl: 60s
+
+management:
+  server:
+    port: 8081
+
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health     # GET /actuator/health 활성화
+          - prometheus # GET /actuator/prometheus 활성화
+
+  endpoint:
+    health:
+      show-details: never
+
+  metrics:
+    tags:
+      application: ${spring.application.name} # bcs 태그 추가
+
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true # api 응답 시간의 p95, p99 계산 가능하도록 구간별 통계 생성

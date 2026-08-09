@@ -1,0 +1,26 @@
+auth_enabled: false # Loki 자체 인증 설정 안함 (서버 내부에서만 쓸거기때문)
+
+server:
+  http_listen_port: 3100
+
+common:
+  path_prefix: /loki
+  storage: # Loki 데이터 저장 경로
+    filesystem:
+      chunks_directory: /loki/chunks # 로그 데이터 저장 chunk 단위로 저장
+      rules_directory: /loki/rules   # Loki의 recording rule이나 alerting rule 같은 규칙 데이터를 저장
+  replication_factor: 1              # 로그 데이터 몇 개의 Loki 인스턴스 복제? -> 단일임으로 1
+  ring:
+    instance_addr: 127.0.0.1         # 내부 주소
+    kvstore:
+      store: inmemory                # 내부 주소 저장 위치 (인메모리)
+
+schema_config:                       # 로그 데이터와 인덱를 어떤 구조로 저장할지 정의하는 부분
+  configs:
+    - from: 2026-08-01               # 26.08.01 이후 데이터만 저장
+      store: tsdb                    # TSDB (Time Series DataBase) : Loki 최신 권장 저장 방식
+      object_store: filesystem       # 로그 데이터 저장시 chunk를 어디에 저장? filesystem -> 로컬 디스크
+      schema: v13                    # Loki가 인덱스와 로그 데이터를 어떤 포맷으로 관리할 것인가 -> v13 : TSDB 기반 최신
+      index:
+        prefix: index_               # index_20260808 처럼 Prefix 처럼 이름 생성
+        period: 24h                  # 인덱스를 하루 단위로 나눠 관리함

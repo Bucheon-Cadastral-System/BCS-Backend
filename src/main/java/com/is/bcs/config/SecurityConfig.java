@@ -7,9 +7,12 @@ import com.is.bcs.adapter.in.security.oauth2.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -17,6 +20,7 @@ import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 
 import java.util.List;
 
@@ -30,7 +34,9 @@ public class SecurityConfig {
     private final AccessTokenAuthenticationFilter accessTokenAuthenticationFilter;
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
 
+    /** 8080 으로 들어오는 일반적인 시큐리티 필터체인 */
     @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         return http
@@ -120,5 +126,22 @@ public class SecurityConfig {
         return source;
     }
 
+    /** 8081 으로 들어오는 Actuator 시큐리티 필터체인 */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher("/actuator/**")    // 해당 경로로 들어오는 것만 잡아서 처리
+                .authorizeHttpRequests(auth ->
+                        auth.anyRequest().permitAll() // 모든 요청 수락 가능
+                )
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+                .build();
+    }
 
 }
