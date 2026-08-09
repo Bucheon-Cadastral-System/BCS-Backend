@@ -24,6 +24,9 @@ services:
       timeout: 5s
       retries: 10
 
+    networks:
+      - monitoring-net
+
   prometheus:
     image: prom/prometheus:v3.7.3
     container_name: bcs-prometheus
@@ -36,6 +39,9 @@ services:
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+
+    networks:
+      - monitoring-net
 
   grafana:
     image: grafana/grafana:12.3.0
@@ -52,6 +58,9 @@ services:
     depends_on:
       - prometheus
 
+    networks:
+      - monitoring-net
+
   loki:
     image: grafana/loki:3.5.5
     container_name: bcs-loki
@@ -63,6 +72,9 @@ services:
     volumes:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
+
+    networks:
+      - monitoring-net
 
   alloy:
     image: grafana/alloy:v1.9.2
@@ -86,10 +98,13 @@ services:
     depends_on:
       - loki
 
+    networks:
+      - monitoring-net
+
   n8n:
     image: n8nio/n8n:latest
     container_name: bcs-n8n
-    restart: always
+    restart: unless-stopped
 
     ports:
       - "127.0.0.1:5678:5678"
@@ -111,8 +126,11 @@ services:
       - n8n_data:/home/node/.n8n
 
     networks:
-      - main-net
+      - monitoring-net
 
+
+networks:
+  monitoring-net:
 
 volumes:
   postgres18_data:
