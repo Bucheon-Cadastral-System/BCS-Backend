@@ -17,10 +17,20 @@ common:
 
 schema_config:                       # 로그 데이터와 인덱를 어떤 구조로 저장할지 정의하는 부분
   configs:
-    - from: 2026-08-01               # 26.08.01 이후 데이터만 저장
+    - from: 2026-08-01               # 2026-08-01부터 이 TSDB schema 설정 적용
       store: tsdb                    # TSDB (Time Series DataBase) : Loki 최신 권장 저장 방식
       object_store: filesystem       # 로그 데이터 저장시 chunk를 어디에 저장? filesystem -> 로컬 디스크
       schema: v13                    # Loki가 인덱스와 로그 데이터를 어떤 포맷으로 관리할 것인가 -> v13 : TSDB 기반 최신
       index:
         prefix: index_               # index_20260808 처럼 Prefix 처럼 이름 생성
         period: 24h                  # 인덱스를 하루 단위로 나눠 관리함
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m           # 10분마다 compaction/retention 작업을 수행
+  retention_enabled: true
+  retention_delete_delay: 2h         # 삭제 시 2시간 뒤 삭제
+  delete_request_store: filesystem   # 삭제 요청 정보 filesystem에 저장
+
+limits_config:
+  retention_period: 30d              # 로그 보관 기간 최대 30일

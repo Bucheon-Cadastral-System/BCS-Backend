@@ -1,12 +1,17 @@
-// Docker 컨테이너 목록 조회
 discovery.docker "containers" {
   host = "unix:///var/run/docker.sock"
 }
 
 
-discovery.relabel "docker_logs" {
+discovery.relabel "bcs_containers" {
 
   targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex = "/(bcs-api|main-postgres|main-loki|main-prometheus|main-grafana|main-n8n)"
+    action = "keep"
+  }
 
   rule {
     source_labels = ["__meta_docker_container_name"]
@@ -16,15 +21,11 @@ discovery.relabel "docker_logs" {
 }
 
 
-// Docker 컨테이너 로그 수집
 loki.source.docker "docker_logs" {
 
   host = "unix:///var/run/docker.sock"
 
-  targets = discovery.docker.containers.targets
-
-  // Docker container name → container label
-  relabel_rules = discovery.relabel.docker_logs.rules
+  targets = discovery.relabel.bcs_containers.output
 
   forward_to = [
     loki.process.docker_logs.receiver,
@@ -32,7 +33,6 @@ loki.source.docker "docker_logs" {
 }
 
 
-// 로그 가공
 loki.process "docker_logs" {
 
   stage.docker {}
@@ -43,10 +43,9 @@ loki.process "docker_logs" {
 }
 
 
-// Loki로 전송
 loki.write "default" {
 
   endpoint {
-    url = "http://bcs-loki:3100/loki/api/v1/push"
+    url = "http://main-loki:3100/loki/api/v1/push"
   }
 }
