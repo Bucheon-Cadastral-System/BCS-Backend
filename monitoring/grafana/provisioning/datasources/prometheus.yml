@@ -15,8 +15,3 @@ scrape_configs:
           - "bcs-api:8081"
         labels:
           environment: prod
-
-      - targets:
-          - "host.docker.internal:8081" # MAC에서 실행중인 Spring
-        labels:
-          environment: local
