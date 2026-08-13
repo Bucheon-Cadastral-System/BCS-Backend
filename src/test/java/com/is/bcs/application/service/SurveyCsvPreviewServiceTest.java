@@ -59,7 +59,7 @@ class SurveyCsvPreviewServiceTest {
     @DisplayName("잘못된 행이 있어도 끝까지 읽어 오류를 모두 돌려준다")
     void preview_collectsAllRowErrors() {
         String csv = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,조사대상여부,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,정상,세계,545000,181000,대상
                 41192D000000002,수준점,이상1,세계,545000,181000,대상
                 41192D000000003,도근점,이상2,세계,좌표아님,181000,대상
@@ -116,7 +116,7 @@ class SurveyCsvPreviewServiceTest {
                 null, null, null, null, null, null, null, null, null));
 
         String csv = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,새점,세계,545100,181100
                 """;
         ControlPointPreviewResult result = service.previewControlPoints(csv.getBytes(StandardCharsets.UTF_8));
@@ -131,7 +131,7 @@ class SurveyCsvPreviewServiceTest {
     @DisplayName("부천 범위 밖 행 경고는 그 점의 줄에 붙는다")
     void previewControlPoints_attachesWarningToPoint() {
         String csv = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000002,도근점,멀리,세계,445000,181000
                 """;
         ControlPointPreviewResult result = service.previewControlPoints(csv.getBytes(StandardCharsets.UTF_8));
@@ -155,14 +155,14 @@ class SurveyCsvPreviewServiceTest {
                 "망실", LocalDate.of(2025, 9, 8)));
 
         String withoutColumn = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000003,도근점,그대로,세계,545100.00,181100.00
                 """;
         ControlPointPreviewResult kept = service.previewControlPoints(withoutColumn.getBytes(StandardCharsets.UTF_8));
         assertEquals(Action.UNCHANGED, kept.points().getFirst().action()); // 열이 없다 = 모른다, 갱신 아님
 
         String withColumn = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000003,도근점,그대로,세계,545100.00,181100.00,완전,2026-06-23
                 """;
         ControlPointPreviewResult changed = service.previewControlPoints(withColumn.getBytes(StandardCharsets.UTF_8));

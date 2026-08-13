@@ -142,7 +142,7 @@ class SurveyTargetMapperTest {
     }
 
     @Test
-    @DisplayName("필수 6열만 있어도 읽히고 나머지 항목은 비어 있다")
+    @DisplayName("필수 열만 있고 그 칸이 비어 있어도 읽힌다 — 요구하는 것은 열 이름이지 값이 아니다")
     void map_minimalColumns() throws Exception {
         List<Row> rows = pointMapper.map(tableOf("/survey-target-minimal.csv")).rows();
 
@@ -159,10 +159,28 @@ class SurveyTargetMapperTest {
     }
 
     @Test
+    @DisplayName("필수 열이 없으면 행을 읽지 않고 파일째로 거부하며, 빠진 열을 모두 알린다")
+    void map_missingRequiredColumns_rejectsFile() {
+        // 점을 가리키는 값과 성과만 있는 표 — 옛 양식이거나 내보내기에서 열을 빠뜨린 파일이다
+        Table table = new Table(
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96")));
+
+        InvalidControlPointException e =
+                assertThrows(InvalidControlPointException.class, () -> pointMapper.map(table));
+
+        // 하나만 알리면 고쳐 올린 파일이 다음 열에서 또 걸린다 — 빠진 것을 한 번에 적는다
+        assertTrue(e.getMessage().startsWith("필수 열이 없습니다"), e.getMessage());
+        for (String column : List.of("토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일")) {
+            assertTrue(e.getMessage().contains(column), e.getMessage());
+        }
+    }
+
+    @Test
     @DisplayName("잘못된 행에서 멈추지 않고 끝까지 훑어 오류를 행 번호와 함께 모은다")
     void map_collectsRowErrors() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(
                         List.of("41192D000000001", "도근점", "정상1", "세계", "545000", "181000"),
                         List.of("41192D000000002", "수준점", "이상", "세계", "545000", "181000"),
@@ -204,7 +222,7 @@ class SurveyTargetMapperTest {
     @DisplayName("고객사가 열을 더해도 코드를 고치지 않고 그 값까지 보관한다")
     void map_columnsAddedByCustomer_areKept() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "점검자", "재조사 사유"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "점검자", "재조사 사유", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "김주무관", "표지 훼손")));
 
         MappingResult result = pointMapper.map(table);
@@ -220,7 +238,7 @@ class SurveyTargetMapperTest {
     @DisplayName("5자에서 잘린 열 이름(기존조사내·조사대상여)도 온전한 이름과 같은 항목으로 읽는다")
     void map_truncatedHeaders() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "기존조사내", "조사대상여"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "기존조사내", "조사대상여", "토지소재지", "상세주소", "설치일자", "기존조사일"),
                 List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "망실", "대상")));
 
         Row row = mapper.map(table).rows().getFirst();
@@ -233,7 +251,8 @@ class SurveyTargetMapperTest {
     @DisplayName("별칭(관리번호)과 표기 흔들림(띄어쓰기·괄호)을 같은 항목으로 흡수한다")
     void map_aliasesAndSpacing() {
         Table table = new Table(
-                List.of("관리번호", "종류", "기준점명", "좌표계 구분", "X 좌표", "Y 좌표", "경도", "위도"),
+                List.of("관리번호", "종류", "기준점명", "좌표계 구분", "X 좌표", "Y 좌표", "경도", "위도",
+                        "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "126.794623", "37.506423")));
 
         Row row = pointMapper.map(table).rows().getFirst();
@@ -249,7 +268,7 @@ class SurveyTargetMapperTest {
     @DisplayName("열 순서가 달라도 읽히고, 모르는 열은 제자리 순서대로 보관된다")
     void map_columnOrderDoesNotMatter() {
         Table table = new Table(
-                List.of("메모", "Y좌표", "종류", "field_20", "기준점명", "X좌표", "좌표계구분", "기준점번호"),
+                List.of("메모", "Y좌표", "종류", "field_20", "기준점명", "X좌표", "좌표계구분", "기준점번호", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(List.of("아무거나", "181840.96", "도근점", "", "1465공", "545236.77", "세계", "41192D000001265")));
 
         Row row = pointMapper.map(table).rows().getFirst();
@@ -265,7 +284,7 @@ class SurveyTargetMapperTest {
     @DisplayName("필수 열의 칸이 비어 있으면 행 오류로 알린다 — 등록 단계까지 미루지 않고 미리보기에서 보이게")
     void map_requiredCellEmpty_isRowError() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(
                         List.of("", "도근점", "1465공", "세계", "545236.77", "181840.96"),
                         List.of("41192D000000002", "도근점", "", "세계", "545000.00", "181000.00")));
@@ -282,7 +301,7 @@ class SurveyTargetMapperTest {
     @DisplayName("같은 기준점이 두 번 나오면 뒤 행을 오류로 알린다 — 뒤 행이 앞 행의 성과를 덮어쓰지 않게")
     void map_duplicatePointInSameFile_isRowError() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(
                         List.of("41192D000000001", "도근점", "1465공", "세계", "545236.77", "181840.96"),
                         List.of("41192D000000002", "도근점", "1465공", "세계", "545000.00", "181000.00")));
@@ -299,7 +318,7 @@ class SurveyTargetMapperTest {
     @DisplayName("같은 관리번호가 두 번 나오면 뒤 행을 오류로 알린다 — 기준점 관리번호는 유일하다")
     void map_duplicatePointNoInSameFile_isRowError() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(
                         List.of("41192D000000001", "도근점", "1465공", "세계", "545236.77", "181840.96"),
                         List.of("41192D000000001", "도근점", "1466공", "세계", "545000.00", "181000.00")));
@@ -317,7 +336,7 @@ class SurveyTargetMapperTest {
     void map_unknownVocabularyAndFormats_areRowErrors() {
         Table table = new Table(
                 List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표",
-                        "표지재질", "설치구분", "교차구분", "기존조사내용", "설치일자", "경도(X)"),
+                        "표지재질", "설치구분", "교차구분", "기존조사내용", "설치일자", "경도(X)", "토지소재지", "상세주소", "기존조사일"),
                 List.of(
                         row("1", "도근점", "재질", "세계", "목재", "설치", "도근점", "완전", "2018-02-21", "126.79"),
                         row("2", "도근점", "설치", "세계", "표석", "이설", "도근점", "완전", "2018-02-21", "126.79"),
@@ -346,7 +365,7 @@ class SurveyTargetMapperTest {
     void map_outsideServiceArea_warnsAndKeepsRow() {
         // 좌표계구분은 '지역'인데 성과는 세계측지계 값이라, 5174로 읽으면 부천에서 100km 북으로 간다
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(List.of("41192D000010438", "도근점", "5673", "지역", "545163.240", "178356.350")));
 
         MappingResult result = pointMapper.map(table);
@@ -369,7 +388,7 @@ class SurveyTargetMapperTest {
     @DisplayName("삼각점·삼각보조점 어휘도 읽고, 재설치는 '재설'·'재설치' 둘 다 받는다")
     void map_remainingVocabulary() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "설치구분"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "설치구분", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(
                         List.of("41192D000000001", "지적삼각점", "삼각1", "세계", "545236.77", "181840.96", "재설"),
                         List.of("41192D000000002", "삼각보조점", "보조1", "세계", "545236.77", "181840.96", "재설치")));
@@ -386,7 +405,7 @@ class SurveyTargetMapperTest {
     @DisplayName("이름 없는 열은 건너뛰고, 헤더보다 짧은 행은 뒤쪽 열이 빈 것으로 읽는다")
     void map_blankHeaderAndShortRow() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "", "상세주소"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "", "상세주소", "토지소재지", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(
                         List.of("41192D000000001", "도근점", "짧은행", "세계", "545236.77", "181840.96"),
                         List.of("41192D000000002", "도근점", "온전한행", "세계", "545236.77", "181840.96", "", "춘의동 1-1")));
@@ -418,7 +437,7 @@ class SurveyTargetMapperTest {
             throw new RuntimeException("projection failure");
         });
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(List.of("41192D000000001", "도근점", "변환불가", "세계", "545236.77", "181840.96")));
 
         MappingResult result = failing.map(table);
@@ -433,7 +452,7 @@ class SurveyTargetMapperTest {
     @DisplayName("최종조사내용·최종조사일자 열을 읽는다 — 기준점 마스터의 최근 조사 요약이 된다")
     void map_lastSurveyColumns() {
         Table table = new Table(
-                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "최종조사내용", "최종조사일자"),
+                List.of("기준점번호", "종류", "기준점명", "좌표계구분", "X좌표", "Y좌표", "최종조사내용", "최종조사일자", "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일"),
                 List.of(List.of("41192D000001265", "도근점", "1465공", "세계", "545236.77", "181840.96", "망실", "20260519")));
 
         MappingResult result = pointMapper.map(table);
