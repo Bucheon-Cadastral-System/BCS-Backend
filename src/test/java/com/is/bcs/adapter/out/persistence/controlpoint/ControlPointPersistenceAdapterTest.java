@@ -221,11 +221,14 @@ class ControlPointPersistenceAdapterTest {
     void findSeedLastSurveys_withoutResult_isFiltered() {
         ControlPoint dated = pointWithSeedSurvey("41192D000009003", null, LocalDate.of(2026, 5, 19));
         ControlPoint blank = pointWithSeedSurvey("41192D000009004", "", LocalDate.of(2026, 5, 19));
+        // 공백만 든 값은 어휘로 되돌릴 말이 없어 기타로 담긴다 — 조사한 적 없는 점이 조사된 점이 된다
+        ControlPoint spaces = pointWithSeedSurvey("41192D000009005", "   ", LocalDate.of(2026, 5, 19));
         repository.flush();
 
         List<Long> found = adapter.findSeedLastSurveys().stream().map(PointLastSurvey::pointId).toList();
 
         assertFalse(found.contains(dated.getId()));
         assertFalse(found.contains(blank.getId()));
+        assertFalse(found.contains(spaces.getId()));
     }
 }

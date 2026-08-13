@@ -36,9 +36,12 @@ public interface ControlPointJpaRepository extends JpaRepository<ControlPointJpa
     /**
      * 시드 최종조사가 적힌 점만 — 판정이 빈 행은 지도가 고를 색이 없으므로 거른다.
      * 점을 통째로 읽어 걸러 내면 쓰지 않을 스무 남짓 열을 수천 행만큼 나른다.
+     *
+     * <p>공백만 든 값도 빈 값으로 본다. 그대로 통과시키면 어휘로 되돌릴 말이 없어 기타로 담기고,
+     * 조사한 적 없는 점이 조사된 점으로 응답에 실린다. 같은 포트의 다른 구현도 같은 기준을 쓴다.
      */
     @Query("select p.id as pointId, p.lastSurveyResult as result, p.lastSurveyedOn as surveyedOn"
-            + " from ControlPointJpaEntity p where p.lastSurveyResult is not null and p.lastSurveyResult <> ''")
+            + " from ControlPointJpaEntity p where p.lastSurveyResult is not null and trim(p.lastSurveyResult) <> ''")
     List<SeedLastSurvey> findSeedLastSurveys();
 
     interface SeedLastSurvey {
