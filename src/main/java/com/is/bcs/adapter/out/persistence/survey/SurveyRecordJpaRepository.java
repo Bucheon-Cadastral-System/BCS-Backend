@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -37,6 +38,36 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
     @Query("select r from SurveyRecordJpaEntity r where r.id.pointId = :pointId"
             + " order by r.surveyedAt desc, r.createdAt desc, r.id.projectId desc limit 1")
     Optional<SurveyRecordJpaEntity> findLatestByPointId(@Param("pointId") Long pointId);
+
+    /**
+     * 점마다 최신 기록 한 줄씩 — 지도가 점 전체의 최신 상태를 한 번에 그릴 때 쓴다.
+     * 점 수만큼 {@link #findLatestByPointId} 를 부르는 대신 한 문장으로 끝낸다.
+     *
+     * <p>{@code distinct on} 은 정렬해 둔 뒤 점마다 첫 줄만 남긴다. 뒤의 세 자리는 위 단건 조회와 같은 기준이라
+     * 어느 쪽으로 읽어도 같은 줄이 나온다. 표준 문법으로는 "무리마다 한 줄"을 한 문장에 담을 수 없어
+     * 이 자리만 PostgreSQL 문법을 쓴다.
+     *
+     * <p>대소를 섞은 별칭은 따옴표로 묶는다. PostgreSQL 은 묶지 않은 식별자를 소문자로 내리므로
+     * 그대로 두면 이름이 어긋나 값이 비어 돌아온다.
+     */
+    @Query(value = """
+            select distinct on (r.point_id)
+                   r.point_id as "pointId", r.result as "result", r.surveyed_at as "surveyedAt"
+            from bcs.survey_records r
+            order by r.point_id, r.surveyed_at desc, r.created_at desc, r.project_id desc
+            """, nativeQuery = true)
+    List<LatestPointSurvey> findLatestSurveyPerPoint();
+
+    interface LatestPointSurvey {
+
+        Long getPointId();
+
+        /** 열에 담긴 이름 그대로 — 어휘로 옮기는 일은 어댑터가 한다. */
+        String getResult();
+
+        /** 시각대를 붙이지 않은 순간 — 네이티브 조회는 timestamptz 를 이 형으로 내린다. */
+        Instant getSurveyedAt();
+    }
 
     /**
      * 목록에 조사원 이름을 함께 그리는 경로 전용 — 조사원을 조인으로 함께 실어 온다.

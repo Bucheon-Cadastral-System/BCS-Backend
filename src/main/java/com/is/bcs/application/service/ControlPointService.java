@@ -2,6 +2,7 @@ package com.is.bcs.application.service;
 
 import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.LastSurveySummary;
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
 import com.is.bcs.application.dto.UpdateControlPointCommand;
@@ -203,6 +204,27 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
                 .map(this::toLastSurvey)
                 .filter(record -> isNotBefore(record.surveyedOn(), seed.surveyedOn()))
                 .orElse(seed);
+    }
+
+    /**
+     * 조사한 적이 있는 점의 최종조사 — 위 단건 계산을 점 전체로 넓힌 것이다.
+     *
+     * <p>후보가 둘인 것도 날짜가 늦은 쪽을 고르는 것도 같다. 다만 점마다 질의를 두 번 내면 문장이 점 수의 두 배가
+     * 되므로, 시드가 적힌 점과 기록이 있는 점을 각각 한 문장으로 읽어 와 여기서 합친다.
+     *
+     * <p>조사한 적이 없는 점은 담기지 않는다. 미조사는 상태가 아니라 상태가 없는 것이므로,
+     * 화면이 목록에 없는 점을 미조사로 읽는다. 응답 크기도 조사 진척만큼만 늘어난다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<PointLastSurvey> getLastSurveys() {
+        Map<Long, PointLastSurvey> byPoint = new LinkedHashMap<>();
+        loadControlPointPort.findSeedLastSurveys().forEach(seed -> byPoint.put(seed.pointId(), seed));
+        loadSurveyRecordPort.findLatestSurveyPerPoint().forEach(latest -> byPoint.merge(
+                latest.pointId(),
+                latest,
+                (seed, record) -> isNotBefore(record.surveyedOn(), seed.surveyedOn()) ? record : seed));
+        return List.copyOf(byPoint.values());
     }
 
     /** 날짜가 같으면 기록을 택한다 — 조사원까지 아는 쪽이 더 자세하다. 한쪽 날짜가 비면 있는 쪽이 이긴다. */

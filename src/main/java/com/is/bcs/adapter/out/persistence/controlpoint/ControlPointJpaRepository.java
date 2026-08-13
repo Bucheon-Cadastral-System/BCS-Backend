@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,5 +31,23 @@ public interface ControlPointJpaRepository extends JpaRepository<ControlPointJpa
         PointType getType();
 
         long getCount();
+    }
+
+    /**
+     * 시드 최종조사가 적힌 점만 — 판정이 빈 행은 지도가 고를 색이 없으므로 거른다.
+     * 점을 통째로 읽어 걸러 내면 쓰지 않을 스무 남짓 열을 수천 행만큼 나른다.
+     */
+    @Query("select p.id as pointId, p.lastSurveyResult as result, p.lastSurveyedOn as surveyedOn"
+            + " from ControlPointJpaEntity p where p.lastSurveyResult is not null and p.lastSurveyResult <> ''")
+    List<SeedLastSurvey> findSeedLastSurveys();
+
+    interface SeedLastSurvey {
+
+        Long getPointId();
+
+        /** 최종조사내용 — 임포트가 표시명으로 맞춰 두지만 모르는 문구는 원문 그대로 남아 있다. */
+        String getResult();
+
+        LocalDate getSurveyedOn();
     }
 }

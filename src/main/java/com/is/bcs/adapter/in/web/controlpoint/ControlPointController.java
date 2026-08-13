@@ -49,6 +49,20 @@ public class ControlPointController {
                 .toList());
     }
 
+    /**
+     * 점마다 최종조사 한 줄씩 — 지도가 조사 프로젝트와 무관하게 점의 최신 상태를 색으로 그릴 때 읽는다.
+     * 조사한 적이 없는 점은 담기지 않으므로, 목록에 없는 점은 미조사다.
+     *
+     * <p>위 목록 응답에 함께 싣지 않는 이유는 {@link ControlPointResponse} 에 적어 두었다.
+     * 화면이 상태 표시를 켤 때만 필요하므로 켜는 자리에서 따로 읽는다.
+     */
+    @GetMapping("/last-surveys")
+    public ContentResponse<PointLastSurveyResponse> lastSurveys() {
+        return new ContentResponse<>(getControlPointsUseCase.getLastSurveys().stream()
+                .map(PointLastSurveyResponse::from)
+                .toList());
+    }
+
     // 수정·삭제 경로는 관리번호가 아니라 id 다 — 수정이 관리번호 자체를 바꿀 수 있어 경로 식별자로 쓸 수 없다
 
     @PutMapping("/{pointId}")
@@ -65,13 +79,13 @@ public class ControlPointController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 조사 데이터가 참조 중인지 — 화면이 삭제 확인 창을 물음/불가로 갈라 여는 데 쓴다. */
     /** 최종조사 요약 — 점 하나를 고른 뒤에만 필요해서 목록과 따로 읽는다. */
     @GetMapping("/{pointId}/last-survey")
     public LastSurveyResponse lastSurvey(@PathVariable("pointId") Long pointId) {
         return LastSurveyResponse.from(getControlPointsUseCase.getLastSurvey(pointId));
     }
 
+    /** 조사 데이터가 참조 중인지 — 화면이 삭제 확인 창을 물음/불가로 갈라 여는 데 쓴다. */
     @GetMapping("/{pointId}/usage")
     public ControlPointUsageResponse usage(@PathVariable("pointId") Long pointId) {
         return new ControlPointUsageResponse(deleteControlPointUseCase.isReferenced(pointId));

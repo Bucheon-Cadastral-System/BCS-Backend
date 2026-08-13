@@ -1,5 +1,6 @@
 package com.is.bcs.application.port.out.controlpoint;
 
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.PointType;
 
@@ -34,4 +35,13 @@ public interface LoadControlPointPort {
 
     /** 종류별 개수 — 저장된 종류만 키로 담는다(집계는 DB가 한다). */
     Map<PointType, Long> countByType();
+
+    /**
+     * 시드 최종조사가 적힌 점만 — 지도가 점마다 최신 상태를 그릴 때 조사기록 쪽과 함께 읽는다.
+     *
+     * <p>최종조사내용이 빈 행은 담지 않는다. 조사일만 있고 판정이 없으면 무슨 색으로 그릴지 정할 수 없다.
+     * 임포트가 표시명으로 맞춰 저장하므로 어휘로 되찾고, 아는 말이 아니면 기타로 싣는다 —
+     * 사람이 판정을 적어 둔 이상 조사한 것은 맞으므로 미조사로 셀 수는 없다.
+     */
+    List<PointLastSurvey> findSeedLastSurveys();
 }

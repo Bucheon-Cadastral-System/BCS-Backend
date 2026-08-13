@@ -1,6 +1,7 @@
 package com.is.bcs.application.service;
 
 import com.is.bcs.application.dto.CreateSurveyProjectCommand;
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.dto.RecordSurveyCommand;
 import com.is.bcs.application.dto.SurveyProgress;
 import com.is.bcs.application.dto.SurveyProjectSummary;
@@ -501,6 +502,11 @@ class SurveyServiceTest {
         }
 
         @Override
+        public List<PointLastSurvey> findLatestSurveyPerPoint() {
+            throw new UnsupportedOperationException("조사 서비스는 점 전체의 최종조사를 읽지 않는다");
+        }
+
+        @Override
         public List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId) {
             // 실제 어댑터는 조인으로 이름을 함께 실어 온다 — 페이크는 이름 없이 같은 목록을 돌려준다
             return findRecordsByProjectId(projectId).stream()
@@ -738,6 +744,11 @@ class SurveyServiceTest {
             Map<PointType, Long> counts = new HashMap<>();
             points.values().forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
             return counts;
+        }
+
+        @Override
+        public List<PointLastSurvey> findSeedLastSurveys() {
+            throw new UnsupportedOperationException("조사 서비스는 시드 최종조사를 읽지 않는다");
         }
     }
 }

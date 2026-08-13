@@ -1,10 +1,12 @@
 package com.is.bcs.adapter.out.persistence.controlpoint;
 
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.survey.SurveyResult;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -105,6 +107,21 @@ public class ControlPointPersistenceAdapter
                 .collect(Collectors.toMap(
                         ControlPointJpaRepository.PointTypeCount::getType,
                         ControlPointJpaRepository.PointTypeCount::getCount));
+    }
+
+    /**
+     * 저장된 문구를 어휘로 되돌린다. 임포트가 "완전"을 정상으로, "망실(포장)"을 망실로 이미 맞춰 두었으므로
+     * 표시명 그대로 찾으면 대부분 걸린다. 걸리지 않는 값은 사람이 적어 둔 판정이 어휘 밖에 있는 것이라
+     * 기타로 싣는다 — 판정이 적혀 있는 이상 미조사로 셀 수는 없다. 원문은 상세 카드가 그대로 보여 준다.
+     */
+    @Override
+    public List<PointLastSurvey> findSeedLastSurveys() {
+        return repository.findSeedLastSurveys().stream()
+                .map(seed -> new PointLastSurvey(
+                        seed.getPointId(),
+                        SurveyResult.fromDisplayName(seed.getResult()).orElse(SurveyResult.ETC),
+                        seed.getSurveyedOn()))
+                .toList();
     }
 
     @Override
