@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.survey;
 
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.application.port.out.member.SaveMemberPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
@@ -355,5 +356,60 @@ class SurveyPersistenceAdapterTest {
                 .findById(new ProjectPointId(saved.getProjectId(), saved.getPointId()))
                 .orElseThrow().toDomain();
         assertEquals(longValue, found.getExtras().getFirst().value());
+    }
+
+    /** 회차를 새로 열고 그 점을 대상에 넣은 뒤 기록을 남긴다 — 한 점에 회차를 여럿 두려면 회차마다 자리가 필요하다. */
+    private void recordInNewProject(long pointId, SurveyResult result, String surveyedAt) {
+        SurveyProject project = savedProject();
+        targetAdapter.save(SurveyTarget.create(project.getId(), pointId));
+        adapter.save(SurveyRecord.create(
+                project.getId(), pointId, result, OffsetDateTime.parse(surveyedAt), null, null));
+    }
+
+    private List<PointLastSurvey> latestSurveysOf(long pointId) {
+        recordRepository.flush();
+        return adapter.findLatestSurveyPerPoint().stream()
+                .filter(survey -> survey.pointId() == pointId)
+                .toList();
+    }
+
+    @Test
+    @DisplayName("점마다 한 줄만 담고 단건 조회와 같은 줄을 고른다")
+    void findLatestSurveyPerPoint_matchesSingleLookup() {
+        long pointId = savedPointId();
+        recordInNewProject(pointId, SurveyResult.INTACT, "2026-06-01T10:00:00+09:00");
+        recordInNewProject(pointId, SurveyResult.LOST, "2026-07-15T10:00:00+09:00");
+        recordInNewProject(pointId, SurveyResult.ETC, "2026-06-20T10:00:00+09:00");
+
+        List<PointLastSurvey> found = latestSurveysOf(pointId);
+
+        assertEquals(1, found.size());
+        assertEquals(adapter.findLatestRecordByPointId(pointId).orElseThrow().getResult(), found.getFirst().result());
+        assertEquals(SurveyResult.LOST, found.getFirst().result());
+        assertEquals(LocalDate.of(2026, 7, 15), found.getFirst().surveyedOn());
+    }
+
+    @Test
+    @DisplayName("조사 시각이 완전히 겹쳐도 단건 조회와 같은 줄을 고른다 — 두 경로가 같은 기준으로 가른다")
+    void findLatestSurveyPerPoint_tiedInstant_matchesSingleLookup() {
+        long pointId = savedPointId();
+        // 파일로 들어온 기록은 조사일의 자정을 시각으로 쓰므로 서로 다른 회차가 같은 날짜를 적으면 시각이 완전히 겹친다
+        recordInNewProject(pointId, SurveyResult.INTACT, "2026-06-01T00:00:00+09:00");
+        recordInNewProject(pointId, SurveyResult.LOST, "2026-06-01T00:00:00+09:00");
+
+        List<PointLastSurvey> found = latestSurveysOf(pointId);
+
+        assertEquals(1, found.size());
+        assertEquals(adapter.findLatestRecordByPointId(pointId).orElseThrow().getResult(), found.getFirst().result());
+    }
+
+    @Test
+    @DisplayName("조사일은 KST 날짜다 — 같은 순간이라도 어느 지역에서 보느냐로 날짜가 갈린다")
+    void findLatestSurveyPerPoint_derivesDateInKst() {
+        long pointId = savedPointId();
+        // UTC 20시는 KST 로 다음 날 05시다. UTC 로 날짜를 뽑으면 하루 앞선 날이 적힌다
+        recordInNewProject(pointId, SurveyResult.INTACT, "2026-07-22T20:00:00Z");
+
+        assertEquals(LocalDate.of(2026, 7, 23), latestSurveysOf(pointId).getFirst().surveyedOn());
     }
 }
