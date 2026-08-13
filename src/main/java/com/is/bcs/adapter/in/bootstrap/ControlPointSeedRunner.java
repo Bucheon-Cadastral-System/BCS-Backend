@@ -4,8 +4,9 @@ import com.is.bcs.application.dto.SeedControlPointsCommand;
 import com.is.bcs.application.dto.SeedControlPointsCommand.SeedFile;
 import com.is.bcs.application.dto.SeedControlPointsResult;
 import com.is.bcs.application.port.in.imports.SeedControlPointsUseCase;
-import lombok.RequiredArgsConstructor;
+import com.is.bcs.domain.controlpoint.ControlPoint;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,6 @@ import java.util.List;
 @Slf4j
 @Component
 @ConditionalOnProperty(prefix = "bcs.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
-@RequiredArgsConstructor
 public class ControlPointSeedRunner implements CommandLineRunner {
 
     /** 고객사가 정리해 준 성과 — 좌표계가 갈려 파일이 둘이다. */
@@ -33,10 +33,27 @@ public class ControlPointSeedRunner implements CommandLineRunner {
 
     private final SeedControlPointsUseCase seedControlPointsUseCase;
 
+    /**
+     * 도근점 성과(CSV) 를 넣을지 — 기본은 넣지 않는다.
+     *
+     * <p>고객사가 이 자료를 쓰지 않기로 해 껐다. 파일과 로더는 그대로 두어 다시 필요해지면 값만 켜면 된다.
+     * 이미 들어가 있는 점을 지우지는 않는다. 시드는 기준점이 하나도 없을 때만 도는 경로다.
+     */
+    private final boolean dogeunEnabled;
+
+    public ControlPointSeedRunner(
+            SeedControlPointsUseCase seedControlPointsUseCase,
+            @Value("${bcs.seed.dogeun.enabled:false}") boolean dogeunEnabled
+    ) {
+        this.seedControlPointsUseCase = seedControlPointsUseCase;
+        this.dogeunEnabled = dogeunEnabled;
+    }
+
     @Override
     public void run(String... args) {
+        List<ControlPoint> basePoints = dogeunEnabled ? DogeunSeedCsv.load() : List.of();
         SeedControlPointsResult result = seedControlPointsUseCase.seedIfEmpty(new SeedControlPointsCommand(
-                DogeunSeedCsv.load(),
+                basePoints,
                 CUSTOMER_FILES.stream().map(file -> new SeedFile(file, read(file))).toList()));
         if (!result.seeded()) {
             return;
@@ -47,7 +64,8 @@ public class ControlPointSeedRunner implements CommandLineRunner {
             file.result().skipped().forEach(reason -> log.warn("시드에서 건너뛴 행 — {} {}", file.name(), reason));
             file.result().warnings().forEach(reason -> log.warn("시드에 넣었으나 확인이 필요한 행 — {} {}", file.name(), reason));
         }
-        log.info("기준점 시드 등록: 도근점 성과 {}점, 고객사 정리분 {}점", result.basePoints(), result.filePoints());
+        log.info("기준점 시드 등록: 도근점 성과 {}, 고객사 정리분 {}점",
+                dogeunEnabled ? result.basePoints() + "점" : "꺼짐", result.filePoints());
     }
 
     private static byte[] read(String resource) {
