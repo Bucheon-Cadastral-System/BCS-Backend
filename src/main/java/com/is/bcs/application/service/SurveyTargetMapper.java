@@ -20,7 +20,7 @@ public class SurveyTargetMapper extends ImportFileMapper {
 
     @Override
     protected List<String> requiredColumns() {
-        return IDENTITY_COLUMNS;
+        return BASE_COLUMNS;
     }
 
     @Override

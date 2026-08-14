@@ -1,5 +1,6 @@
 package com.is.bcs.application.port.out.survey;
 
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
@@ -23,6 +24,17 @@ public interface LoadSurveyRecordPort {
      * 기준을 두지 않으면 조회 순서가 바뀔 때마다 답이 달라진다.
      */
     Optional<SurveyRecord> findLatestRecordByPointId(Long pointId);
+
+    /**
+     * 점마다 가장 최근 기록 하나씩, 기록이 있는 점만.
+     *
+     * <p>{@link #findLatestRecordByPointId} 를 점 수만큼 부르는 것과 답이 같아야 하므로 순서 기준도 같다.
+     * 조사 시각이 늦은 것을 따르고, 겹치면 나중에 만든 기록을, 그것마저 겹치면 프로젝트 id 가 큰 쪽을 따른다.
+     *
+     * <p>조사원과 비고는 싣지 않는다. 지도가 색으로 옮기는 데는 결과와 조사일이면 되고,
+     * 조사원 이름까지 실으면 점 수만큼 회원 조인이 붙는다.
+     */
+    List<PointLastSurvey> findLatestSurveyPerPoint();
 
     /** 기록과 조사원 표시명을 한 문장으로 가져온다 — 목록 화면 전용. */
     List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId);

@@ -28,12 +28,19 @@ class ControlPointSeedRunnerTest {
     private static final int DOGEUN_SEED_POINTS = 2146;
 
     private final FakeControlPointStore store = new FakeControlPointStore();
-    private final ControlPointSeedRunner runner = new ControlPointSeedRunner(
-            new ControlPointImportService(
-                    new SpreadsheetTableExtractor(),
-                    new ControlPointFileMapper(new Proj4jCoordinateTransformer()),
-                    new ControlPointRegistrar(store, store),
-                    directTransaction(), store, store));
+
+    /** 도근점 성과를 넣을지는 설정이 가른다 — 두 경우를 다 세워 본다. */
+    private ControlPointSeedRunner runner(boolean dogeunEnabled) {
+        return new ControlPointSeedRunner(
+                new ControlPointImportService(
+                        new SpreadsheetTableExtractor(),
+                        new ControlPointFileMapper(new Proj4jCoordinateTransformer()),
+                        new ControlPointRegistrar(store, store),
+                        directTransaction(), store, store),
+                dogeunEnabled);
+    }
+
+    private final ControlPointSeedRunner runner = runner(true);
 
     @Test
     @DisplayName("기준점이 하나도 없으면 도근점 성과와 고객사 파일을 함께 등록한다")
@@ -58,6 +65,18 @@ class ControlPointSeedRunnerTest {
         // 값이 맞는지는 성과를 가진 쪽이 판단할 일이라 등록은 하고 알리기만 한다.
         ControlPoint outside = store.findByNameAndType("5673", PointType.DOGEUN).orElseThrow();
         assertFalse(ServiceArea.BUCHEON.contains(outside.getGeo()));
+    }
+
+    @Test
+    @DisplayName("도근점 성과를 꺼 두면 고객사 파일만 등록한다 — 파일은 그대로 두고 넣지 않을 뿐이다")
+    void run_dogeunDisabled_seedsCustomerFilesOnly() {
+        runner(false).run();
+
+        // 고객사 파일은 백여 행이고 도근점 성과는 2,146행이다. 성과가 함께 들어갔다면 개수가 그 수를 넘으므로
+        // 관리번호 하나로 가리지 않고 개수로 가른다 — 두 파일에 같은 관리번호가 서른둘 겹쳐 있어 한 점의 존재로는 못 가린다
+        assertTrue(store.count() > 0, "고객사 파일이 등록되지 않았습니다");
+        assertTrue(store.count() < DOGEUN_SEED_POINTS, "도근점 성과가 함께 등록됐습니다");
+        assertTrue(store.countByType().getOrDefault(PointType.TRIANGULATION_AUX, 0L) > 0);
     }
 
     @Test

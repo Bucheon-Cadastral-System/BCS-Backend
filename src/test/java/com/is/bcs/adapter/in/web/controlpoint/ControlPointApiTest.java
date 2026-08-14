@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** 기준점 API 계약 검증 — DB 필요(bcs/docker-compose). 데이터는 고객사 대상지 CSV 실측값. */
@@ -248,6 +249,42 @@ class ControlPointApiTest {
         String body = bodyOf(result);
         assertTrue(body.contains("\"content\":["));
         assertTrue(body.contains("\"pointNo\":\"41192D000001265\""));
+    }
+
+    @Test
+    @DisplayName("최종조사 일괄 조회 — 조사한 점만 결과·조사일과 함께 담고 조사하지 않은 점은 빠진다")
+    void lastSurveys_carriesSurveyedPointsOnly() throws Exception {
+        long id = extractId(bodyOf(register()));
+
+        mockMvc.perform(get("/api/control-points/last-surveys"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.pointId == %d)]".formatted(id)).isEmpty());
+
+        MvcResult project = mockMvc.perform(post("/api/survey-projects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "일제조사", "startedOn": "2026-07-01", "targetPointIds": [%d]}
+                                """.formatted(id)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long projectId = extractId(bodyOf(project));
+        mockMvc.perform(put("/api/survey-projects/" + projectId + "/records/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"result\": \"LOST\"}"))
+                .andExpect(status().isOk());
+
+        // 조사일은 서버가 찍으므로 값을 못 박지 않고 단건 최종조사와 맞춰 본다 — 두 경로가 같은 줄을 보아야 한다
+        MvcResult single = mockMvc.perform(get("/api/control-points/" + id + "/last-survey"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").value("망실"))
+                .andReturn();
+        String surveyedOn = JsonPath.read(bodyOf(single), "$.surveyedOn");
+
+        // 어휘를 내리는 자리가 갈린다 — 상세 카드는 사람이 읽는 문구를, 지도는 색으로 옮길 이름을 받는다
+        mockMvc.perform(get("/api/control-points/last-surveys"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.pointId == %d)].result".formatted(id)).value("LOST"))
+                .andExpect(jsonPath("$.content[?(@.pointId == %d)].surveyedOn".formatted(id)).value(surveyedOn));
     }
 
 }

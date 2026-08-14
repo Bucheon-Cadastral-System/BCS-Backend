@@ -2,6 +2,7 @@ package com.is.bcs.adapter.in.ai;
 
 import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.LastSurveySummary;
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
@@ -129,6 +130,11 @@ class ControlPointChatToolsTest {
         @Override
         public LastSurveySummary getLastSurvey(Long pointId) {
             return new LastSurveySummary(null, null, null, null);
+        }
+
+        @Override
+        public List<PointLastSurvey> getLastSurveys() {
+            throw new UnsupportedOperationException("챗봇 도구는 점 전체의 최종조사를 읽지 않는다");
         }
 
         @Override

@@ -1,10 +1,12 @@
 package com.is.bcs.support;
 
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.port.out.controlpoint.DeleteControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.LoadControlPointPort;
 import com.is.bcs.application.port.out.controlpoint.SaveControlPointPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.survey.SurveyResult;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -71,6 +73,18 @@ public class FakeControlPointStore implements LoadControlPointPort, SaveControlP
         Map<PointType, Long> counts = new HashMap<>();
         points.values().forEach(p -> counts.merge(p.getType(), 1L, Long::sum));
         return counts;
+    }
+
+    /** 실제 어댑터와 같은 규칙 — 판정이 빈 점은 거르고, 어휘 밖의 문구는 기타로 싣는다. */
+    @Override
+    public List<PointLastSurvey> findSeedLastSurveys() {
+        return points.values().stream()
+                .filter(p -> p.getLastSurveyResult() != null && !p.getLastSurveyResult().isBlank())
+                .map(p -> new PointLastSurvey(
+                        p.getId(),
+                        SurveyResult.fromDisplayName(p.getLastSurveyResult()).orElse(SurveyResult.ETC),
+                        p.getLastSurveyedOn()))
+                .toList();
     }
 
     @Override

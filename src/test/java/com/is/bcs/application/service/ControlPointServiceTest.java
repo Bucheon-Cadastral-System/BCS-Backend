@@ -3,6 +3,7 @@ package com.is.bcs.application.service;
 import com.is.bcs.adapter.out.geo.Proj4jCoordinateTransformer;
 import com.is.bcs.application.dto.ControlPointCountSummary;
 import com.is.bcs.application.dto.LastSurveySummary;
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.dto.RegisterControlPointCommand;
 import com.is.bcs.application.dto.RegisterControlPointResult;
 import com.is.bcs.application.dto.UpdateControlPointCommand;
@@ -159,6 +160,54 @@ class ControlPointServiceTest {
 
         assertEquals("망실", summary.result());
         assertEquals(LocalDate.of(2026, 6, 23), summary.surveyedOn());
+    }
+
+    @Test
+    @DisplayName("일괄 최종조사도 단건과 같은 규칙으로 시드와 기록 중 늦은 쪽을 고른다")
+    void getLastSurveys_appliesSameRuleAsSingleLookup() {
+        ControlPoint point = pointWithFileSurvey("망실", LocalDate.of(2026, 6, 23));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.INTACT, OffsetDateTime.parse("2025-09-08T10:00:00+09:00"), null, null));
+
+        PointLastSurvey found = onlyLastSurvey(point.getId());
+
+        assertEquals(SurveyResult.LOST, found.result());
+        assertEquals(LocalDate.of(2026, 6, 23), found.surveyedOn());
+        assertEquals(service.getLastSurvey(point.getId()).surveyedOn(), found.surveyedOn());
+    }
+
+    @Test
+    @DisplayName("시드보다 늦은 기록이 있으면 기록을 고른다")
+    void getLastSurveys_recordNewerThanSeed_prefersRecord() {
+        ControlPoint point = pointWithFileSurvey("망실", LocalDate.of(2025, 9, 8));
+        surveyUsage.records.add(SurveyRecord.restore(
+                1L, point.getId(), SurveyResult.UNAVAILABLE, OffsetDateTime.parse("2026-06-23T10:00:00+09:00"), null, null));
+
+        assertEquals(SurveyResult.UNAVAILABLE, onlyLastSurvey(point.getId()).result());
+    }
+
+    @Test
+    @DisplayName("조사한 적 없는 점은 담기지 않는다 — 미조사는 상태가 아니라 상태가 없는 것이다")
+    void getLastSurveys_neverSurveyed_isAbsent() {
+        pointWithFileSurvey(null, null);
+
+        assertTrue(service.getLastSurveys().isEmpty());
+    }
+
+    @Test
+    @DisplayName("시드 판정이 어휘 밖이면 기타로 싣는다 — 사람이 적어 둔 이상 미조사는 아니다")
+    void getLastSurveys_seedOutsideVocabulary_fallsBackToEtc() {
+        ControlPoint point = pointWithFileSurvey("반쯤 묻힘", LocalDate.of(2026, 6, 23));
+
+        assertEquals(SurveyResult.ETC, onlyLastSurvey(point.getId()).result());
+    }
+
+    /** 페이크 저장소에는 이 시험이 만든 점만 있으므로 한 줄이어야 한다 — 여러 줄이면 점마다 하나라는 약속이 깨진 것이다. */
+    private PointLastSurvey onlyLastSurvey(Long pointId) {
+        List<PointLastSurvey> found = service.getLastSurveys();
+        assertEquals(1, found.size());
+        assertEquals(pointId, found.getFirst().pointId());
+        return found.getFirst();
     }
 
     @Test
@@ -534,6 +583,18 @@ class ControlPointServiceTest {
         public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
             return findRecordsByPointId(pointId).stream()
                     .reduce((older, newer) -> newer.getSurveyedAt().isBefore(older.getSurveyedAt()) ? older : newer);
+        }
+
+        /** 위 단건 조회를 점마다 돌린 것과 같아야 한다 — 실제 어댑터도 두 경로가 같은 줄을 고른다. */
+        @Override
+        public List<PointLastSurvey> findLatestSurveyPerPoint() {
+            return records.stream().map(SurveyRecord::getPointId).distinct()
+                    .map(pointId -> findLatestRecordByPointId(pointId).orElseThrow())
+                    .map(latest -> new PointLastSurvey(
+                            latest.getPointId(),
+                            latest.getResult(),
+                            latest.getSurveyedAt().atZoneSameInstant(TimeConfig.KST).toLocalDate()))
+                    .toList();
         }
 
         @Override

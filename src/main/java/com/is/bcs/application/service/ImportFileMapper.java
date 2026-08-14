@@ -116,9 +116,22 @@ public abstract class ImportFileMapper {
     private static final String LAST_SURVEY_DATE = "최종조사일자";
     protected static final String TARGET_NOTE = "조사대상여부";
 
-    /** 어느 서식이든 있어야 하는 열 — 점을 가리키는 값과 성과 좌표. */
+    /** 점을 가리키는 값과 성과 좌표 — 이것이 없으면 어느 점인지도, 어디인지도 알 수 없다. */
     protected static final List<String> IDENTITY_COLUMNS =
             List.of(POINT_NO, TYPE, NAME, CRS, NORTHING, EASTING);
+
+    /**
+     * 기본 양식이 갖추는 열 — 위 여섯에 소재·설치일자·기존조사 이력을 더한 열한 개다. 두 서식이 함께 요구한다.
+     *
+     * <p>요구하는 것은 열 이름이지 칸의 값이 아니다. 값이 비어도 되는 열(상세주소·기존조사내용 등)이 섞여 있는데,
+     * 열째로 없는 파일은 다른 양식이거나 내보내기에서 빠뜨린 것이라 읽어도 뜻이 어긋난다.
+     *
+     * <p>최종조사내용·최종조사일자는 넣지 않는다. 시스템이 조사를 쌓으며 채우는 값이라 처음 올리는 대장에는
+     * 열 자체가 없는 편이 보통이다. 있으면 읽고, 없으면 기존 값을 그대로 둔다.
+     */
+    protected static final List<String> BASE_COLUMNS = List.of(
+            POINT_NO, TYPE, NAME, CRS, NORTHING, EASTING,
+            REGION, ADDRESS, INSTALLED_DATE, PRIOR_RESULT, PRIOR_SURVEY_DATE);
 
     /**
      * 이 서식이 요구하는 열 — 서식마다 다르다.

@@ -7,6 +7,7 @@ import com.is.bcs.application.port.out.survey.LoadSurveyRecordPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyProjectPort;
 import com.is.bcs.application.port.out.survey.SaveSurveyRecordPort;
 import com.is.bcs.domain.survey.SurveyProject;
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
@@ -73,6 +74,20 @@ public class SurveyPersistenceAdapter
     @Override
     public Optional<SurveyRecord> findLatestRecordByPointId(Long pointId) {
         return recordRepository.findLatestByPointId(pointId).map(SurveyRecordJpaEntity::toDomain);
+    }
+
+    /**
+     * 조사 시각을 조사일로 내리는 자리 — 시각은 순간이고 조사일은 지역의 날짜라 어느 시간대에서 보는지 정해야 한다.
+     * 단건 최종조사도 같은 시계로 내리므로 두 경로가 같은 날짜를 낸다.
+     */
+    @Override
+    public List<PointLastSurvey> findLatestSurveyPerPoint() {
+        return recordRepository.findLatestSurveyPerPoint().stream()
+                .map(latest -> new PointLastSurvey(
+                        latest.getPointId(),
+                        SurveyResult.valueOf(latest.getResult()),
+                        latest.getSurveyedAt().atZone(clock.getZone()).toLocalDate()))
+                .toList();
     }
 
     @Override

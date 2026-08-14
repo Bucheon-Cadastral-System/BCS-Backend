@@ -1,5 +1,6 @@
 package com.is.bcs.adapter.out.persistence.controlpoint;
 
+import com.is.bcs.application.dto.PointLastSurvey;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.controlpoint.GeoCoordinate;
@@ -8,6 +9,7 @@ import com.is.bcs.domain.controlpoint.MarkerMaterial;
 import com.is.bcs.domain.controlpoint.PointType;
 import com.is.bcs.domain.controlpoint.TmCoordinate;
 import com.is.bcs.domain.controlpoint.TraverseInfo;
+import com.is.bcs.domain.survey.SurveyResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -174,5 +176,59 @@ class ControlPointPersistenceAdapterTest {
         assertEquals(2, counts.get(PointType.DOGEUN));
         assertEquals(1, counts.get(PointType.TRIANGULATION));
         assertEquals(2, counts.size()); // 없는 종류(삼각보조)는 키가 없다 — 0 채움은 서비스 몫
+    }
+
+    /** 최종조사 두 칸만 갈라 둔 점 — 시드 조회가 무엇을 담고 무엇을 거르는지는 이 두 칸이 정한다. */
+    private ControlPoint pointWithSeedSurvey(String pointNo, String result, LocalDate surveyedOn) {
+        return adapter.save(ControlPoint.register(
+                pointNo, PointType.DOGEUN, "시드" + pointNo,
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545236.77"), new BigDecimal("181840.96")),
+                new GeoCoordinate(126.794623, 37.506423),
+                null, null, null, null, null, null, null, result, surveyedOn));
+    }
+
+    private PointLastSurvey seedSurveyOf(Long pointId) {
+        return adapter.findSeedLastSurveys().stream()
+                .filter(survey -> survey.pointId().equals(pointId))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    @DisplayName("시드 최종조사는 표시명을 어휘로 되돌려 담는다")
+    void findSeedLastSurveys_translatesDisplayName() {
+        ControlPoint point = pointWithSeedSurvey("41192D000009001", "망실", LocalDate.of(2026, 5, 19));
+        repository.flush();
+
+        PointLastSurvey found = seedSurveyOf(point.getId());
+
+        assertEquals(SurveyResult.LOST, found.result());
+        assertEquals(LocalDate.of(2026, 5, 19), found.surveyedOn());
+    }
+
+    @Test
+    @DisplayName("어휘 밖의 문구는 기타로 담는다 — 판정이 적혀 있는 이상 미조사가 아니다")
+    void findSeedLastSurveys_unknownWordingBecomesEtc() {
+        ControlPoint point = pointWithSeedSurvey("41192D000009002", "반쯤 묻힘", LocalDate.of(2026, 5, 19));
+        repository.flush();
+
+        assertEquals(SurveyResult.ETC, seedSurveyOf(point.getId()).result());
+    }
+
+    @Test
+    @DisplayName("판정이 비었으면 조사일이 있어도 담지 않는다 — 지도가 고를 색이 없다")
+    void findSeedLastSurveys_withoutResult_isFiltered() {
+        ControlPoint dated = pointWithSeedSurvey("41192D000009003", null, LocalDate.of(2026, 5, 19));
+        ControlPoint blank = pointWithSeedSurvey("41192D000009004", "", LocalDate.of(2026, 5, 19));
+        // 공백만 든 값은 어휘로 되돌릴 말이 없어 기타로 담긴다 — 조사한 적 없는 점이 조사된 점이 된다
+        ControlPoint spaces = pointWithSeedSurvey("41192D000009005", "   ", LocalDate.of(2026, 5, 19));
+        repository.flush();
+
+        List<Long> found = adapter.findSeedLastSurveys().stream().map(PointLastSurvey::pointId).toList();
+
+        assertFalse(found.contains(dated.getId()));
+        assertFalse(found.contains(blank.getId()));
+        assertFalse(found.contains(spaces.getId()));
     }
 }

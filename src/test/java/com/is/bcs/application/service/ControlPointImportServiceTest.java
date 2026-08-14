@@ -74,7 +74,8 @@ class ControlPointImportServiceTest {
     @DisplayName("읽지 못한 행이 하나라도 있으면 아무것도 등록하지 않는다")
     void importControlPoints_rowError_rejectsWholeFile() {
         // 필수 열의 칸이 빈 행 — 등록 단계에서 터뜨리지 않고 읽는 단계에서 거른다
-        byte[] file = "기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표\n,도근점,1465공,세계,545236.77,181840.96\n"
+        byte[] file = ("기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,설치일자,기존조사내용,기존조사일\n"
+                + ",도근점,1465공,세계,545236.77,181840.96\n")
                 .getBytes(StandardCharsets.UTF_8);
 
         InvalidControlPointException e =
@@ -127,13 +128,13 @@ class ControlPointImportServiceTest {
     @DisplayName("선택 열이 없는 파일은 기존 점의 선택 항목을 지우지 않는다 — 값이 같으면 갱신도 아니다")
     void importControlPoints_minimalColumns_keepExistingOptionalValues() {
         String full = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,상세주소,표지재질,최종조사내용
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,상세주소,표지재질,최종조사내용,토지소재지,설치일자,기존조사내용,기존조사일
                 41192D000000002,도근점,보존,세계,545100,181100,경기도 부천시 어딘가,철재,망실
                 """;
         service.importControlPoints(full.getBytes(StandardCharsets.UTF_8));
 
         String minimal = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000002,도근점,보존,세계,545100,181100
                 """;
         ControlPointImportResult second = service.importControlPoints(minimal.getBytes(StandardCharsets.UTF_8));
@@ -148,7 +149,7 @@ class ControlPointImportServiceTest {
     @DisplayName("최종조사 열이 있는 파일은 요약을 채우고, 그 열이 없는 파일이 와도 지우지 않는다")
     void importControlPoints_lastSurveyMergeRule() {
         String withLast = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96,망실,2025-09-08
                 """;
         service.importControlPoints(withLast.getBytes(StandardCharsets.UTF_8));
@@ -157,7 +158,7 @@ class ControlPointImportServiceTest {
         assertEquals(LocalDate.of(2025, 9, 8), stored.getLastSurveyedOn());
 
         String withoutLast = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96
                 """;
         ControlPointImportResult second = service.importControlPoints(withoutLast.getBytes(StandardCharsets.UTF_8));
@@ -172,13 +173,13 @@ class ControlPointImportServiceTest {
     @DisplayName("겹치는 점의 시드 조사는 조사일이 늦은 쪽이 남는다 — 옛 자료 파일이 최신 값을 덮지 않게")
     void importControlPoints_seedSurvey_prefersLaterDate() {
         String recent = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96,망실,2026-06-23
                 """;
         service.importControlPoints(recent.getBytes(StandardCharsets.UTF_8));
 
         String older = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96,정상,2025-09-08
                 """;
         ControlPointImportResult second = service.importControlPoints(older.getBytes(StandardCharsets.UTF_8));
@@ -193,13 +194,13 @@ class ControlPointImportServiceTest {
     @DisplayName("조사일이 더 늦은 파일이 오면 내용과 날짜가 함께 바뀐다 — 두 칸은 한 쌍이다")
     void importControlPoints_seedSurvey_laterFileReplacesBothCells() {
         String older = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96,정상,2025-09-08
                 """;
         service.importControlPoints(older.getBytes(StandardCharsets.UTF_8));
 
         String recent = """
-                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자
+                기준점번호,종류,기준점명,좌표계구분,X좌표,Y좌표,최종조사내용,최종조사일자,토지소재지,상세주소,설치일자,기존조사내용,기존조사일
                 41192D000000001,도근점,1465공,세계,545236.77,181840.96,망실,2026-06-23
                 """;
         service.importControlPoints(recent.getBytes(StandardCharsets.UTF_8));
