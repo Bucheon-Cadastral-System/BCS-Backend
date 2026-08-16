@@ -99,7 +99,7 @@ public class SecurityConfig {
                                 "/api/admin/**"
                         ).hasRole("ADMIN")
 
-                        // 기준점 마스터 등록·수정·삭제
+                        // 모든 회원의 기준점 등록·수정·삭제
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/control-points"
@@ -113,14 +113,14 @@ public class SecurityConfig {
                                 "/api/control-points/**"
                         ).hasAnyRole("USER", "ADMIN")
 
-                        // 전체 프로젝트에 걸친 사진 조회
+                        // 모든 회원의 프로젝트 및 프로젝트 하위 자원
                         .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/control-point-images"
-                        ).hasRole("ADMIN")
+                                "/api/survey-projects/**"
+                        ).hasAnyRole("USER", "ADMIN")
+
+                        // 모든 회원의 사진 파일 접근
                         .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/control-points/*/images"
+                                "/api/control-point-images/**"
                         ).hasAnyRole("USER", "ADMIN")
 
                         // 기준점 마스터 파일 처리
@@ -133,18 +133,6 @@ public class SecurityConfig {
                         // 조사 파일 처리
                         .requestMatchers(
                                 "/api/imports/**"
-                        ).hasAnyRole("USER", "ADMIN")
-
-                        // 프로젝트 및 프로젝트 하위 자원.
-                        // projectId 단위 소유권은 @PreAuthorize가 추가로 검사한다.
-                        .requestMatchers(
-                                "/api/survey-projects/**"
-                        ).hasAnyRole("USER", "ADMIN")
-
-                        // 사진 파일 단건 접근.
-                        // imageId가 속한 프로젝트 권한은 @PreAuthorize가 검사한다.
-                        .requestMatchers(
-                                "/api/control-point-images/**"
                         ).hasAnyRole("USER", "ADMIN")
 
                         // 내부 기준점 조회
