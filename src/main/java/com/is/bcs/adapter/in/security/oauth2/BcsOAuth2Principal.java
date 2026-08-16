@@ -43,6 +43,10 @@ public class BcsOAuth2Principal implements OAuth2User {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
+        if(!status.equals(MemberStatus.ACTIVE)) {
+            return List.of(new SimpleGrantedAuthority("ROLE_PENDING"));
+        }
+
         return List.of(
                 new SimpleGrantedAuthority(
                         "ROLE_" + role.name()
