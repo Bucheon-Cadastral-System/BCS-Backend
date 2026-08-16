@@ -90,4 +90,19 @@ public class ControlPointController {
     public ControlPointUsageResponse usage(@PathVariable("pointId") Long pointId) {
         return new ControlPointUsageResponse(deleteControlPointUseCase.isReferenced(pointId));
     }
+
+    @GetMapping("/public")
+    public ContentResponse<PublicControlPointResponse> publicList() {
+        return new ContentResponse<>(
+                getControlPointsUseCase.getAll()
+                        .stream()
+                        .map(PublicControlPointResponse::from)
+                        .toList()
+        );
+    }
+
+    @GetMapping("/public/{pointNo}")
+    public PublicControlPointResponse publicDetail(@PathVariable("pointNo") String pointNo) {
+        return PublicControlPointResponse.from(getControlPointsUseCase.getByPointNo(pointNo));
+    }
 }
