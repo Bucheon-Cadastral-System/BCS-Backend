@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -65,7 +66,10 @@ class AdminApiTest {
     @BeforeEach
     void setUp() {
         // 컨트롤러가 Authentication 을 인자로 받으므로 시큐리티 필터를 태워야 주체가 실린다
-        mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        mockMvc = MockMvcBuilders
+                .webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
     }
 
     /** 관리자로 로그인한 것처럼 요청한다 — 실제 토큰 발급 경로는 이 검증의 관심이 아니다. */
@@ -82,7 +86,13 @@ class AdminApiTest {
     private RequestPostProcessor as(long memberId, MemberRole role) {
         AccessTokenClaims claims =
                 new AccessTokenClaims(memberId, role, Instant.now(), Instant.now().plusSeconds(900));
-        return authentication(new UsernamePasswordAuthenticationToken(claims, "n/a", List.of()));
+        return authentication(
+                new UsernamePasswordAuthenticationToken(
+                        claims,
+                        "n/a",
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role.name()))
+                )
+        );
     }
 
     private Member member(String name, boolean approved) {
@@ -324,5 +334,23 @@ class AdminApiTest {
         mockMvc.perform(get("/api/members/me/state").with(asMember))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("ACTIVE")));
+    }
+
+    @Test
+    @DisplayName("일반 회원은 관리자 API에 접근할 수 없다")
+    void userCannotAccessAdminApi() throws Exception {
+        long memberId = member("일반회원", true).getId();
+
+        mockMvc.perform(get("/api/admin/members").with(as(memberId, MemberRole.USER)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("AUTH_FORBIDDEN")));
+    }
+
+    @Test
+    @DisplayName("인증하지 않으면 관리자 API에 접근할 수 없다")
+    void unauthenticatedCannotAccessAdminApi() throws Exception {
+        mockMvc.perform(get("/api/admin/members"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code", is("AUTHENTICATION_REQUIRED")));
     }
 }

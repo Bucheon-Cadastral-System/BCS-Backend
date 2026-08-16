@@ -2,6 +2,7 @@ package com.is.bcs.adapter.in.web.error;
 
 import com.is.bcs.adapter.in.web.exception.CommonErrorCode;
 import com.is.bcs.adapter.in.web.exception.ErrorDetailResolver;
+import com.is.bcs.adapter.in.web.exception.SecurityErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.web.error.ErrorAttributeOptions;
 import org.springframework.boot.webmvc.autoconfigure.error.AbstractErrorController;
@@ -49,13 +50,24 @@ public class ProblemDetailErrorController extends AbstractErrorController {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, errorDetailResolver.detailFor(status));
         // 필터단 경로는 MVC의 instance 자동 채움이 없어 직접 설정
         problem.setInstance(URI.create(String.valueOf(attrs.getOrDefault("path", request.getRequestURI()))));
-        problem.setProperty("code", (status.is5xxServerError()
-                ? CommonErrorCode.COMMON_INTERNAL_ERROR
-                : CommonErrorCode.COMMON_BAD_REQUEST).code());
+        problem.setProperty("code", codeFor(status));
         problem.setProperty("timestamp", OffsetDateTime.now(clock));
 
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(problem);
     }
+
+    private String codeFor(HttpStatus status) {
+        return switch (status) {
+            case UNAUTHORIZED ->
+                    SecurityErrorCode.AUTHENTICATION_REQUIRED.code();
+            case FORBIDDEN ->
+                    CommonErrorCode.AUTH_FORBIDDEN.code();
+            default -> status.is5xxServerError()
+                    ? CommonErrorCode.COMMON_INTERNAL_ERROR.code()
+                    : CommonErrorCode.COMMON_BAD_REQUEST.code();
+        };
+    }
+
 }
