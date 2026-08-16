@@ -341,16 +341,17 @@ class AdminApiTest {
     void userCannotAccessAdminApi() throws Exception {
         long memberId = member("일반회원", true).getId();
 
-        mockMvc.perform(get("/api/admin/members").with(as(memberId, MemberRole.USER)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code", is("AUTH_FORBIDDEN")));
+        mockMvc.perform(
+                        get("/api/admin/members")
+                                .with(as(memberId, MemberRole.USER))
+                )
+                .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("인증하지 않으면 관리자 API에 접근할 수 없다")
     void unauthenticatedCannotAccessAdminApi() throws Exception {
         mockMvc.perform(get("/api/admin/members"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code", is("AUTHENTICATION_REQUIRED")));
+                .andExpect(status().isUnauthorized());
     }
 }

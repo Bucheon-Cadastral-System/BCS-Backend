@@ -2,6 +2,7 @@ package com.is.bcs.adapter.in.web;
 
 import com.is.bcs.domain.member.exception.InvalidMemberStateException;
 import com.is.bcs.domain.member.exception.MemberNotFoundException;
+import jakarta.servlet.RequestDispatcher;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -23,8 +25,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
+
 import java.nio.charset.StandardCharsets;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -196,5 +200,41 @@ class ErrorResponseIntegrationTest {
     }
 
     record ProfileRequest(@NotBlank(message = "이름은 필수입니다.") String name) {
+    }
+
+    @Test
+    @DisplayName("/error 401 — AUTHENTICATION_REQUIRED")
+    void unauthorized_normalized() throws Exception {
+        mockMvc.perform(
+                        get("/error")
+                                .requestAttr(
+                                        RequestDispatcher.ERROR_STATUS_CODE,
+                                        HttpStatus.UNAUTHORIZED.value()
+                                )
+                                .requestAttr(
+                                        RequestDispatcher.ERROR_REQUEST_URI,
+                                        "/api/survey-projects"
+                                )
+                )
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("/error 403 — AUTH_FORBIDDEN")
+    void forbidden_normalized() throws Exception {
+        mockMvc.perform(
+                        get("/error")
+                                .requestAttr(
+                                        RequestDispatcher.ERROR_STATUS_CODE,
+                                        HttpStatus.FORBIDDEN.value()
+                                )
+                                .requestAttr(
+                                        RequestDispatcher.ERROR_REQUEST_URI,
+                                        "/api/admin/members"
+                                )
+                )
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
     }
 }
