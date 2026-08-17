@@ -1,17 +1,9 @@
-global:
-  scrape_interval: 15s         # 프로메테우스가 수집하는 주기 15초
-  evaluation_interval: 15s     # 수집한 데이터로 규칙을 계산하는 주기
+apiVersion: 1
 
-scrape_configs:
-  - job_name: prometheus       # 프로메테우스 자기 자신을 수집
-    static_configs:
-      - targets:
-          - "localhost:9090"   # 서버의 local이 아닌 프로메테우스 컨테이너 스스로를 localhost 라고 칭함
-
-  - job_name: bcs-backend      # bcs_backend 수집
-    metrics_path: /actuator/prometheus
-    static_configs:
-      - targets:
-          - "bcs-api:8081"
-        labels:
-          environment: prod
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
