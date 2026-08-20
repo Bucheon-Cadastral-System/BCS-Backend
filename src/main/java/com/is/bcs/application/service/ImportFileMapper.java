@@ -531,7 +531,7 @@ public abstract class ImportFileMapper {
         }
         String head = value.split("[(,]", 2)[0].trim();
         return switch (head) {
-            case "완전" -> SurveyResult.INTACT.getDisplayName();
+            case "완전", "정상" -> SurveyResult.INTACT.getDisplayName();
             case "망실" -> SurveyResult.LOST.getDisplayName();
             case "조사불가" -> SurveyResult.UNAVAILABLE.getDisplayName();
             case "기타" -> SurveyResult.ETC.getDisplayName();
@@ -539,12 +539,16 @@ public abstract class ImportFileMapper {
         };
     }
 
+    /**
+     * 조사 결과 어휘 — 고객사 서식은 '완전', 이 시스템이 내보낸 파일은 '정상'으로 적는다.
+     * 둘은 같은 판정이고, 내보낸 파일을 그대로 다시 올려 다음 회차를 열 수 있어야 하므로 둘 다 받는다.
+     */
     private static SurveyResult surveyResult(String value, String field) {
         if (value == null) {
             return null;
         }
         return switch (value) {
-            case "완전" -> SurveyResult.INTACT;
+            case "완전", "정상" -> SurveyResult.INTACT;
             case "망실" -> SurveyResult.LOST;
             case "조사불가" -> SurveyResult.UNAVAILABLE;
             case "기타" -> SurveyResult.ETC;
