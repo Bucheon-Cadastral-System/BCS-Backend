@@ -13,7 +13,6 @@ import com.is.bcs.application.port.out.survey.LoadSurveyTargetPort;
 import com.is.bcs.domain.controlpoint.ControlPoint;
 import com.is.bcs.domain.controlpoint.CoordinateSystem;
 import com.is.bcs.domain.survey.SurveyProject;
-import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,23 +35,25 @@ import java.util.stream.Collectors;
 /**
  * 조사의 대상 기준점을 파일 한 장으로 내보낸다.
  *
- * <p>열 이름과 어휘를 대상지 파일 읽기({@link ImportFileMapper})와 같게 맞춘다. 내보낸 파일을 그대로 다시
- * 올려 다음 회차를 열 수 있어야 하기 때문이다. 그래서 이 클래스가 쓰는 표기가 바뀌면 읽는 쪽도 함께 바뀐다.
+ * <p>열 이름과 어휘는 대상지 파일 읽기({@link ImportFileMapper})와 같게 맞춘다. 같은 대장을 두 벌의 말로
+ * 부르지 않기 위해서다. 그래서 이 클래스가 쓰는 표기가 바뀌면 읽는 쪽도 함께 바뀐다.
  *
- * <p>맨 뒤 네 열(최종조사)은 읽기가 요구하지 않는 값이다. 그 점이 지금 어떤 상태로 남아 있는지를 파일 하나로
- * 보여 주기 위한 것이라, 화면의 점 상세가 세우는 최종조사와 같은 값을 같은 규칙으로 고른다.
+ * <p>기존조사 두 열은 싣지 않는다. 그 열이 가리키는 것은 회차 하나의 판정인데, 맨 뒤 최종조사가 이미 그 점의
+ * 마지막 상태를 세우므로 대개 같은 값이 두 번 선다.
+ *
+ * <p>최종조사 네 열은 화면의 점 상세가 세우는 그 값이다. 같은 규칙으로 고른다.
  */
 @Service
 @RequiredArgsConstructor
 public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
 
     /**
-     * 내보내는 열 — 앞 열한 개는 대상지 파일이 요구하는 열이고 그 차례도 고객사 서식과 같다.
+     * 내보내는 열 — 앞 아홉 개는 대상지 파일이 요구하는 열이고 그 차례도 고객사 서식과 같다.
      * 경위도는 성과 좌표 옆에 같은 축 차례로 붙이고, 최종조사 네 열은 맨 뒤에 둔다.
      */
     private static final List<String> HEADERS = List.of(
             "종류", "기준점명", "기준점번호", "좌표계구분", "X좌표", "Y좌표", "경도(X)", "위도(Y)",
-            "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일",
+            "토지소재지", "상세주소", "설치일자",
             "최종조사내용", "최종조사일자", "최종조사원", "비고");
 
     /** 저장 이름에 쓸 수 없는 글자 — 운영체제마다 다르므로 어디서나 막히는 것을 모두 바꾼다. */
@@ -79,15 +80,12 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
         List<ControlPoint> points = new ArrayList<>(loadControlPointPort.findAllByIds(pointIds));
         points.sort(Comparator.comparing(ControlPoint::getType).thenComparing(ControlPoint::getName, byName()));
 
-        Map<Long, SurveyRecord> thisRound = loadSurveyRecordPort.findRecordSummariesByProjectId(projectId).stream()
-                .map(SurveyRecordSummary::record)
-                .collect(Collectors.toMap(SurveyRecord::getPointId, Function.identity()));
         Map<Long, SurveyRecordSummary> latest = loadSurveyRecordPort
                 .findLatestRecordSummariesByPointIds(pointIds).stream()
                 .collect(Collectors.toMap(summary -> summary.record().getPointId(), Function.identity()));
 
         List<List<String>> rows = points.stream()
-                .map(point -> row(point, thisRound.get(point.getId()), lastSurvey(point, latest.get(point.getId()))))
+                .map(point -> row(point, lastSurvey(point, latest.get(point.getId()))))
                 .toList();
         byte[] content = tableWriter.write("대상 기준점", new Table(HEADERS, rows));
         return new SurveyProjectExportFile(content, fileName(project.getName()));
@@ -102,7 +100,7 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
                 : LastSurveySummary.later(seed, LastSurveySummary.of(latest.record(), latest.surveyorName(), clock.getZone()));
     }
 
-    private List<String> row(ControlPoint point, SurveyRecord thisRound, LastSurveySummary last) {
+    private List<String> row(ControlPoint point, LastSurveySummary last) {
         return List.of(
                 text(point.getType().getDisplayName()),
                 text(point.getName()),
@@ -115,8 +113,6 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
                 region(point),
                 text(point.getAddress()),
                 date(point.getInstalledDate()),
-                thisRound == null ? "" : thisRound.getResult().getDisplayName(),
-                thisRound == null ? "" : date(thisRound.getSurveyedAt().atZoneSameInstant(clock.getZone()).toLocalDate()),
                 last == null ? "" : text(last.result()),
                 last == null ? "" : date(last.surveyedOn()),
                 last == null ? "" : text(last.surveyorName()),

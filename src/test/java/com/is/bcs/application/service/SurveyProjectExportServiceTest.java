@@ -60,8 +60,6 @@ class SurveyProjectExportServiceTest {
     @DisplayName("열 차례와 어휘 — 대상지 파일이 요구하는 열 뒤에 최종조사 네 열")
     void columns() {
         given(point(1L, "1465공", PointType.DOGEUN, "완전", LocalDate.parse("2025-09-08")));
-        when(records.findRecordSummariesByProjectId(7L)).thenReturn(List.of(
-                summary(record(7L, 1L, SurveyResult.INTACT, "2026-08-01T00:00:00+09:00", null), null)));
         when(records.findLatestRecordSummariesByPointIds(any())).thenReturn(List.of(
                 summary(record(7L, 1L, SurveyResult.LOST, "2026-08-01T00:00:00+09:00", "표석 확인 불가"), "김민석")));
 
@@ -69,45 +67,36 @@ class SurveyProjectExportServiceTest {
 
         assertEquals(List.of(
                 "종류", "기준점명", "기준점번호", "좌표계구분", "X좌표", "Y좌표", "경도(X)", "위도(Y)",
-                "토지소재지", "상세주소", "설치일자", "기존조사내용", "기존조사일",
+                "토지소재지", "상세주소", "설치일자",
                 "최종조사내용", "최종조사일자", "최종조사원", "비고"), written.get().headers());
         assertEquals(List.of(
                 "지적도근점", "1465공", "41192D000001265", "세계", "545236.77", "181840.96",
                 "126.794623", "37.506423", "10300-춘의동", "경기도 부천시 춘의동 102-16", "2018-02-21",
-                "정상", "2026-08-01",
                 "망실", "2026-08-01", "김민석", "표석 확인 불가"), written.get().rows().getFirst());
     }
 
     @Test
-    @DisplayName("조사하지 않은 대상 — 기존조사 두 칸이 빈다")
-    void notSurveyed() {
+    @DisplayName("조사한 적이 없는 점 — 최종조사 네 칸이 빈다")
+    void neverSurveyed() {
         given(point(1L, "1465공", PointType.DOGEUN, null, null));
-        when(records.findRecordSummariesByProjectId(7L)).thenReturn(List.of());
         when(records.findLatestRecordSummariesByPointIds(any())).thenReturn(List.of());
 
         service.export(7L);
 
         List<String> row = written.get().rows().getFirst();
-        assertEquals("", row.get(11));
-        assertEquals("", row.get(12));
-        assertEquals("", row.get(13));
+        assertEquals(List.of("", "", "", ""), row.subList(11, 15));
     }
 
     @Test
     @DisplayName("최종조사 — 시드가 기록보다 늦으면 시드를 세우고 조사원은 비운다")
     void seedWinsWhenNewer() {
         given(point(1L, "1465공", PointType.DOGEUN, "완전", LocalDate.parse("2026-09-08")));
-        when(records.findRecordSummariesByProjectId(7L)).thenReturn(List.of());
         when(records.findLatestRecordSummariesByPointIds(any())).thenReturn(List.of(
                 summary(record(7L, 1L, SurveyResult.LOST, "2026-08-01T00:00:00+09:00", "비고"), "김민석")));
 
         service.export(7L);
 
-        List<String> row = written.get().rows().getFirst();
-        assertEquals("완전", row.get(13));
-        assertEquals("2026-09-08", row.get(14));
-        assertEquals("", row.get(15));
-        assertEquals("", row.get(16));
+        assertEquals(List.of("완전", "2026-09-08", "", ""), written.get().rows().getFirst().subList(11, 15));
     }
 
     @Test
@@ -119,7 +108,6 @@ class SurveyProjectExportServiceTest {
                 point(1L, "10공", PointType.DOGEUN, null, null),
                 point(2L, "2공", PointType.DOGEUN, null, null),
                 point(3L, "가1", PointType.TRIANGULATION_AUX, null, null)));
-        when(records.findRecordSummariesByProjectId(7L)).thenReturn(List.of());
         when(records.findLatestRecordSummariesByPointIds(any())).thenReturn(List.of());
 
         service.export(7L);
@@ -134,7 +122,6 @@ class SurveyProjectExportServiceTest {
                 7L, null, "2026/8 굴착", LocalDate.parse("2026-08-01"), null, null)));
         when(targets.findPointIdsByProjectId(7L)).thenReturn(List.of());
         when(points.findAllByIds(any())).thenReturn(List.of());
-        when(records.findRecordSummariesByProjectId(7L)).thenReturn(List.of());
         when(records.findLatestRecordSummariesByPointIds(any())).thenReturn(List.of());
 
         SurveyProjectExportFile file = service.export(7L);
