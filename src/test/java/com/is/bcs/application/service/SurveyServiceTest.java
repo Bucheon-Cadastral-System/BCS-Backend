@@ -515,6 +515,15 @@ class SurveyServiceTest {
         }
 
         @Override
+        public List<SurveyRecordSummary> findLatestRecordSummariesByPointIds(Collection<Long> pointIds) {
+            return pointIds.stream()
+                    .map(this::findLatestRecordByPointId)
+                    .flatMap(Optional::stream)
+                    .map(record -> new SurveyRecordSummary(record, surveyorNames.get(record.getSurveyedById())))
+                    .toList();
+        }
+
+        @Override
         public Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId) {
             return records.values().stream()
                     .filter(r -> r.getProjectId().equals(projectId) && r.getPointId().equals(pointId))

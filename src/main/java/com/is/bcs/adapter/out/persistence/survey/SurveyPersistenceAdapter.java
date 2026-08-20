@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -97,6 +98,25 @@ public class SurveyPersistenceAdapter
                 .map(entity -> new SurveyRecordSummary(
                         entity.toDomain(),
                         entity.getSurveyor() == null ? null : entity.getSurveyor().getName()))
+                .toList();
+    }
+
+    @Override
+    public List<SurveyRecordSummary> findLatestRecordSummariesByPointIds(Collection<Long> pointIds) {
+        // 빈 목록으로는 묻지 않는다 — in () 는 문법 오류다
+        if (pointIds.isEmpty()) {
+            return List.of();
+        }
+        return recordRepository.findLatestRecordsByPointIds(pointIds).stream()
+                .map(latest -> new SurveyRecordSummary(
+                        SurveyRecord.restore(
+                                latest.getProjectId(),
+                                latest.getPointId(),
+                                SurveyResult.valueOf(latest.getResult()),
+                                latest.getSurveyedAt().atZone(clock.getZone()).toOffsetDateTime(),
+                                latest.getNote(),
+                                latest.getSurveyedBy()),
+                        latest.getSurveyorName()))
                 .toList();
     }
 
