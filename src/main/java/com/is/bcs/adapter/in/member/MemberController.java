@@ -51,6 +51,17 @@ public class MemberController {
         return ResponseEntity.ok(MemberProfileResponse.from(result));
     }
 
+    /**
+     * 다른 회원의 신원 — 화면이 작성자·조사원 이름을 눌렀을 때 그 사람이 누구인지 보인다.
+     *
+     * <p>읽는 일은 내 정보 조회와 같아 같은 유스케이스를 쓰고, 응답만 남에게 보일 만큼으로 좁힌다.
+     */
+    @Operation(summary = "회원 신원 조회", security = @SecurityRequirement(name = "Bearer Authentication"))
+    @GetMapping("/{memberId}")
+    public ResponseEntity<MemberSummaryResponse> getMemberSummary(@PathVariable("memberId") Long memberId) {
+        return ResponseEntity.ok(MemberSummaryResponse.from(getMyProfileUseCase.getProfile(memberId)));
+    }
+
     @Operation(summary = "가입 정보 입력, CSRF 토큰을 꼭 넣으셔야합니다. (세션 사용하기 때문)", security = @SecurityRequirement(name = CSRF_SECURITY_SCHEME))
     @PutMapping("/me/registration")
     public ResponseEntity<Void> completeRegistration(Authentication authentication, @Valid @RequestBody CompleteRegistrationRequest request
