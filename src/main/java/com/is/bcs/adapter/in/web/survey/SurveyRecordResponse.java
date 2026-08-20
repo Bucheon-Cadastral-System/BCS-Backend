@@ -15,6 +15,8 @@ public record SurveyRecordResponse(
         SurveyResult result,
         OffsetDateTime surveyedAt,
         String note,
+        /** 조사원 회원 id — 화면이 그 사람의 신원을 물을 때 쓴다. */
+        Long surveyorId,
         /** 조사원 표시명 — 인증 없는 기록·파일 임포트 기록은 null 이다. */
         String surveyorName
 ) {
@@ -23,6 +25,6 @@ public record SurveyRecordResponse(
         SurveyRecord record = summary.record();
         return new SurveyRecordResponse(
                 record.getPointId(), record.getResult(), record.getSurveyedAt(),
-                record.getNote(), summary.surveyorName());
+                record.getNote(), record.getSurveyedById(), summary.surveyorName());
     }
 }

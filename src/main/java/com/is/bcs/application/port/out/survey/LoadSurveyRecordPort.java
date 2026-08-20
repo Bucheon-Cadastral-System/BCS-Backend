@@ -5,6 +5,7 @@ import com.is.bcs.application.dto.SurveyRecordSummary;
 import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyResult;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,6 +39,14 @@ public interface LoadSurveyRecordPort {
 
     /** 기록과 조사원 표시명을 한 문장으로 가져온다 — 목록 화면 전용. */
     List<SurveyRecordSummary> findRecordSummariesByProjectId(Long projectId);
+
+    /**
+     * 이 점들의 최신 기록 한 줄씩, 조사원 표시명까지 — 점 목록이 정해진 자리(내보내기) 전용.
+     *
+     * <p>{@link #findLatestSurveyPerPoint} 와 고르는 줄은 같고 조사원·비고를 더 싣는다. 점 전체가 아니라
+     * 물어본 점만 훑으므로 회원 조인이 붙어도 문장 하나로 끝난다. 기록이 없는 점은 담기지 않는다.
+     */
+    List<SurveyRecordSummary> findLatestRecordSummariesByPointIds(Collection<Long> pointIds);
 
     Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId);
 

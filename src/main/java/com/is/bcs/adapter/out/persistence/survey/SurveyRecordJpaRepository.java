@@ -70,6 +70,43 @@ public interface SurveyRecordJpaRepository extends JpaRepository<SurveyRecordJpa
     }
 
     /**
+     * 물어본 점마다 최신 기록 한 줄씩, 조사원 이름과 비고까지 — 내보내기 전용.
+     *
+     * <p>고르는 줄은 위 {@link #findLatestSurveyPerPoint} 와 같은 기준이다. 조사원은 없을 수 있어 왼쪽 조인이다.
+     */
+    @Query(value = """
+            select distinct on (r.point_id)
+                   r.project_id as "projectId", r.point_id as "pointId", r.result as "result",
+                   r.surveyed_at as "surveyedAt", r.note as "note", r.surveyed_by as "surveyedBy",
+                   m.name as "surveyorName"
+            from bcs.survey_records r
+            left join bcs.members m on m.id = r.surveyed_by
+            where r.point_id in (:pointIds)
+            order by r.point_id, r.surveyed_at desc, r.created_at desc, r.project_id desc
+            """, nativeQuery = true)
+    List<LatestPointRecord> findLatestRecordsByPointIds(@Param("pointIds") Collection<Long> pointIds);
+
+    interface LatestPointRecord {
+
+        Long getProjectId();
+
+        Long getPointId();
+
+        /** 열에 담긴 이름 그대로 — 어휘로 옮기는 일은 어댑터가 한다. */
+        String getResult();
+
+        /** 시각대를 붙이지 않은 순간 — 네이티브 조회는 timestamptz 를 이 형으로 내린다. */
+        Instant getSurveyedAt();
+
+        String getNote();
+
+        Long getSurveyedBy();
+
+        /** 조사원 표시명 — 파일로 들어온 기록과 인증 전에 남긴 기록은 비어 있다. */
+        String getSurveyorName();
+    }
+
+    /**
      * 목록에 조사원 이름을 함께 그리는 경로 전용 — 조사원을 조인으로 함께 실어 온다.
      * 이름을 따로 모아 다시 조회하면 문장이 하나 더 나가고, 연관을 그냥 두면 행마다 나간다.
      *

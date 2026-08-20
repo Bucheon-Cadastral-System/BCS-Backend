@@ -603,6 +603,12 @@ class ControlPointServiceTest {
         }
 
         @Override
+        public List<com.is.bcs.application.dto.SurveyRecordSummary> findLatestRecordSummariesByPointIds(
+                Collection<Long> pointIds) {
+            return List.of();
+        }
+
+        @Override
         public Optional<SurveyRecord> findRecordByProjectIdAndPointId(Long projectId, Long pointId) {
             return Optional.empty();
         }

@@ -18,7 +18,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -98,6 +100,31 @@ public class SurveyPersistenceAdapter
                         entity.toDomain(),
                         entity.getSurveyor() == null ? null : entity.getSurveyor().getName()))
                 .toList();
+    }
+
+    @Override
+    public List<SurveyRecordSummary> findLatestRecordSummariesByPointIds(Collection<Long> pointIds) {
+        // 빈 목록으로는 묻지 않는다 — in () 는 문법 오류다
+        if (pointIds.isEmpty()) {
+            return List.of();
+        }
+        // PostgreSQL 바인드 변수 상한(65,535)에 여유를 두고 나눈다 — 점 조회 어댑터와 같은 규칙.
+        // 점마다 한 줄씩이라 나눠 물어도 합친 결과가 같다
+        List<Long> all = List.copyOf(pointIds);
+        List<SurveyRecordSummary> found = new ArrayList<>(all.size());
+        for (int from = 0; from < all.size(); from += CHUNK_SIZE) {
+            recordRepository.findLatestRecordsByPointIds(all.subList(from, Math.min(from + CHUNK_SIZE, all.size())))
+                    .forEach(latest -> found.add(new SurveyRecordSummary(
+                            SurveyRecord.restore(
+                                    latest.getProjectId(),
+                                    latest.getPointId(),
+                                    SurveyResult.valueOf(latest.getResult()),
+                                    latest.getSurveyedAt().atZone(clock.getZone()).toOffsetDateTime(),
+                                    latest.getNote(),
+                                    latest.getSurveyedBy()),
+                            latest.getSurveyorName())));
+        }
+        return found;
     }
 
     @Override

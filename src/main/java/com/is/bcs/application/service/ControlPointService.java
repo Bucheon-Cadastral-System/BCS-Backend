@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
@@ -199,10 +198,9 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
                 .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
         // 시드에는 조사원도 비고도 없다. 파일이 그 두 가지를 적어 오지 않는다
         LastSurveySummary seed = new LastSurveySummary(
-                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null);
+                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null, null);
         return loadSurveyRecordPort.findLatestRecordByPointId(pointId)
-                .map(this::toLastSurvey)
-                .filter(record -> isNotBefore(record.surveyedOn(), seed.surveyedOn()))
+                .map(record -> LastSurveySummary.later(seed, toLastSurvey(record)))
                 .orElse(seed);
     }
 
@@ -223,16 +221,8 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
         loadSurveyRecordPort.findLatestSurveyPerPoint().forEach(latest -> byPoint.merge(
                 latest.pointId(),
                 latest,
-                (seed, record) -> isNotBefore(record.surveyedOn(), seed.surveyedOn()) ? record : seed));
+                (seed, record) -> LastSurveySummary.recordWins(record.surveyedOn(), seed.surveyedOn()) ? record : seed));
         return List.copyOf(byPoint.values());
-    }
-
-    /** 날짜가 같으면 기록을 택한다 — 조사원까지 아는 쪽이 더 자세하다. 한쪽 날짜가 비면 있는 쪽이 이긴다. */
-    private static boolean isNotBefore(LocalDate recordDate, LocalDate seedDate) {
-        if (seedDate == null) {
-            return true;
-        }
-        return recordDate != null && !recordDate.isBefore(seedDate);
     }
 
     private LastSurveySummary toLastSurvey(SurveyRecord latest) {
@@ -241,10 +231,6 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
         String surveyorName = surveyorId == null
                 ? null
                 : loadMemberNamesPort.findNamesByIds(Set.of(surveyorId)).get(surveyorId);
-        return new LastSurveySummary(
-                latest.getResult().getDisplayName(),
-                latest.getSurveyedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
-                surveyorName,
-                latest.getNote());
+        return LastSurveySummary.of(latest, surveyorName, clock.getZone());
     }
 }
