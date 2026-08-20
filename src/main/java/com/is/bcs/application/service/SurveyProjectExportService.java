@@ -94,7 +94,7 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
     /** 화면의 점 상세와 같은 최종조사 — 기준점이 든 시드 조사와 조사기록 중 날짜가 늦은 쪽. */
     private LastSurveySummary lastSurvey(ControlPoint point, SurveyRecordSummary latest) {
         LastSurveySummary seed = new LastSurveySummary(
-                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null);
+                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null, null);
         return latest == null
                 ? seed
                 : LastSurveySummary.later(seed, LastSurveySummary.of(latest.record(), latest.surveyorName(), clock.getZone()));

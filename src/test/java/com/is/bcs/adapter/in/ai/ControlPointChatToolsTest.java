@@ -129,7 +129,7 @@ class ControlPointChatToolsTest {
 
         @Override
         public LastSurveySummary getLastSurvey(Long pointId) {
-            return new LastSurveySummary(null, null, null, null);
+            return new LastSurveySummary(null, null, null, null, null);
         }
 
         @Override

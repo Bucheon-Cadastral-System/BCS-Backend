@@ -199,7 +199,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
                 .orElseThrow(() -> new ControlPointNotFoundException("기준점을 찾을 수 없습니다: " + pointId));
         // 시드에는 조사원도 비고도 없다. 파일이 그 두 가지를 적어 오지 않는다
         LastSurveySummary seed = new LastSurveySummary(
-                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null);
+                point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null, null);
         return loadSurveyRecordPort.findLatestRecordByPointId(pointId)
                 .map(record -> LastSurveySummary.later(seed, toLastSurvey(record)))
                 .orElse(seed);
