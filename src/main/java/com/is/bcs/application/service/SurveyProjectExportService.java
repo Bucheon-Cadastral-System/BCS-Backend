@@ -60,7 +60,6 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
     private static final Pattern UNSAFE_FILE_NAME = Pattern.compile("[\\\\/:*?\"<>|\\p{Cntrl}]");
     /** 이름의 숫자는 자릿수가 아니라 값으로 견준다 — 화면 목록과 같은 차례로 선다. */
     private static final Pattern DIGITS = Pattern.compile("(\\d+)");
-    private static final Collator KOREAN = Collator.getInstance(Locale.KOREAN);
     /** 경위도 자릿수 — 파생값이라 성과처럼 자릿수를 못박을 필요는 없고, 표기가 흔들리지 않을 만큼만 자른다. */
     private static final int GEO_SCALE = 8;
 
@@ -162,6 +161,9 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
      * 화면 목록이 쓰는 규칙과 같아야 파일과 화면을 나란히 놓고 볼 수 있다.
      */
     private static Comparator<String> byName() {
+        // 정렬마다 새로 만든다 — RuleBasedCollator 는 견주는 자리(sourceCursor·targetCursor)를 필드에 들고 있어
+        // 한 인스턴스를 여러 요청이 함께 쓰면 서로의 자리를 덮는다
+        Collator korean = Collator.getInstance(Locale.KOREAN);
         return (a, b) -> {
             List<String> left = split(a);
             List<String> right = split(b);
@@ -169,7 +171,7 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
                 String x = left.get(i);
                 String y = right.get(i);
                 boolean bothNumbers = isNumber(x) && isNumber(y);
-                int compared = bothNumbers ? new BigDecimal(x).compareTo(new BigDecimal(y)) : KOREAN.compare(x, y);
+                int compared = bothNumbers ? new BigDecimal(x).compareTo(new BigDecimal(y)) : korean.compare(x, y);
                 if (compared != 0) {
                     return compared;
                 }
