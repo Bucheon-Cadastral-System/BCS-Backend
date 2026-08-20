@@ -201,8 +201,7 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
         LastSurveySummary seed = new LastSurveySummary(
                 point.getLastSurveyResult(), point.getLastSurveyedOn(), null, null);
         return loadSurveyRecordPort.findLatestRecordByPointId(pointId)
-                .map(this::toLastSurvey)
-                .filter(record -> isNotBefore(record.surveyedOn(), seed.surveyedOn()))
+                .map(record -> LastSurveySummary.later(seed, toLastSurvey(record)))
                 .orElse(seed);
     }
 
@@ -241,10 +240,6 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
         String surveyorName = surveyorId == null
                 ? null
                 : loadMemberNamesPort.findNamesByIds(Set.of(surveyorId)).get(surveyorId);
-        return new LastSurveySummary(
-                latest.getResult().getDisplayName(),
-                latest.getSurveyedAt().atZoneSameInstant(clock.getZone()).toLocalDate(),
-                surveyorName,
-                latest.getNote());
+        return LastSurveySummary.of(latest, surveyorName, clock.getZone());
     }
 }
