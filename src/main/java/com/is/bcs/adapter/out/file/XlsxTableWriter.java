@@ -23,7 +23,7 @@ import java.util.List;
  * 도 문자열로 받으므로 내보낸 파일을 그대로 다시 올릴 수 있다.
  *
  * <p>{@link SXSSFWorkbook} 은 쓴 행을 디스크로 흘려보내며 메모리에는 창만큼만 둔다 — 점 수천 개짜리 조사도
- * 한 번에 다 쥐지 않는다.
+ * 한 번에 다 쥐지 않는다. 흘려 쓰기가 남긴 임시 파일은 close 가 지운다.
  */
 @Component
 public class XlsxTableWriter implements TableWriter {
@@ -47,8 +47,6 @@ public class XlsxTableWriter implements TableWriter {
                 sheet.setColumnWidth(column, COLUMN_WIDTH);
             }
             workbook.write(out);
-            // 흘려 쓰기가 남긴 임시 파일은 스스로 지우지 않는다
-            workbook.dispose();
             return out.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException("파일을 만들지 못했습니다.", e);
