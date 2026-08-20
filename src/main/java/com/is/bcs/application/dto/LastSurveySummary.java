@@ -41,9 +41,19 @@ public record LastSurveySummary(
         if (record == null) {
             return seed;
         }
-        if (seed == null || seed.surveyedOn() == null) {
-            return record;
+        return seed == null || recordWins(record.surveyedOn(), seed.surveyedOn()) ? record : seed;
+    }
+
+    /**
+     * 날짜만 견주는 같은 규칙 — 조사원까지 실을 수 없는 일괄 경로도 이 규칙을 쓴다.
+     *
+     * <p>두 경로가 같은 답을 내야 하므로 비교를 한곳에 둔다. 한쪽만 고치면 점 하나를 열 때와
+     * 지도를 그릴 때의 최종조사가 갈린다.
+     */
+    public static boolean recordWins(LocalDate recordDate, LocalDate seedDate) {
+        if (seedDate == null) {
+            return true;
         }
-        return record.surveyedOn() != null && !record.surveyedOn().isBefore(seed.surveyedOn()) ? record : seed;
+        return recordDate != null && !recordDate.isBefore(seedDate);
     }
 }

@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
@@ -222,16 +221,8 @@ public class ControlPointService implements RegisterControlPointUseCase, UpdateC
         loadSurveyRecordPort.findLatestSurveyPerPoint().forEach(latest -> byPoint.merge(
                 latest.pointId(),
                 latest,
-                (seed, record) -> isNotBefore(record.surveyedOn(), seed.surveyedOn()) ? record : seed));
+                (seed, record) -> LastSurveySummary.recordWins(record.surveyedOn(), seed.surveyedOn()) ? record : seed));
         return List.copyOf(byPoint.values());
-    }
-
-    /** 날짜가 같으면 기록을 택한다 — 조사원까지 아는 쪽이 더 자세하다. 한쪽 날짜가 비면 있는 쪽이 이긴다. */
-    private static boolean isNotBefore(LocalDate recordDate, LocalDate seedDate) {
-        if (seedDate == null) {
-            return true;
-        }
-        return recordDate != null && !recordDate.isBefore(seedDate);
     }
 
     private LastSurveySummary toLastSurvey(SurveyRecord latest) {
