@@ -540,8 +540,8 @@ public abstract class ImportFileMapper {
     }
 
     /**
-     * 조사 결과 어휘 — 고객사 서식은 '완전', 이 시스템이 내보낸 파일은 '정상'으로 적는다.
-     * 둘은 같은 판정이고, 내보낸 파일을 그대로 다시 올려 다음 회차를 열 수 있어야 하므로 둘 다 받는다.
+     * 조사 결과 어휘 — 고객사 서식은 '완전', 이 시스템의 화면은 '정상'으로 같은 판정을 부른다.
+     * 화면을 보고 적은 파일이 그 자리에서 거절되지 않게 둘 다 받는다.
      */
     private static SurveyResult surveyResult(String value, String field) {
         if (value == null) {
