@@ -153,7 +153,7 @@ public class SurveyProjectExportService implements ExportSurveyProjectUseCase {
 
     private static String fileName(String projectName) {
         String safe = UNSAFE_FILE_NAME.matcher(projectName).replaceAll(" ").trim();
-        return (safe.isEmpty() ? "조사" : safe) + "_기준점.xlsx";
+        return (safe.isEmpty() ? "조사" : safe) + ".xlsx";
     }
 
     /**

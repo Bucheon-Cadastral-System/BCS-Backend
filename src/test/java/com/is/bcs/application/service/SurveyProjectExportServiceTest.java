@@ -126,7 +126,7 @@ class SurveyProjectExportServiceTest {
 
         SurveyProjectExportFile file = service.export(7L);
 
-        assertEquals("2026 8 굴착_기준점.xlsx", file.fileName());
+        assertEquals("2026 8 굴착.xlsx", file.fileName());
     }
 
     @Test
