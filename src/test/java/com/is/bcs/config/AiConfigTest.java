@@ -26,7 +26,7 @@ class AiConfigTest {
 
     private final FakeModel model = new FakeModel();
     private final ChatClient chatClient = new AiConfig().chatClient(
-            ChatClient.builder(model), new ControlPointChatTools(null), new SurveyChatTools(null, null));
+            ChatClient.builder(model), new ControlPointChatTools(null), new SurveyChatTools(null, null, null));
 
     @Test
     @DisplayName("호출 프롬프트에 시스템 프롬프트와 사용자 질문이 실린다")
@@ -45,7 +45,7 @@ class AiConfigTest {
     }
 
     @Test
-    @DisplayName("조회 도구 4개가 도구 콜백으로 등록된다")
+    @DisplayName("조회 도구 7개가 도구 콜백으로 등록된다 — 쓰기·삭제 유스케이스는 올리지 않는다")
     void prompt_carriesToolCallbacks() {
         chatClient.prompt().user("질문").call().content();
 
@@ -54,9 +54,10 @@ class AiConfigTest {
         List<String> toolNames = options.getToolCallbacks().stream()
                 .map(callback -> callback.getToolDefinition().name())
                 .toList();
-        assertEquals(4, toolNames.size());
+        assertEquals(7, toolNames.size());
         assertTrue(toolNames.containsAll(List.of(
-                "countControlPoints", "getControlPointByNo", "getSurveyProjects", "getSurveyProgress")));
+                "countControlPoints", "getControlPointByNo", "findControlPoints", "getLastSurveyByPointNo",
+                "getSurveyProjects", "getSurveyProgress", "getSurveyRecords")));
     }
 
     /** 모델 페이크 — 받은 프롬프트를 기록하고 고정 답변을 돌려준다(도구 호출은 하지 않는다). */

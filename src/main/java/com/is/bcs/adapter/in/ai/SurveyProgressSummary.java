@@ -50,7 +50,7 @@ public record SurveyProgressSummary(
     }
 
     /** 화면(shared/lib/percent)과 같은 규칙 — 대상이 없으면 0, 그 외에는 반올림. */
-    private static int percent(long value, long total) {
+    static int percent(long value, long total) {
         return total == 0 ? 0 : Math.round((float) value / total * 100);
     }
 }
