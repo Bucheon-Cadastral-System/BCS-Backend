@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -31,9 +30,7 @@ public class ChatController {
 
     @PostMapping
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, Authentication authentication) {
-        long startedAt = System.nanoTime();
-        String answer = askChatBotUseCase.ask(request.message(), optionalMemberId.of(authentication));
-        return new ChatResponse(answer, Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+        return new ChatResponse(askChatBotUseCase.ask(request.message(), optionalMemberId.of(authentication)));
     }
 
     /** 그 계정의 대화를 오래된 것부터 돌려준다 — 화면이 새로고침 뒤 이어 보는 경로다. */
