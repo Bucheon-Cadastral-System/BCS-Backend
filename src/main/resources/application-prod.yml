@@ -71,10 +71,13 @@ spring:
     openai:
       base-url: https://generativelanguage.googleapis.com/v1beta/openai
       api-key: ${GEMINI_API_KEY}
+      # 모델 호출 한 번의 상한과 재시도 횟수. 기본값(60초 · 3회)이면 한 라운드가 4분까지 늘어난다.
+      # 위 spring.http.clients 설정은 여기에 걸리지 않는다 — 이 호출은 OpenAI SDK 가 제 클라이언트로 보낸다
+      timeout: 30s
+      max-retries: 1
       chat:
         completions-path: /chat/completions
         model: gemini-3.5-flash-lite
-        max-tokens: 2048
 
   http:
     clients:
