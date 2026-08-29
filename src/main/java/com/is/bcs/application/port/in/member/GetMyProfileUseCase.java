@@ -20,7 +20,8 @@ public interface GetMyProfileUseCase {
             Team team,
             Position position,
             MemberRole role,
-            MemberStatus status
+            MemberStatus status,
+            boolean profileImageRegistered
     ) {
     }
 }
