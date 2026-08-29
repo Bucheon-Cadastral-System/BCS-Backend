@@ -40,4 +40,11 @@ public class MemberPersistenceAdapter implements LoadMemberPort, SaveMemberPort 
 
         return savedEntity.toDomain();
     }
+
+    @Override
+    public Optional<Member> findByIdForUpdate(Long memberId) {
+        return memberJpaRepository
+                .findByIdForUpdate(memberId)
+                .map(MemberJpaEntity::toDomain);
+    }
 }

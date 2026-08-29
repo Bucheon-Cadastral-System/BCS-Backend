@@ -15,6 +15,7 @@ public class Member {
     private final Long id;
     private final OAuthProvider provider;
     private final String providerUserId;
+    private String profileImagePath;
 
     private String name;
     private String phone;
@@ -39,6 +40,7 @@ public class Member {
             String name,
             String phone,
             String email,
+            String profileImagePath,
             District district,
             String department,
             Team team,
@@ -55,6 +57,7 @@ public class Member {
         this.name = name;
         this.phone = phone;
         this.email = email;
+        this.profileImagePath = profileImagePath;
         this.district = district;
         this.department = department;
         this.team = team;
@@ -82,6 +85,7 @@ public class Member {
                 null, // name
                 null, // phone
                 null, // email
+                null, // profileImagePath
                 null, // district
                 null, // department
                 null, // team
@@ -104,6 +108,7 @@ public class Member {
             String name,
             String phone,
             String email,
+            String profileImagePath,
             District district,
             String department,
             Team team,
@@ -121,6 +126,7 @@ public class Member {
                 name,
                 phone,
                 email,
+                profileImagePath,
                 district,
                 department,
                 team,
@@ -269,6 +275,16 @@ public class Member {
         if (this.approvedAt == null) {
             this.approvedAt = validActivatedAt;
         }
+    }
+
+    public void updateProfileImage(String profileImagePath) {
+        validateActiveStatus();
+        this.profileImagePath = requireText(profileImagePath, "프로필 이미지 경로");
+    }
+
+    public void deleteProfileImage() {
+        validateActiveStatus();
+        this.profileImagePath = null;
     }
 
     public void promoteToAdmin() {
