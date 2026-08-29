@@ -14,6 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 챗봇 질문 처리와 대화 이력.
@@ -40,11 +42,19 @@ public class ChatBotService implements AskChatBotUseCase, GetChatHistoryUseCase,
     private final LoadChatMessagePort loadChatMessagePort;
     private final DeleteChatMessagePort deleteChatMessagePort;
 
+    /**
+     * 계정별 '새 대화' 횟수 — 질문이 도는 사이에 대화가 지워졌는지 가른다.
+     *
+     * <p>기다리는 쪽은 이 서버의 요청이므로 이 서버의 기억으로 충분하다. 계정 수만큼만 늘어난다.
+     */
+    private final Map<Long, Long> clearCounts = new ConcurrentHashMap<>();
+
     @Override
     public String ask(String question, Long memberId) {
+        long clearsBefore = clearCount(memberId);
         String answer = chatModelPort.answer(question);
         if (memberId != null) {
-            record(memberId, question, answer);
+            record(memberId, question, answer, clearsBefore);
         }
         return answer;
     }
@@ -62,11 +72,21 @@ public class ChatBotService implements AskChatBotUseCase, GetChatHistoryUseCase,
         if (memberId == null) {
             return;
         }
+        clearCounts.merge(memberId, 1L, Long::sum);
         deleteChatMessagePort.deleteByMemberId(memberId);
     }
 
-    /** 답변은 이미 만들어졌으므로 이력 저장이 실패해도 화면에는 답변을 내보낸다. */
-    private void record(Long memberId, String question, String answer) {
+    /**
+     * 답변은 이미 만들어졌으므로 이력 저장이 실패해도 화면에는 답변을 내보낸다.
+     *
+     * <p>모델이 도는 사이에 '새 대화'가 들어왔다면 남기지 않는다. 그대로 저장하면 비운 대화에
+     * 지난 질문과 답이 되살아난다.
+     */
+    private void record(Long memberId, String question, String answer, long clearsBefore) {
+        if (clearCount(memberId) != clearsBefore) {
+            log.info("질문이 도는 사이 대화를 비워 답변을 남기지 않습니다. memberId={}", memberId);
+            return;
+        }
         try {
             saveChatMessagePort.saveAll(List.of(
                     ChatMessage.of(memberId, ChatRole.USER, question),
@@ -75,5 +95,9 @@ public class ChatBotService implements AskChatBotUseCase, GetChatHistoryUseCase,
         } catch (RuntimeException e) {
             log.warn("대화 이력을 저장하지 못했습니다. memberId={}", memberId, e);
         }
+    }
+
+    private long clearCount(Long memberId) {
+        return memberId == null ? 0L : clearCounts.getOrDefault(memberId, 0L);
     }
 }

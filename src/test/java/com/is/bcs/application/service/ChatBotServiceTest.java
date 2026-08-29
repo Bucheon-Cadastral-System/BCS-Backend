@@ -76,6 +76,28 @@ class ChatBotServiceTest {
     }
 
     @Test
+    @DisplayName("답을 만드는 사이 새 대화를 시작하면 그 답변은 남기지 않는다")
+    void ask_clearedWhileAnswering_doesNotRecord() {
+        model.whileAnswering = () -> service.clear(MEMBER);
+
+        String answer = service.ask("기준점 몇 개야?", MEMBER);
+
+        assertEquals("답변: 기준점 몇 개야?", answer);
+        assertTrue(history.saved.isEmpty());
+        assertEquals(0, history.trimmedTo);
+    }
+
+    @Test
+    @DisplayName("새 대화를 시작한 뒤 던진 질문은 그대로 남긴다")
+    void ask_afterClear_recordsAgain() {
+        service.clear(MEMBER);
+
+        service.ask("기준점 몇 개야?", MEMBER);
+
+        assertEquals(2, history.saved.size());
+    }
+
+    @Test
     @DisplayName("이력 조회는 그 계정의 최근 50줄을 요청한다")
     void getHistory_readsRecentOfMember() {
         history.stored.add(ChatMessage.of(MEMBER, ChatRole.USER, "지난 질문"));
@@ -116,10 +138,15 @@ class ChatBotServiceTest {
     private static class FakeChatModel implements ChatModelPort {
 
         String askedQuestion;
+        /** 답을 만드는 동안 벌어지는 일 — 모델이 도는 사이의 '새 대화'를 대신한다. */
+        Runnable whileAnswering;
 
         @Override
         public String answer(String question) {
             this.askedQuestion = question;
+            if (whileAnswering != null) {
+                whileAnswering.run();
+            }
             return "답변: " + question;
         }
     }
