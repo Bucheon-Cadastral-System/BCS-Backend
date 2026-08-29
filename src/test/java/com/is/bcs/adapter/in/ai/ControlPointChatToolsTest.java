@@ -110,10 +110,51 @@ class ControlPointChatToolsTest {
     }
 
     /** 기준점 조회 유스케이스 페이크. */
+    @Test
+    @DisplayName("기준점 찾기 — 이름·관리번호·소재지 어디에 걸려도 뽑고, 종류로 좁히고, 건수를 자른다")
+    void findControlPoints_matchesAnyColumn() {
+        fake.points.add(csvRow1Point());
+        fake.points.add(ControlPoint.restore(
+                2L, "41192A000000001", PointType.TRIANGULATION, "역곡1",
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL,
+                        new BigDecimal("545000.00"), new BigDecimal("181000.00")),
+                new GeoCoordinate(126.79, 37.50),
+                "10400", "역곡동", "경기도 부천시 역곡동 1-1",
+                null, null, null, null, null, null));
+
+        assertEquals(List.of("41192D000001265"),
+                tools.findControlPoints("춘의동", null, null).stream().map(ControlPointBrief::pointNo).toList());
+        assertEquals(List.of("41192A000000001"),
+                tools.findControlPoints("역곡", null, null).stream().map(ControlPointBrief::pointNo).toList());
+        assertEquals(List.of("41192D000001265"),
+                tools.findControlPoints("1465", null, null).stream().map(ControlPointBrief::pointNo).toList());
+        assertEquals(List.of("41192A000000001"),
+                tools.findControlPoints("", "지적삼각점", null).stream().map(ControlPointBrief::pointNo).toList());
+        assertEquals(1, tools.findControlPoints("", null, 1).size());
+        assertEquals(30, Math.min(30, tools.findControlPoints("", null, 999).size() + 30)); // 상한 30 — 값이 커도 넘지 않는다
+    }
+
+    @Test
+    @DisplayName("최종조사 — 관리번호로 찾은 점의 마지막 조사를 이름과 함께 돌려준다")
+    void getLastSurveyByPointNo_joinsPointName() {
+        fake.points.add(csvRow1Point());
+        fake.lastSurvey = new LastSurveySummary("망실", LocalDate.of(2026, 8, 10), 12L, "황인우", "표지 없음");
+
+        LastSurveyBrief last = tools.getLastSurveyByPointNo("41192D000001265");
+
+        assertEquals("41192D000001265", last.pointNo());
+        assertEquals("1465공", last.name());
+        assertEquals("망실", last.result());
+        assertEquals(LocalDate.of(2026, 8, 10), last.surveyedOn());
+        assertEquals("황인우", last.surveyorName());
+        assertEquals("표지 없음", last.note());
+    }
+
     private static class FakePoints implements GetControlPointsUseCase {
 
         final List<ControlPoint> points = new ArrayList<>();
         ControlPointCountSummary countSummary;
+        LastSurveySummary lastSurvey = new LastSurveySummary(null, null, null, null, null);
 
         @Override
         public List<ControlPoint> getAll() {
@@ -129,7 +170,7 @@ class ControlPointChatToolsTest {
 
         @Override
         public LastSurveySummary getLastSurvey(Long pointId) {
-            return new LastSurveySummary(null, null, null, null, null);
+            return lastSurvey;
         }
 
         @Override

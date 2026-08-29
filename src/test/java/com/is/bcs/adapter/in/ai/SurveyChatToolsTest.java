@@ -2,15 +2,25 @@ package com.is.bcs.adapter.in.ai;
 
 import com.is.bcs.application.dto.SurveyProgress;
 import com.is.bcs.application.dto.SurveyRecordSummary;
+import com.is.bcs.application.port.in.controlpoint.GetControlPointsUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyProjectsUseCase;
 import com.is.bcs.application.port.in.survey.GetSurveyRecordsUseCase;
+import com.is.bcs.domain.controlpoint.ControlPoint;
+import com.is.bcs.domain.controlpoint.CoordinateSystem;
+import com.is.bcs.domain.controlpoint.GeoCoordinate;
+import com.is.bcs.domain.controlpoint.PointType;
+import com.is.bcs.domain.controlpoint.TmCoordinate;
+import com.is.bcs.domain.survey.SurveyRecord;
 import com.is.bcs.domain.survey.SurveyProject;
 import com.is.bcs.domain.survey.SurveyResult;
 import com.is.bcs.domain.survey.exception.SurveyProjectNotFoundException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,12 +36,15 @@ class SurveyChatToolsTest {
     private static final LocalDate ENDED = LocalDate.of(2026, 7, 31);
 
     private final FakeSurveys fake = new FakeSurveys();
-    private final SurveyChatTools tools = new SurveyChatTools(fake, fake);
+    private final FakePoints points = new FakePoints();
+    private final SurveyChatTools tools = new SurveyChatTools(fake, fake, points);
 
     @Test
     @DisplayName("프로젝트 목록 — id·이름·기간·비고를 돌려준다")
     void getSurveyProjects_returnsSummaries() {
         fake.projects.put(1L, SurveyProject.restore(1L, null, "2026 일제조사", STARTED, ENDED, "정기 조사"));
+        fake.targetCounts.put(1L, 40L);
+        fake.surveyedCounts.put(1L, 10L);
 
         List<ProjectSummary> projects = tools.getSurveyProjects();
 
@@ -41,6 +54,9 @@ class SurveyChatToolsTest {
         assertEquals(STARTED, projects.getFirst().startedOn());
         assertEquals(ENDED, projects.getFirst().endedOn());
         assertEquals("정기 조사", projects.getFirst().note());
+        assertEquals(40, projects.getFirst().totalPoints());
+        assertEquals(10, projects.getFirst().surveyedPoints());
+        assertEquals(25, projects.getFirst().progressPercent());
     }
 
     @Test
@@ -125,10 +141,79 @@ class SurveyChatToolsTest {
         assertEquals(99L, fake.progressProjectId); // 실패 경로에서도 전달받은 id를 그대로 넘긴다
     }
 
+    @Test
+    @DisplayName("조사 기록 — 결과로 거르고 조사일이 늦은 것부터 자르며 기준점 이름을 붙인다")
+    void getSurveyRecords_filtersSortsAndJoins() {
+        points.points.add(point(1L, "41192D000001265", "1465공"));
+        points.points.add(point(2L, "41192D000001266", "1466공"));
+        fake.records.add(record(1L, SurveyResult.LOST, "2026-08-10T09:00:00+09:00", "표지 없음"));
+        fake.records.add(record(2L, SurveyResult.INTACT, "2026-08-12T09:00:00+09:00", null));
+
+        List<SurveyRecordBrief> all = tools.getSurveyRecords(1L, null, null);
+        assertEquals(List.of("1466공", "1465공"), all.stream().map(SurveyRecordBrief::name).toList());
+        assertEquals(LocalDate.of(2026, 8, 12), all.getFirst().surveyedOn());
+        assertEquals("황인우", all.getFirst().surveyorName());
+
+        List<SurveyRecordBrief> lost = tools.getSurveyRecords(1L, "망실", null);
+        assertEquals(1, lost.size());
+        assertEquals("41192D000001265", lost.getFirst().pointNo());
+        assertEquals("표지 없음", lost.getFirst().note());
+
+        assertEquals(1, tools.getSurveyRecords(1L, null, 1).size());
+    }
+
+    private static ControlPoint point(Long id, String pointNo, String name) {
+        return ControlPoint.restore(
+                id, pointNo, PointType.DOGEUN, name,
+                new TmCoordinate(CoordinateSystem.GRS80_CENTRAL, new BigDecimal("545236.77"), new BigDecimal("181840.96")),
+                new GeoCoordinate(126.794623, 37.506423),
+                null, null, null, null, null, null, null, null, null);
+    }
+
+    private static SurveyRecordSummary record(Long pointId, SurveyResult result, String surveyedAt, String note) {
+        return new SurveyRecordSummary(
+                SurveyRecord.restore(1L, pointId, result, OffsetDateTime.parse(surveyedAt), note, 12L),
+                "황인우");
+    }
+
+    /** 기준점 조회 유스케이스 페이크 — 기록에 붙일 이름만 준다. */
+    private static class FakePoints implements GetControlPointsUseCase {
+
+        final List<ControlPoint> points = new ArrayList<>();
+
+        @Override
+        public List<ControlPoint> getAll() {
+            return points;
+        }
+
+        @Override
+        public ControlPoint getByPointNo(String pointNo) {
+            throw new UnsupportedOperationException("조사 기록 도구는 관리번호로 찾지 않는다");
+        }
+
+        @Override
+        public com.is.bcs.application.dto.ControlPointCountSummary getCountSummary() {
+            throw new UnsupportedOperationException("조사 기록 도구는 개수를 세지 않는다");
+        }
+
+        @Override
+        public com.is.bcs.application.dto.LastSurveySummary getLastSurvey(Long pointId) {
+            throw new UnsupportedOperationException("조사 기록 도구는 최종조사를 읽지 않는다");
+        }
+
+        @Override
+        public List<com.is.bcs.application.dto.PointLastSurvey> getLastSurveys() {
+            throw new UnsupportedOperationException("조사 기록 도구는 점 전체의 최종조사를 읽지 않는다");
+        }
+    }
+
     /** 조사 조회 유스케이스 페이크. */
     private static class FakeSurveys implements GetSurveyProjectsUseCase, GetSurveyRecordsUseCase {
 
         final Map<Long, SurveyProject> projects = new HashMap<>();
+        final Map<Long, Long> targetCounts = new HashMap<>();
+        final Map<Long, Long> surveyedCounts = new HashMap<>();
+        final List<SurveyRecordSummary> records = new ArrayList<>();
         SurveyProgress progress;
         Long progressProjectId; // getProgress에 전달된 id 기록 — 도구가 올바른 id를 넘기는지 검증용
 
@@ -139,7 +224,13 @@ class SurveyChatToolsTest {
 
         @Override
         public List<com.is.bcs.application.dto.SurveyProjectSummary> getSummaries() {
-            throw new UnsupportedOperationException("챗봇 도구는 목록 요약을 쓰지 않는다");
+            return projects.values().stream()
+                    .map(project -> new com.is.bcs.application.dto.SurveyProjectSummary(
+                            project,
+                            targetCounts.getOrDefault(project.getId(), 0L),
+                            surveyedCounts.getOrDefault(project.getId(), 0L),
+                            null))
+                    .toList();
         }
 
         @Override
@@ -153,7 +244,7 @@ class SurveyChatToolsTest {
 
         @Override
         public List<SurveyRecordSummary> getByProjectId(Long projectId) {
-            return List.of();
+            return records;
         }
 
         @Override
