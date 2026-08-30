@@ -71,7 +71,8 @@ public class MemberAdminQueryAdapter implements GetMemberAdminPort {
                 entity.getTeam(),
                 entity.getPosition(),
                 entity.getStatus(),
-                entity.getRole()
+                entity.getRole(),
+                entity.getProfileImagePath()
         );
     }
 

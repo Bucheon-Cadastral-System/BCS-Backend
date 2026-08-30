@@ -65,7 +65,8 @@ public class MemberAdminController {
                         team,
                         position,
                         status,
-                        role
+                        role,
+                        null
                 );
 
         Page<MemberAdminResponse> response = getMemberAdminUseCase

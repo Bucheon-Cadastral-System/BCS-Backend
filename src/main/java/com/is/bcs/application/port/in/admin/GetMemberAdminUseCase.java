@@ -20,7 +20,8 @@ public interface GetMemberAdminUseCase {
             Team team,
             Position position,
             MemberStatus status,
-            MemberRole role
+            MemberRole role,
+            String profileImagePath
     ) {
     }
 
@@ -34,7 +35,8 @@ public interface GetMemberAdminUseCase {
             Team team,
             Position position,
             MemberStatus status,
-            MemberRole role
+            MemberRole role,
+            String profileImagePath
     ) {
     }
 }

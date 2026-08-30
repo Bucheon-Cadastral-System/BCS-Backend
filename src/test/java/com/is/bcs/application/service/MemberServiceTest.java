@@ -31,6 +31,7 @@ class MemberServiceTest {
                 "홍길동",
                 "01012345678",
                 "hong@example.com",
+                null,
                 District.WONMI,
                 "민원지적과",
                 Team.CADASTRAL_MANAGEMENT,

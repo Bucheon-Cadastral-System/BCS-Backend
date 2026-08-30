@@ -79,12 +79,17 @@ class OAuthLoginServiceTest {
         }
 
         @Override
+        public Optional<Member> findByIdForUpdate(Long memberId) {
+            return findById(memberId);
+        }
+
+        @Override
         public Member save(Member member) {
             saveCount++;
             long id = member.getId() != null ? member.getId() : ++sequence;
             Member saved = Member.restore(
                     id, member.getProvider(), member.getProviderUserId(),
-                    member.getName(), member.getPhone(), member.getEmail(),
+                    member.getName(), member.getPhone(), member.getEmail(),member.getProfileImagePath(),
                     member.getDistrict(), member.getDepartment(), member.getTeam(), member.getPosition(),
                     member.getRole(), member.getStatus(),
                     member.getRequestedAt(), member.getApprovedAt(), member.getDeactivatedAt()
