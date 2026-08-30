@@ -78,12 +78,17 @@ public class MemberService implements CompleteMemberProfileUseCase, GetMemberSta
                 member.getTeam(),
                 member.getPosition(),
                 member.getRole(),
-                member.getStatus()
+                member.getStatus(),
+                hasProfileImage(member)
         );
     }
 
     private Member getMember(Long memberId) {
         return loadMemberPort.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException( "회원을 찾을 수 없습니다. memberId=" + memberId));
+    }
+
+    private static boolean hasProfileImage(Member member) {
+        return member.getProfileImagePath() != null && !member.getProfileImagePath().isBlank();
     }
 }

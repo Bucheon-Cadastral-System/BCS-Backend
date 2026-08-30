@@ -18,7 +18,8 @@ public record MemberProfileResponse(
         Team team,
         Position position,
         MemberRole role,
-        MemberStatus status
+        MemberStatus status,
+        String profileImageUrl
 ) {
 
     public static MemberProfileResponse from(GetMyProfileUseCase.Result result) {
@@ -32,8 +33,17 @@ public record MemberProfileResponse(
                 result.team(),
                 result.position(),
                 result.role(),
-                result.status()
+                result.status(),
+                toProfileImageUrl(result)
         );
+    }
+
+    private static String toProfileImageUrl(GetMyProfileUseCase.Result result) {
+        if (!result.profileImageRegistered()) {
+            return null;
+        }
+
+        return "/api/members/%d/profile-image".formatted(result.id());
     }
 
 

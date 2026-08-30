@@ -56,6 +56,9 @@ public class MemberJpaEntity extends BaseTime {
     @Column(name = "email", length = 255)
     private String email;
 
+    @Column(name = "profile_image_path", length = 500)
+    private String profileImagePath;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "district", length = 30)
     private District district;
@@ -107,6 +110,7 @@ public class MemberJpaEntity extends BaseTime {
             String name,
             String phone,
             String email,
+            String profileImagePath,
             District district,
             String department,
             Team team,
@@ -123,6 +127,7 @@ public class MemberJpaEntity extends BaseTime {
         this.name = name;
         this.phone = phone;
         this.email = email;
+        this.profileImagePath = profileImagePath;
         this.district = district;
         this.department = department;
         this.team = team;
@@ -142,6 +147,7 @@ public class MemberJpaEntity extends BaseTime {
                 member.getName(),
                 member.getPhone(),
                 member.getEmail(),
+                member.getProfileImagePath(),
                 member.getDistrict(),
                 member.getDepartment(),
                 member.getTeam(),
@@ -162,6 +168,7 @@ public class MemberJpaEntity extends BaseTime {
                 name,
                 phone,
                 email,
+                profileImagePath,
                 district,
                 department,
                 team,

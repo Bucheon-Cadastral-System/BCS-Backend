@@ -50,7 +50,8 @@ class MemberControllerTest {
                 Team.CADASTRAL_MANAGEMENT,
                 Position.OFFICER,
                 MemberRole.USER,
-                MemberStatus.ACTIVE
+                MemberStatus.ACTIVE,
+                true
         );
         when(getMyProfileUseCase.getProfile(7L)).thenReturn(result);
 
@@ -62,5 +63,6 @@ class MemberControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(7L, response.getBody().id());
         assertEquals("홍길동", response.getBody().name());
+        assertEquals("/api/members/7/profile-image", response.getBody().profileImageUrl());
     }
 }

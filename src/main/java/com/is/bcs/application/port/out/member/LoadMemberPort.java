@@ -11,4 +11,6 @@ public interface LoadMemberPort {
 
     Optional<Member> findByProviderAndProviderUserId(OAuthProvider provider, String providerUserId);
 
+    Optional<Member> findByIdForUpdate(Long memberId);
+
 }
