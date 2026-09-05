@@ -13,6 +13,10 @@ import com.is.bcs.domain.member.Team;
  *
  * <p>인증만 하면 누구나 회원 번호를 바꿔 가며 물을 수 있는 경로다. 여기에 칸을 더하면 그 값이 전 회원분
  * 열리는 것과 같으므로, 칸이 늘면 시험이 깨지게 두었다(MemberSummaryResponseTest).
+ *
+ * <p>프로필 이미지 경로는 그 기준을 통과해 싣는다. 이미지 자체가 이미 활성 회원 누구에게나 열려 있어
+ * (GET /api/members/{memberId}/profile-image) 이 칸이 새로 여는 값은 없고, 등록 여부를 모르는 화면이
+ * 없는 이미지를 조회하던 왕복만 사라진다.
  */
 public record MemberSummaryResponse(
         Long id,
@@ -22,7 +26,8 @@ public record MemberSummaryResponse(
         District district,
         String department,
         Team team,
-        Position position
+        Position position,
+        String profileImageUrl
 ) {
 
     public static MemberSummaryResponse from(GetMyProfileUseCase.Result result) {
@@ -34,7 +39,8 @@ public record MemberSummaryResponse(
                 result.district(),
                 result.department(),
                 result.team(),
-                result.position()
+                result.position(),
+                ProfileImageUrl.of(result)
         );
     }
 }

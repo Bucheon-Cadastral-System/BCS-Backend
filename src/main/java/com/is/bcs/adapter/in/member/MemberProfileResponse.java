@@ -1,6 +1,5 @@
 package com.is.bcs.adapter.in.member;
 
-import com.is.bcs.application.port.in.admin.GetMemberAdminUseCase;
 import com.is.bcs.application.port.in.member.GetMyProfileUseCase;
 import com.is.bcs.domain.member.District;
 import com.is.bcs.domain.member.MemberRole;
@@ -34,17 +33,7 @@ public record MemberProfileResponse(
                 result.position(),
                 result.role(),
                 result.status(),
-                toProfileImageUrl(result)
+                ProfileImageUrl.of(result)
         );
     }
-
-    private static String toProfileImageUrl(GetMyProfileUseCase.Result result) {
-        if (!result.profileImageRegistered()) {
-            return null;
-        }
-
-        return "/api/members/%d/profile-image".formatted(result.id());
-    }
-
-
 }
