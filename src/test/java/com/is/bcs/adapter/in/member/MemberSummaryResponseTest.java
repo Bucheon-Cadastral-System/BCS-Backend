@@ -18,12 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MemberSummaryResponseTest {
 
     @Test
-    @DisplayName("회원 신원 응답은 정해진 여덟 칸만 담는다")
+    @DisplayName("회원 신원 응답은 정해진 아홉 칸만 담는다")
     void allowedFields() {
         List<String> fields = Arrays.stream(MemberSummaryResponse.class.getRecordComponents())
                 .map(RecordComponent::getName)
                 .toList();
 
-        assertEquals(List.of("id", "name", "phone", "email", "district", "department", "team", "position"), fields);
+        assertEquals(
+                List.of("id", "name", "phone", "email", "district", "department", "team", "position", "profileImageUrl"),
+                fields);
     }
 }
