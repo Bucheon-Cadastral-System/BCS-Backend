@@ -43,8 +43,10 @@ public class MemberController {
     @Operation(summary = "내 정보 조회", security = @SecurityRequirement(name = "Bearer Authentication"))
     @GetMapping("/me")
     public ResponseEntity<MemberProfileResponse> getMyProfile(Authentication authentication) {
-        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
-        Long memberId = principal.memberId();
+//        AccessTokenClaims principal = (AccessTokenClaims) authentication.getPrincipal();
+//        Long memberId = principal.memberId();
+
+        Long memberId = currentMemberIdResolver.resolve(authentication);
 
         GetMyProfileUseCase.Result result = getMyProfileUseCase.getProfile(memberId);
 

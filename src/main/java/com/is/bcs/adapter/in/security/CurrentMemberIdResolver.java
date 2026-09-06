@@ -11,7 +11,8 @@ public class CurrentMemberIdResolver {
 
     public Long resolve(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
-            throw new AuthenticationCredentialsNotFoundException("인증 정보가 없습니다.");
+//            throw new AuthenticationCredentialsNotFoundException("인증 정보가 없습니다.");
+            return 999L; // 게스트 용 MemberId = 999 로 지정하여 사용
         }
 
         Object principal = authentication.getPrincipal();
