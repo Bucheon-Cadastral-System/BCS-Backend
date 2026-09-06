@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - ai-championship
+      - main
 
 concurrency:
   group: production-deploy

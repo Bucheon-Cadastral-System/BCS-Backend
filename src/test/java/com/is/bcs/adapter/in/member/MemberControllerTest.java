@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,20 +41,7 @@ class MemberControllerTest {
                 Instant.parse("2026-07-30T00:00:00Z"),
                 Instant.parse("2026-07-30T01:00:00Z")
         );
-        GetMyProfileUseCase.Result result = new GetMyProfileUseCase.Result(
-                7L,
-                "홍길동",
-                "01012345678",
-                "hong@example.com",
-                District.WONMI,
-                "민원지적과",
-                Team.CADASTRAL_MANAGEMENT,
-                Position.OFFICER,
-                MemberRole.USER,
-                MemberStatus.ACTIVE,
-                true
-        );
-        when(getMyProfileUseCase.getProfile(7L)).thenReturn(result);
+        when(getMyProfileUseCase.getProfile(7L)).thenReturn(profile(7L, true));
 
         var response = controller.getMyProfile(
                 new UsernamePasswordAuthenticationToken(claims, null, List.of())
@@ -64,5 +52,40 @@ class MemberControllerTest {
         assertEquals(7L, response.getBody().id());
         assertEquals("홍길동", response.getBody().name());
         assertEquals("/api/members/7/profile-image", response.getBody().profileImageUrl());
+    }
+
+    @Test
+    void getMemberSummaryCarriesImagePathOnlyForRegisteredImage() {
+        GetMyProfileUseCase getMyProfileUseCase = mock(GetMyProfileUseCase.class);
+
+        MemberController controller = new MemberController(
+                mock(CompleteMemberProfileUseCase.class),
+                mock(GetMemberStateUseCase.class),
+                getMyProfileUseCase,
+                mock(UpdateMemberProfileUseCase.class),
+                mock(CurrentMemberIdResolver.class)
+        );
+
+        when(getMyProfileUseCase.getProfile(7L)).thenReturn(profile(7L, true));
+        when(getMyProfileUseCase.getProfile(9L)).thenReturn(profile(9L, false));
+
+        assertEquals("/api/members/7/profile-image", controller.getMemberSummary(7L).getBody().profileImageUrl());
+        assertNull(controller.getMemberSummary(9L).getBody().profileImageUrl());
+    }
+
+    private static GetMyProfileUseCase.Result profile(Long memberId, boolean profileImageRegistered) {
+        return new GetMyProfileUseCase.Result(
+                memberId,
+                "홍길동",
+                "01012345678",
+                "hong@example.com",
+                District.WONMI,
+                "민원지적과",
+                Team.CADASTRAL_MANAGEMENT,
+                Position.OFFICER,
+                MemberRole.USER,
+                MemberStatus.ACTIVE,
+                profileImageRegistered
+        );
     }
 }
