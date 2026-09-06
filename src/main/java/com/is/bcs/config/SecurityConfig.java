@@ -66,6 +66,11 @@ public class SecurityConfig {
                         // /error 재디스패치를 다시 차단하지 않는다.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 
+                        // 관리자 API
+                        .requestMatchers(
+                                "/api/admin/**"
+                        ).hasRole("ADMIN")
+
                         // 인증 및 가입 과정
                         .requestMatchers(
                                 "/oauth2/**",
@@ -75,6 +80,12 @@ public class SecurityConfig {
                                 "/api/auth/token/refresh",
                                 "/api/auth/logout",
                                 "/api/csrf"
+                        ).permitAll()
+
+                        // Ai-Championship (원티드 대회용)
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/**"
                         ).permitAll()
 
                         // 게스트에게 공개하는 기준점 기본 정보
@@ -93,11 +104,6 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/members/me/state"
                         ).authenticated()
-
-                        // 관리자 API
-                        .requestMatchers(
-                                "/api/admin/**"
-                        ).hasRole("ADMIN")
 
                         // 모든 회원의 기준점 등록·수정·삭제
                         .requestMatchers(
